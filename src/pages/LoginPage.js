@@ -26,6 +26,14 @@ const LoginPage = () => {
         localStorage.setItem('user', JSON.stringify({
           username: formData.username
         }));
+
+        // Set initial active status
+        await axios.post(
+          'https://obc.work.gd/api/update-status/',
+          { status: 'active' },
+          { headers: { 'Authorization': `Token ${response.data.token}` }}
+      );
+
         navigate('/');
       }
     } catch (err) {

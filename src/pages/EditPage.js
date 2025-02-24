@@ -17,6 +17,68 @@ import LocationSearch from './locationsearch.js';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import JobCard from './JobCard';
+import Bill from './bill.js';
+import Estimate from './estimate.js';
+import { FaCheckCircle, FaTimesCircle } from 'react-icons/fa'; // Add this import 18 feb
+
+
+// Add this before the EditPage component definition 18-2
+const initialFormState = {
+  overview: {
+    tableData: [],
+    total: 0
+  },
+  customerInfo: {
+    mobileNumber: '',
+    customerName: '',
+    source: '',
+    whatsappNumber: '',
+    customerEmail: '',
+    languageBarrier: false
+  },
+  location: {
+    address: '',
+    city: '',
+    state: '',
+    buildingName: '',
+    mapLink: '',
+    landmark: ''
+  },
+  cars: [], // Array to store multiple cars
+  activeCar: null, // Currently selected car
+  arrivalStatus: {
+    leadStatus: '',
+    arrivalMode: '',
+    disposition: '',
+    dateTime: '',
+    batteryFeature: '',
+    fuelStatus: '',
+    speedometerRd: '',
+    inventory: [],
+    carDocumentDetails: [],
+    otherCheckList: [],
+    jobCardNumber: '',
+    estimatedDeliveryTime: '',
+    orderId: 'NA', // Add this new field
+  },
+  workshop: {
+    name: '',
+    mechanic: '',
+    locality: '',
+    mobile: '',
+    status: 'Open'
+  },
+  basicInfo: {
+    carType: '',
+    caName: '',
+    cceName: '', // Will be initialized with user's username
+    caComments: '',
+    cceComments: '',
+    total: 0
+  },
+  created_at: null,
+  updated_at: null,
+};
 
 const EditPage = () => {
   const { id } = useParams();
@@ -27,6 +89,9 @@ const EditPage = () => {
   const seqNum = location.state?.seqNum;
   const [editingCar, setEditingCar] = useState(null);
   const [validationErrors, setValidationErrors] = useState({});
+  const [showPopup, setShowPopup] = useState(false);
+  const [discount, setDiscount] = useState(0);
+  const [cards, setCards] = useState(false);
 
 
 
@@ -37,6 +102,8 @@ const EditPage = () => {
 
   const addressInputRef = useRef(null);
   const jobCardRef = useRef(null);
+  const billRef = useRef(null);
+  const estimateRef = useRef(null);
 
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -76,6 +143,54 @@ const EditPage = () => {
     setShowGaragePopup(false);
   };
 
+  // 18 feb start
+
+  const StatusHistoryDisplay = ({ statusHistory }) => {
+    const hasStatus = (statusToCheck) => {
+      // Add debug logs
+      console.log('Status History:', statusHistory);
+      console.log('Checking for:', statusToCheck);
+      
+      if (!statusHistory) return false;
+      
+      const found = statusHistory.some(entry => 
+        entry.status.toLowerCase().trim() === statusToCheck.toLowerCase().trim()
+      );
+      
+      console.log(`${statusToCheck} found:`, found);
+      return found;
+    };
+  
+    // Define status checks in display order with exact matching strings
+    const statusChecks = [
+      { name: 'Job Card', present: hasStatus('Job Card') },
+      { name: 'Estimate', present: hasStatus('Estimate') },
+      { name: 'Bill', present: hasStatus('Bill') },
+      { name: 'Completed', present: hasStatus('Completed') }
+    ];
+  
+    return (
+      <div className="p-4">
+        <div className="grid gap-4">
+          {statusChecks.map((status, index) => (
+            <div 
+              key={index}
+              className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
+            >
+              <span className="font-medium">{status.name}</span>
+              {status.present ? (
+                <FaCheckCircle className="text-green-500 text-xl" />
+              ) : (
+                <FaTimesCircle className="text-red-500 text-xl" />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+  // 18 feb end
+
 
 //   const generateOrderId = (mobileNumber) => {
 //   // Get current time in IST
@@ -104,6 +219,8 @@ const EditPage = () => {
       tableData: [],
       caComments: '',
       total: 0,
+      discount: 0, // Add this new field
+      finalAmount: 0, // Add this new field
     },
     customerInfo: {
       mobileNumber: '',
@@ -132,9 +249,13 @@ const EditPage = () => {
       fuelStatus: '', // Add this new field
       speedometerRd: '', // Add this new field
       inventory: [],
+      additionalWork: '',
       carDocumentDetails: [],
       otherCheckList: [],
       estimatedDeliveryTime: '', // Add this new field
+      status_history: [], // 18 feb
+      finalAmount: 0,
+      orderId: 'NA', // Add this new field
     },
     workshop: {
       name: selectedGarage.name,
@@ -195,6 +316,17 @@ const EditPage = () => {
           
           // Restructure the incoming data to match formState structure
           const leadData = response.data[0];
+
+          const customerResponse = await axios.get(
+            `https://obc.work.gd/api/customers/${leadData.number}/`,
+            {
+              headers: {
+                'Authorization': `Token ${token}`
+              }
+            }
+          );
+  
+
           const technicianComments = leadData.products?.map(product => 
             product.name ? `${product.name} to be done` : ''
           )//14-2
@@ -207,6 +339,8 @@ const EditPage = () => {
               tableData: leadData.products || [],
               caComments: technicianComments, //14-2
               total: leadData.estimated_price || 0,
+              discount: leadData.overview.discount || 0, // Add this new field
+              finalAmount: leadData.overview.finalAmount || leadData.overview.total || 0, // Add this new field
             },
             customerInfo: {
               mobileNumber: leadData.number || '',
@@ -241,6 +375,15 @@ const EditPage = () => {
               dateTime: leadData.arrival_time ? new Date(leadData.arrival_time).toISOString().slice(0, 16) : '',
               jobCardNumber: leadData.job_card_number || '', // Add this new field
               estimatedDeliveryTime: leadData.estimated_delivery_time ? new Date(leadData.estimated_delivery_time).toISOString().slice(0, 16) : '', // Add this new field
+              status_history: leadData.status_history || [], // 18 feb
+              finalAmount: leadData.final_amount || 0,
+              batteryFeature: leadData.battery_feature || '', // Add this new field
+              additionalWork: leadData.additional_work || '',
+              fuelStatus: leadData.fuel_status || '', // Add this new field 
+              speedometerRd: leadData.speedometer_rd || '', // Add this new field
+              inventory: leadData.inventory || [],
+              orderId: leadData.orderId || 'NA' // Add this new field
+              
             },
             workshop: {
               name: leadData.workshop_details?.name || '',
@@ -260,6 +403,14 @@ const EditPage = () => {
             created_at: leadData.created_at,
             updated_at: leadData.updated_at,
           });
+
+          setDiscount(leadData.overview.discount || 0); // Add this new field
+          
+
+          // Check if orderId is not 'NA' and set cards to true
+        if (leadData.orderId && leadData.orderId !== 'NA') {
+          setCards(true);
+        }
 
           // Also update selectedGarage if workshop data exists
           if (leadData.workshop_details) {
@@ -335,7 +486,9 @@ const EditPage = () => {
       overview: {
         ...prev.overview,
         tableData: newTableData,
-        total: newTotal || 0
+
+        total: newTotal || 0,
+        finalAmount: newTotal || 0 // Sync final amount with total
       },
       basicInfo: {
         ...prev.basicInfo,
@@ -430,7 +583,7 @@ const EditPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  const handleInputChange = (section, field, value) => {
+  const handleInputChange = async (section, field, value) => {
     setFormState(prev => ({
       ...prev,
       [section]: {
@@ -438,7 +591,52 @@ const EditPage = () => {
         [field]: value
       }
     }));
+  
+    // If the field is mobileNumber and length is 10, fetch customer data
+    if (section === 'customerInfo' && field === 'mobileNumber' && value.length === 10) {
+      try {
+        const response = await axios.get(
+          `https://obc.work.gd/api/customers/${value}/`,
+          {
+            headers: {
+              'Authorization': `Token ${token}`
+            }
+          }
+        );
+  
+        const customerData = response.data;
+        
+        // Update form state with fetched data
+        setFormState(prev => ({
+          ...prev,
+          customerInfo: {
+            ...prev.customerInfo,
+            customerName: customerData.customerName || '',
+            whatsappNumber: customerData.whatsappNumber || '',
+            customerEmail: customerData.customerEmail || '',
+            languageBarrier: customerData.languageBarrier || false
+          },
+          location: {
+            ...prev.location,
+            address: customerData.location?.address || '',
+            city: customerData.location?.city || '',
+            state: customerData.location?.state || '',
+            buildingName: customerData.location?.buildingName || '',
+            landmark: customerData.location?.landmark || '',
+            mapLink: customerData.location?.mapLink || ''
+          },
+          // cars: customerData.cars || []
+        }));
+      } catch (error) {
+        if (error.response?.status !== 404) {
+          console.error('Error fetching customer data:', error);
+        }
+      }
+    }
   };
+
+ 
+  
 
   const handleAddCar = (carData, isEdit) => {
     if (isEdit) {
@@ -522,6 +720,13 @@ const EditPage = () => {
   // Modify handleSubmit to handle both create and update
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+     // Check if the previous status is "Completed"
+  if (location.state?.previousStatus === "Completed") {
+    setShowPopup(true);
+    return;
+  }
+
     setIsSubmitting(true);
     
     const errors = validateForm();
@@ -771,8 +976,8 @@ const formattedData = [
         title: "Comprehensive Service",
         duration: "6 Hrs Taken",
         frequency: "Every 10,000 km (Recommended)",
-        workshopServices: "<ul><li>Engine Oil Replacement</li><li>Oil Filter Replacement</li><li>Air Filter Check & Clean</li><li>Brake Fluid Top-up</li></ul>",
-        doorstepServices: "<ul><li>AC Gas Checking</li><li>Battery Water Top-up</li><li>Tyre Pressure Check</li><li>Basic Diagnostics</li></ul>",
+        workshopServices: "<ul><li>Engine Oil Replacement (Fully Synthetic)</li><li>Air Filter Replacement</li><li>Oil Filter Replacement</li><li>AC Filter Replacement</li><li>Wiper Fluid Replacement</li><li>Battery Water Top Up</li><li>Coolant Top Up (300 ml)</li><li>Brake Fluid Top Up</li><li>All brake pads cleaning</li><li>Clutch plate check up</li><li>AC check up</li><li>Car Wash</li><li>All suspension check up</li><li>ECM Errors Check & Reset</li><li>Spark/Heater Plugs Checking</li><li>Fuel Filter Checking</li><li>Interior Cleaning</li><li>Tyre Alignment Check</li><li>Tyre Balancing Check</li><li>4 door greasing</li><li>Dashboard polish</li><li>Tyre polish</li><li>car wash</li><li>Car Scanning</li><li>Anti Rat Treatment</li><li>AC Vent Fumigation</li></ul>",
+        doorstepServices: "<ul><li>Engine Oil Replacement (Fully Synthetic)</li><li>Air Filter Replacement</li><li>Oil Filter Replacement</li><li>AC Filter Replacement</li><li>Wiper Fluid Replacement</li><li>Battery Water Top Up</li><li>Coolant Top Up (300 ml)</li><li>Brake Fluid Top Up</li><li>Front Brake Pads Check</li><li>Rear Brake Pads Check</li><li>ECM Errors Check & Reset</li><li>Tyre Alignment Check</li><li>Tyre Balancing Check</li><li>Car Scanning</li><li>Anti Rat Treatment</li><li>AC Vent Fumigation</li></ul>",
         price: "Determine"
       },
       {
@@ -780,8 +985,9 @@ const formattedData = [
         title: "Standard Service",
         duration: "4 Hrs Taken",
         frequency: "Every 5,000 km (Recommended)",
-        workshopServices: "<ul><li>Engine Oil Change</li><li>Oil Filter Change</li><li>Coolant Top-up</li></ul>",
-        doorstepServices: "<ul><li>Air Filter Clean</li><li>Battery Check</li><li>Washer Fluid Top-up</li></ul>",
+        workshopServices: "<ul><li>Engine Oil Replacement (Fully Synthetic)</li><li>Air Filter Replacement</li><li>Oil Filter Replacement</li><li>Wiper Fluid Replacement</li><li>AC Filter Cleaning</li><li>Car Scanning</li><li>Front Brake Pads Check</li><li>Car Wash</li><li>Rear Brake Pads Check</li><li>Spark/Heater Plugs Checking</li><li>Fuel Filter Checking</li><li>Coolant Top Up (200 ml)</li><li>Brake Fluid Top Up</li><li>Battery Water Top Up</li></ul>",
+        doorstepServices: "<ul><li>Engine Oil Replacement (Fully Synthetic)</li><li>Air Filter Replacement</li><li>Oil Filter Replacement</li><li>Wiper Fluid Replacement</li><li>AC Filter Cleaning</li><li>Car Scanning</li><li>Front Brake Pads Check</li><li>Rear Brake Pads Check</li><li>Fuel Filter Checking</li><li>Coolant Top Up (200 ml)</li><li>Brake Fluid Top Up</li><li>Battery Water Top Up</li></ul>",
+        
         price: "Determine"
       },
       {
@@ -789,8 +995,8 @@ const formattedData = [
         title: "Basic Service",
         duration: "2 Hrs Taken",
         frequency: "Every 3,000 km (Recommended)",
-        workshopServices: "<ul><li>Engine Oil Top-up</li><li>Basic Inspection</li></ul>",
-        doorstepServices: "<ul><li>Fluid Level Check</li><li>Tyre Pressure Check</li></ul>",
+        workshopServices: "<ul><li>Engine Oil Replacement (Fully Synthetic)</li><li>Wiper Fluid Replacement</li><li>Oil Filter Replacement</li><li>Air Filter Cleaning</li><li>Spark/Heater Plugs Checking</li><li>Coolant Top Up (200 ml)</li><li>Battery Water Top Up</li></ul>",
+        doorstepServices: "<ul><li>Engine Oil Replacement (Fully Synthetic)</li><li>Wiper Fluid Replacement</li><li>Oil Filter Replacement</li><li>Air Filter Cleaning</li><li>Coolant Top Up (200 ml)</li><li>Battery Water Top Up</li></ul>",
         price: "Determine"
       }
     ],
@@ -1693,6 +1899,26 @@ const formattedData = [
 
 // 2. Add state for job card modal
 const [showJobCard, setShowJobCard] = useState(false);
+const [showBill, setShowBill] = useState(false);
+const [showEstimate, setShowEstimate] = useState(false);
+
+
+const handleDiscountChange = (value) => {
+  const discountAmount = parseFloat(value) || 0;
+  const total = formState.overview.total || 0; //20-2
+  const finalAmount = Math.max(total - discountAmount, 0);
+  
+  
+  setDiscount(value);
+  setFormState(prev => ({
+    ...prev,
+    overview: {
+      ...prev.overview,
+      discount: discountAmount,
+      finalAmount: finalAmount
+    }
+  }));
+};
 
   // First, add the state for tracking active view
 const [activeViews, setActiveViews] = useState({
@@ -1763,29 +1989,61 @@ const [activeViews, setActiveViews] = useState({
   );
 
   // Add this function after other state definitions
-  const handleAddEmptyRow = () => {
-    const emptyRow = {
-      type: '',
-      name: '',
-      comments: '',
-      workdone: '',
-      determined: false,
-      qt: 1,
-      total: 0
-    };
+  // const handleAddEmptyRow = () => {
+  //   const emptyRow = {
+  //     type: '',
+  //     name: '',
+  //     comments: '',
+  //     workdone: '',
+  //     determined: false,
+  //     qt: 1,
+  //     total: 0
+  //   };
   
-    setFormState(prev => {
-      const newTableData = [...prev.overview.tableData, emptyRow];
-      return {
-        ...prev,
-        overview: {
-          ...prev.overview,
-          tableData: [...prev.overview.tableData, emptyRow],
-          total: calculateTotalAmount(newTableData)
-        }
-      };
-    });
+  //   setFormState(prev => {
+  //     const newTableData = [...prev.overview.tableData, emptyRow];
+  //     return {
+  //       ...prev,
+  //       overview: {
+  //         ...prev.overview,
+  //         tableData: [...prev.overview.tableData, emptyRow],
+  //         total: calculateTotalAmount(newTableData)
+  //       }
+  //     };
+  //   });
+  // };
+
+// Add this function after other state definitions
+const handleAddEmptyRow = () => {
+  const emptyRow = {
+    type: 'Service',
+    name: 'Sub Service',
+    comments: '',
+    workdone: 'Work to be done',
+    determined: false,
+    qt: 1,
+    total: 0
   };
+
+  setFormState(prev => {
+    const newTableData = [...prev.overview.tableData, emptyRow];
+    return {
+      ...prev,
+      overview: {
+        ...prev.overview,
+        tableData: newTableData,
+        total: calculateTotalAmount(newTableData)
+      },
+      basicInfo: {
+        ...prev.basicInfo,
+        caComments: newTableData
+          .map(row => `${row.name} to be done`)
+          .filter(Boolean)
+          .join('\n')
+      }
+    };
+  });
+};
 
   // First add this CSS at the top of your file or in your CSS file
 const serviceCardStyles = {
@@ -1830,6 +2088,20 @@ const shouldDisableOption = (optionValue, previousStatus) => {
   return false;
 };
 
+const fetchCustomerData = async (mobileNumber) => {
+  try {
+    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/customer/${mobileNumber}`, {
+      headers: {
+        'Authorization': `Token ${token}`,
+      }
+    });
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error fetching customer data:', error);
+    return null;
+  }
+};
 
 // 3. Add function to handle Generate Card button click
 const handleGenerateCard = async () => {
@@ -1849,6 +2121,42 @@ const handleGenerateCard = async () => {
   } finally {
     setShowJobCard(false);
   }
+};
+
+const handleGenerateBill = async () => {
+  setShowBill(true);
+  try {
+    // Wait longer for component to fully render
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    if (billRef.current) {
+      await billRef.current.generatePDF();
+    
+    } else {
+      throw new Error('Job card reference not available');
+    }
+  } catch (error) {
+    console.error('Error generating job card:', error);
+  } 
+};
+
+
+
+const handleGenerateEstimate = async () => {
+  setShowEstimate(true);
+  try {
+    // Wait longer for component to fully render
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    if (estimateRef.current) {
+      await estimateRef.current.generatePDF();
+    
+    } else {
+      throw new Error('Job card reference not available');
+    }
+  } catch (error) {
+    console.error('Error generating job card:', error);
+  } 
 };
 
   return (
@@ -1937,7 +2245,29 @@ const handleGenerateCard = async () => {
             </div>
 
 
-            <div className="dropdown-container" style={{ marginTop: "15px" }}>
+            {/* // Update your existing status history section 18 feb */ }
+<div className="dropdown-container" style={{ marginTop: "15px" }}>
+  <Button
+    onClick={() => setIsOpenLeft(!isOpenLeft)}
+    variant="dark"
+    className={`w-full d-flex justify-content-between align-items-center rounded-bottom-0 ${isOpenLeft ? 'border-bottom-0' : ''}`}
+  >
+    Status History
+    {isOpenLeft ? <FaChevronUp /> : <FaChevronDown />}
+  </Button>
+
+  <Collapse in={isOpenLeft}>
+    <div>
+      <Card className="rounded-top-0 border-top-0">
+        <Card.Body>
+          {/* 18 feb */}
+        <StatusHistoryDisplay statusHistory={formState.arrivalStatus.status_history || []} />  
+        </Card.Body>
+      </Card>
+    </div>
+  </Collapse>
+</div>
+            {/* <div className="dropdown-container" style={{ marginTop: "15px" }}>
               <Button
                 onClick={() => setIsOpenLeft(!isOpenLeft)}
                 variant="dark"
@@ -1956,7 +2286,7 @@ const handleGenerateCard = async () => {
                   </Card>
                 </div>
               </Collapse>
-            </div>
+            </div> */}
 
 
 
@@ -2110,7 +2440,13 @@ const handleGenerateCard = async () => {
                     placeholder="Mobile Number*"
                     required
                     maxLength={10}
-                    // pattern="\d{10}"
+  pattern="[0-9]{10}"
+  onKeyPress={(e) => {
+    // Only allow numbers
+    if (!/[0-9]/.test(e.key)) {
+      e.preventDefault();
+    }
+  }}
                   />
                   {validationErrors.mobileNumber && (
   <div className="text-red-500 text-xs mt-1">
@@ -2148,6 +2484,7 @@ const handleGenerateCard = async () => {
                     <option value="Instagram">Instagram</option>
                     <option value="Facebook">Facebook</option>
                     <option value="Reference">Reference</option>
+                    <option value="Repeat">Repeat</option>
                     <option value="B2B">B2B</option>
                     <option value="SMS">SMS</option>
                   </select>
@@ -2176,7 +2513,7 @@ const handleGenerateCard = async () => {
                 </div>
 
               {/* Replace language barrier button with checkbox */}
-<div className="flex-1">
+{/* <div className="flex-1">
   <label className="flex items-center space-x-2 cursor-pointer">
     <input
       type="checkbox"
@@ -2186,7 +2523,7 @@ const handleGenerateCard = async () => {
     />
     <span className="text-gray-700">Language Barrier</span>
   </label>
-</div>
+</div> */}
 
               </div>
 
@@ -2310,8 +2647,14 @@ const handleGenerateCard = async () => {
             </div>
 
             <div className="w-full p-2 rounded-lg">
-                      <div className="text-gray-700 mb-4 mt-3" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>Our Services</div>
-            
+                      <div className="text-gray-700 mb-4 mt-3" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>Our Feature Services</div>
+            <input
+            type="text"
+            placeholder="Search services..."
+            value={searchQuery}
+            onChange={handleSearchChange}
+            className="w-full p-2 mb-4 border rounded"
+          />
                       <div style={{ display: 'flex', flexWrap: 'wrap' }}> 
                         {services.map((service, index) => (
                           <Button 
@@ -2334,13 +2677,7 @@ const handleGenerateCard = async () => {
                       <div className="text-gray-700 mb-2 mt-3" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>Our Products</div>
           
           {/* Add Search Bar */}
-          <input
-            type="text"
-            placeholder="Search services..."
-            value={searchQuery}
-            onChange={handleSearchChange}
-            className="w-full p-2 mb-4 border rounded"
-          />
+          
 {/* search div product */}
 <div className="w-full">
             <div className="flex overflow-x-auto gap-4 p-4 scrollbar-hide snap-x snap-mandatory">
@@ -2502,6 +2839,28 @@ const handleGenerateCard = async () => {
                       />
                     </td>
                     <td className="p-3">
+  <textarea
+    value={row.workdone}
+    onChange={(e) => {
+      const newTableData = [...formState.overview.tableData];
+      newTableData[index].workdone = e.target.value;
+      setFormState(prev => ({
+        ...prev,
+        overview: {
+          ...prev.overview,
+          tableData: newTableData
+        }
+      }));
+    }}
+    onInput={(e) => {
+      e.target.style.height = 'auto';
+      e.target.style.height = `${e.target.scrollHeight}px`;
+    }}
+    className="w-full p-1 border rounded resize-none"
+    style={{ minHeight: '80px' }}
+  />
+</td>
+                    {/* <td className="p-3">
                       <input
                         type="text"
                         value={row.workdone}
@@ -2518,7 +2877,7 @@ const handleGenerateCard = async () => {
                         }}
                         className="w-full p-1 border rounded"
                       />
-                    </td>
+                    </td> */}
                     {/* <td className="p-3">
                       <input
                         type="checkbox"
@@ -2560,6 +2919,7 @@ const handleGenerateCard = async () => {
         type="number"
         value={row.total}
         onChange={(e) => handleTotalChange(index, e.target.value)}
+        min="0" // 18 Feb
         className="w-16 text-center p-1 border rounded"
       />
     </td>
@@ -2590,35 +2950,36 @@ const handleGenerateCard = async () => {
   </div>
 
   <div className="w-70 space-y-4">
+
+
+<div className="bg-gray-50 p-4 rounded space-y-4">
+  <div className="flex justify-between items-center">
+    <span>Sub Total: </span>
+    <span><strong>₹{formState.overview.total}</strong></span>
+  </div>
+  
+  <div className="flex justify-between items-center gap-4">
+    <span>Discount: </span>
+    <div className="flex items-center gap-2">
+      <input 
+        type="number"
+        min="0"
+        max={formState.overview.total}
+        value={discount}
+        onChange={(e) => handleDiscountChange(e.target.value)}
+        className="w-24 p-1 border rounded text-right"
+        placeholder="0"
+      />
+      <span className="text-gray-600">₹</span>
+    </div>
+  </div>
+
+  <div className="border-t pt-2 flex justify-between font-bold">
+    <span>Final Amount: </span>
+    <span>₹{formState.overview.finalAmount}</span>
+  </div>
+</div>
     
-
-    <div className='flex flex-row gap-3' style={{ float: "right" }}>
-      <div className='flex flex-col justify-center' >
-        {/* <Button 
-          variant="outline-dark" 
-          className="w-full" 
-          style={{ fontSize: "12px" }}
-          onClick={() => }
-        >
-          Send to Customer
-        </Button>
-        <Button 
-          variant="outline-dark" 
-          className="w-full mt-3" 
-          style={{ fontSize: "12px" }}
-          onClick={() => }
-        >
-          Download Estimate
-        </Button> */}
-      </div>
-
-      <div className="bg-gray-50 p-4 rounded space-y-2">
-      <div className="flex justify-between">
-        <span>Final Amount: </span>
-        <span><strong>{formState.overview.total}</strong></span>
-      </div>
-    </div>
-    </div>
   </div>
 </div>
           </div>
@@ -2635,7 +2996,8 @@ const handleGenerateCard = async () => {
               {/* Location Form */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 mt-4">
 
-              <select
+              {/* // Replace the wasJobCard condition with this */}
+<select
   value={formState.arrivalStatus.leadStatus}
   onChange={(e) => handleInputChange('arrivalStatus', 'leadStatus', e.target.value)}
   className="p-2 border border-gray-300 rounded-md"
@@ -2645,20 +3007,22 @@ const handleGenerateCard = async () => {
   <option value="Assigned" disabled={shouldDisableOption("Assigned", location.state?.previousStatus)}>Assigned</option>
   <option value="Follow Up" disabled={shouldDisableOption("Follow Up", location.state?.previousStatus)}>Follow Up</option>
   <option value="Dead" disabled={shouldDisableOption("Dead", location.state?.previousStatus)}>Dead</option>
+  <option value="Duplicate" disabled={shouldDisableOption("Duplicate", location.state?.previousStatus)}>Duplicate</option>
   <option value="Communicate To Ops" disabled={shouldDisableOption("Communicate To Ops", location.state?.previousStatus)}>Communicate To Ops</option>
   <option value="Referred To Ops" disabled={shouldDisableOption("Referred To Ops", location.state?.previousStatus)}>Referred To Ops</option>
-  <option value="Converted" disabled={shouldDisableOption("Converted", location.state?.previousStatus)}>Converted</option>
-  <option value="At Workshop" disabled={shouldDisableOption("At Workshop", location.state?.previousStatus)}>At Workshop</option>
+  {/* <option value="Converted" disabled={shouldDisableOption("Converted", location.state?.previousStatus)}>Converted</option> */}
+  
   {/* <option value="Completed" disabled={shouldDisableOption("Completed", location.state?.previousStatus)}>Completed</option> */}
   <option value="Walkin" disabled={shouldDisableOption("Walkin", location.state?.previousStatus)}>Walkin</option>
   <option value="Pickup" disabled={shouldDisableOption("Pickup", location.state?.previousStatus)}>Pickup</option>
   <option value="Doorstep" disabled={shouldDisableOption("Doorstep", location.state?.previousStatus)}>Doorstep</option>
+  <option value="At Workshop" disabled={shouldDisableOption("At Workshop", location.state?.previousStatus)}>At Workshop</option>
   <option value="Job Card" disabled={shouldDisableOption("Job Card", location.state?.previousStatus)}>Job Card</option>
   <option value="Estimate" disabled={shouldDisableOption("Estimate", location.state?.previousStatus)}>Estimate</option>
-  <option value="Bill" disabled={shouldDisableOption("Bill", location.state?.previousStatus)}>Bill</option>
+  {/* <option value="Bill" disabled={shouldDisableOption("Bill", location.state?.previousStatus)}>Bill</option> */}
   <option value="Completed" disabled={shouldDisableOption("Completed", location.state?.previousStatus)}>Completed</option>
-</select>
 
+</select>
 
 <select
                     value={formState.arrivalStatus.arrivalMode}
@@ -2685,6 +3049,9 @@ const handleGenerateCard = async () => {
   <option value="Wrong Number">Wrong Number</option>
   <option value="Out of Service Area">Out of Service Area</option>
   <option value="Invalid Lead">Invalid Lead</option>
+  <option value="Marketing Leads">Marketing Leads</option>
+  <option value="Workshop Tie-ups">Workshop Tie-ups</option>
+  <option value="Test Leads">Test Leads</option>
   <option value="Others">Others</option>
 </select>
                 <input
@@ -2702,6 +3069,8 @@ const handleGenerateCard = async () => {
                   required
                 />
 
+
+
     {/* New fields that appear when Job Card is selected */}
     {formState.arrivalStatus.leadStatus === 'Job Card' && (
       <>
@@ -2716,7 +3085,7 @@ const handleGenerateCard = async () => {
           type="text"
           value={formState.arrivalStatus.fuelStatus}
           onChange={(e) => handleInputChange('arrivalStatus', 'fuelStatus', e.target.value)}
-          placeholder="Fuel Status"
+          placeholder="Fuel Status (Ex. 50%)"
           className="p-2 border border-gray-300 rounded-md w-full"
         />
         
@@ -2732,7 +3101,7 @@ const handleGenerateCard = async () => {
   rows={4}
   style={{ resize: 'vertical' }}
 />
-<textarea
+{/* <textarea
   value={formState.arrivalStatus.carDocumentDetails}
   onChange={(e) => handleInputChange('arrivalStatus', 'carDocumentDetails', e.target.value)}
   placeholder="Document Details (one per line)
@@ -2753,7 +3122,7 @@ const handleGenerateCard = async () => {
   className="p-2 border border-gray-300 rounded-md w-full"
   rows={4}
   style={{ resize: 'vertical' }}
-/>
+/> */}
 
        <input
           type="text"
@@ -2762,6 +3131,15 @@ const handleGenerateCard = async () => {
           placeholder="Speedmometer Rd"
           className="p-2 border border-gray-300 rounded-md w-full"
         />
+       <input
+          type="text"
+          value={formState.arrivalStatus.additionalWork}
+          onChange={(e) => handleInputChange('arrivalStatus', 'additionalWork', e.target.value)}
+          placeholder="Additional Work"
+          className="p-2 border border-gray-300 rounded-md w-full"
+        />
+
+
         
         {/* <input
           type="text"
@@ -2778,6 +3156,36 @@ const handleGenerateCard = async () => {
         /> */}
       </>
     )}
+
+{formState.arrivalStatus.leadStatus === 'Completed' && (
+  <div className="mt-4 p-3 flex gap-4">
+    <div className="flex-1">
+      <input
+        type="number"
+        value={formState.arrivalStatus.finalAmount}
+        onChange={(e) => handleInputChange('arrivalStatus', 'finalAmount', e.target.value)}
+        placeholder="Final Amount"
+        className="w-full p-2 border border-gray-300 rounded-md"
+        required
+      />
+    </div>
+  </div>
+)}
+
+{/* {formState.arrivalStatus.leadStatus === 'Completed' && (
+  <div className="mt-4 p-3 flex gap-4">
+    <div className="flex-1">
+      <input
+        type="number"
+        value={formState.arrivalStatus.finalAmount}
+        onChange={(e) => handleInputChange('arrivalStatus', 'finalAmount', e.target.value)}
+        placeholder="Final Amount"
+        className="w-full p-2 border border-gray-300 rounded-md"
+        required
+      />
+    </div>
+  </div>
+)} */}
               </div>
 
 
@@ -2899,7 +3307,7 @@ const handleGenerateCard = async () => {
                   </Button>
                   
                   {/* Add Generate Card button when lead status is Job Card */}
-                  {(['Job Card', 'Estimate', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
+                  {cards && (['Job Card', 'Estimate', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
         <Button
             variant="outline-dark"
             type="button"
@@ -2908,8 +3316,46 @@ const handleGenerateCard = async () => {
         >
             Generate Card
         </Button>
-    )}
+
+        
                   
+        
+    )}
+
+{ cards && (['Job Card', 'Estimate', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
+   
+   
+   <Button
+   variant="outline-dark"
+   type="button"
+   disabled={isSubmitting}
+   onClick={handleGenerateEstimate}
+   >
+   Generate Estimate
+   </Button>
+
+)}
+
+    
+{/* <button 
+onClick={handleGenerateBill} 
+className="bg-blue-600 text-white px-4 py-2 rounded"
+>
+Generate Bill
+</button> */}
+
+{/* <Button
+    variant="outline-dark"
+    type="button"
+    disabled={isSubmitting}
+    onClick={handleGenerateBill}
+    >
+    Generate Bill
+    </Button> */}
+       
+
+
+
                   
                   <Button 
                     variant="danger" 
@@ -2925,6 +3371,22 @@ const handleGenerateCard = async () => {
                   {error}
                 </div>
               )} */}
+
+
+{showPopup && (
+  <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+    <div className="bg-white p-6 rounded shadow-lg">
+      <h2 className="text-xl font-bold mb-4">Cannot Edit Lead</h2>
+      <p>You cannot edit a lead after completion. In order to make any changes, please mail at info@onlybigcars.com.</p>
+      <button 
+        className="mt-4 px-4 py-2 bg-red-500 text-white rounded"
+        onClick={() => setShowPopup(false)}
+      >
+        Close
+      </button>
+    </div>
+  </div>
+)}
 
 {/* // Update the error display component */}
 {error && (
@@ -2970,13 +3432,14 @@ const handleGenerateCard = async () => {
         carModel: formState.cars[0]?.carModel || '',
         regNumber: formState.cars[0]?.regNo || '',
         carYearFuel: `${formState.cars[0]?.year || ''} ${formState.cars[0]?.fuel || ''}`,
-        orderId: formState.arrivalStatus.jobCardNumber || '',
+        orderId: formState.arrivalStatus.orderId || '',
         customerMobile: formState.customerInfo.mobileNumber,
         whatsappNum: formState.customerInfo.whatsappNumber,
         batteryFeature: formState.arrivalStatus.batteryFeature,
+        additionalWork: formState.arrivalStatus.additionalWork,
         inventory: formState.arrivalStatus.inventory,
-        carDocumentDetails: formState.arrivalStatus.carDocumentDetails,
-        otherCheckList: formState.arrivalStatus.otherCheckList,
+        // carDocumentDetails: formState.arrivalStatus.carDocumentDetails,
+        // otherCheckList: formState.arrivalStatus.otherCheckList,
         fuelStatus: formState.arrivalStatus.fuelStatus,
         speedometerRd: formState.arrivalStatus.speedometerRd,
         workshop: formState.workshop.name,
@@ -3007,13 +3470,118 @@ const handleGenerateCard = async () => {
         })),
         invoiceSummary: {
           netAmount: formState.overview.total,
-          discount: 0,
-          totalPayable: formState.overview.total
+          discount: parseFloat(discount) || 0,
+          // totalAmount: formState.overview.finalAmount,
+          totalPayable: formState.overview.finalAmount
         }
       }}
     />
   </div>
 )}
+
+
+{showBill && (
+  <div style={{ width: '100%', minHeight: '100vh', position: 'absolute', left: '-9999px' }}>
+    <Bill 
+      ref={billRef}
+      data={{
+        customerName: formState.customerInfo.customerName,
+        carBrand: formState.cars[0]?.carBrand || '',
+        carModel: formState.cars[0]?.carModel || '',
+        regNumber: formState.cars[0]?.regNo || '',
+        carYearFuel: `${formState.cars[0]?.year || ''} ${formState.cars[0]?.fuel || ''}`,
+        handoverDate: new Date(formState.arrivalStatus.dateTime).toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
+        }),
+        orderId: formState.arrivalStatus.jobCardNumber || '',
+        speedRd: formState.arrivalStatus.speedometerRd,
+        // If you have these fields in your formState, else use fallback values
+        carColor: formState.cars[0]?.color || '',
+        vinNo: formState.cars[0]?.vin || '',
+        customerAdd: formState.location.address || '',
+        workshop: formState.workshop.name,
+        // Convert invoiceSummary to an array as expected in Bill.js
+        invoiceSum: [
+          {
+            netAmt: formState.overview.total,
+            dis: 0,
+            totalPay: formState.overview.total
+          }
+        ],
+        // Adjust work details field names to match Bill.js
+        workDetail: formState.overview.tableData.map(item => ({
+          descriptions: item.type,
+          workDn: item.workdone,
+          quant: 1,
+          unitPr: parseFloat(item.total) || 0,
+          dis: 0,
+          netAmt: parseFloat(item.total) || 0
+        })),
+        totalUnitPriceBill: formState.overview.total,
+        totalDiscountedPriceBill: 0,
+        finalPriceBill: formState.overview.total,
+        totalPayablePriceBill: formState.overview.total
+      }}
+    />
+  </div>
+)}
+
+{showEstimate && (
+  <div style={{ width: '100%', minHeight: '100vh', position: 'absolute', left: '-9999px' }}>
+    <Estimate 
+      ref={estimateRef}
+      data={{
+        customerName: formState.customerInfo.customerName,
+        customerMobile: formState.customerInfo.mobileNumber,
+        orderId: formState.arrivalStatus.orderId || '',
+        batteryFeature: formState.arrivalStatus.batteryFeature,
+        additionalWork: formState.arrivalStatus.additionalWork,
+        carBrand: formState.cars[0]?.carBrand || '',
+        carModel: formState.cars[0]?.carModel || '',
+        regNumber: formState.cars[0]?.regNo || '',
+        carYearFuel: `${formState.cars[0]?.year || ''} ${formState.cars[0]?.fuel || ''}`,
+        fuelStatus: formState.arrivalStatus.fuelStatus,
+        handoverDate: new Date(formState.arrivalStatus.dateTime).toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
+        }),
+       
+        speedRd: formState.arrivalStatus.speedometerRd,
+        // If you have these fields in your formState, else use fallback values
+        carColor: formState.cars[0]?.color || '',
+        vinNo: formState.cars[0]?.vin || '',
+        customerAdd: formState.location.address || '',
+        workshop: formState.workshop.name,
+        // Convert invoiceSummary to an array as expected in Bill.js
+        invoiceSum: [
+          {
+            netAmt: formState.overview.total,
+            dis: formState.overview.discount,
+            totalPay: formState.overview.finalAmount
+          }
+        ],
+        // Adjust work details field names to match Bill.js
+        workDetail: formState.overview.tableData.map(item => ({
+          descriptions: item.type,
+          workDn: item.workdone,
+          quant: 1,
+          unitPr: parseFloat(item.total) || 0,
+          dis: 0,
+          netAmt: parseFloat(item.total) || 0
+        })),
+        totalUnitPriceBill: formState.overview.total,
+        totalDiscountedPriceBill: 0,
+        finalPriceBill: formState.overview.total,
+        totalPayablePriceBill: formState.overview.total,
+        totalPayable: formState.overview.finalAmount
+      }}
+    />
+  </div>
+)}
+
       </form>
     </Layout>
   );

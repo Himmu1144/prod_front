@@ -229,12 +229,12 @@ const filteredModels = modelSearchQuery
                 className="p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                 placeholder="Enter Year (e.g., 2022)"
                 maxLength={4}
-                // onKeyPress={(e) => {
-                //   // Only allow numbers
-                //   if (!/[0-9]/.test(e.key)) {
-                //     e.preventDefault();
-                //   }
-                // }}
+                onKeyPress={(e) => {
+                  // Only allow numbers
+                  if (!/[0-9]/.test(e.key)) {
+                    e.preventDefault();
+                  }
+                }}
               />
             </div>
 
@@ -278,4 +278,3 @@ const filteredModels = modelSearchQuery
 };
 
 export default AddNewCar;
-

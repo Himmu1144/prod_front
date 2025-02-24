@@ -10,8 +10,8 @@ import garageIcon from '../assets/images/garage.png';
 const JobCard = forwardRef(({ data }, ref) => {
   const defaultData = {
     inventory: [],
-    carDocuments: [],
-    otherChecklist: [],
+    // carDocuments: [],
+    // otherChecklist: [],
     additionalWork: [],
     customerName: '',
     carBrand: '',
@@ -35,8 +35,13 @@ const JobCard = forwardRef(({ data }, ref) => {
       type: '',
       name: '',
       workdone: '',
-      total: 0
+      total: 0,
     }],
+    invoiceSummary: {
+      total: 0,
+      discount: 0,
+      totalPayable: 0,
+    },
   };
 
   const mergedData = { ...defaultData, ...data };
@@ -148,46 +153,50 @@ const JobCard = forwardRef(({ data }, ref) => {
       <div className="p-2 border border-gray-200 rounded">{mergedData.customerName}</div>
     </div>
     <div className="grid grid-cols-2 gap-2">
-      <div className="bg-gray-100 p-2 rounded font-semibold text-center">Brand</div>
-      <div className="p-2 border border-gray-200 rounded">{mergedData.carBrand}</div>
+      <div className="bg-gray-100 p-2 rounded font-semibold text-center">Mobile</div>
+      <div className="p-2 border border-gray-200 rounded">{mergedData.customerMobile}</div>
+    </div>
+    <div className="grid grid-cols-2 gap-2">
+      <div className="bg-gray-100 p-2 rounded font-semibold text-center">Order ID</div>
+      <div className="p-2 border border-gray-200 rounded">{mergedData.orderId || 'N/A'}</div>
     </div>
     <div className="grid grid-cols-2 gap-2">
       <div className="bg-gray-100 p-2 rounded font-semibold text-center">Reg No</div>
       <div className="p-2 border border-gray-200 rounded">{mergedData.regNumber}</div>
     </div>
     <div className="grid grid-cols-2 gap-2">
-      <div className="bg-gray-100 p-2 rounded font-semibold text-center">Fuel Status</div>
-      <div className="p-2 border border-gray-200 rounded">{mergedData.fuelStatus}</div>
-    </div>
-    
-    <div className="grid grid-cols-2 gap-2">
       <div className="bg-gray-100 p-2 rounded font-semibold text-center">Battery Features</div>
       <div className="p-2 border border-gray-200 rounded">{mergedData.batteryFeature || 'N/A'}</div>
     </div>
+
+    
+    
+    
+    
+    
   </div>
 
   {/* Column 2 */}
   <div className="space-y-2">
     <div className="grid grid-cols-2 gap-2">
-      <div className="bg-gray-100 p-2 rounded font-semibold text-center">Mobile</div>
-      <div className="p-2 border border-gray-200 rounded">{mergedData.customerMobile}</div>
+      <div className="bg-gray-100 p-2 rounded font-semibold text-center">Brand</div>
+      <div className="p-2 border border-gray-200 rounded">{mergedData.carBrand}</div>
     </div>
     <div className="grid grid-cols-2 gap-2">
       <div className="bg-gray-100 p-2 rounded font-semibold text-center">Model</div>
       <div className="p-2 border border-gray-200 rounded">{mergedData.carModel}</div>
     </div>
     <div className="grid grid-cols-2 gap-2">
-      <div className="bg-gray-100 p-2 rounded font-semibold text-center">Speedometer</div>
-      <div className="p-2 border border-gray-200 rounded">{mergedData.speedometerRd}</div>
-    </div>
-    <div className="grid grid-cols-2 gap-2">
-      <div className="bg-gray-100 p-2 rounded font-semibold text-center">Order ID</div>
-      <div className="p-2 border border-gray-200 rounded">{mergedData.orderId || 'N/A'}</div>
-    </div>
-    
-    <div className="grid grid-cols-2 gap-2">
       <div className="bg-gray-100 p-2 rounded font-semibold text-center">Fuel Type</div>
       <div className="p-2 border border-gray-200 rounded">{mergedData.carYearFuel}</div>
+    </div>
+    <div className="grid grid-cols-2 gap-2">
+      <div className="bg-gray-100 p-2 rounded font-semibold text-center">Fuel Status</div>
+      <div className="p-2 border border-gray-200 rounded">{mergedData.fuelStatus}</div>
+    </div>
+    <div className="grid grid-cols-2 gap-2">
+      <div className="bg-gray-100 p-2 rounded font-semibold text-center">Speedometer</div>
+      <div className="p-2 border border-gray-200 rounded">{mergedData.speedometerRd}</div>
     </div>
 
   </div>
@@ -217,7 +226,7 @@ const JobCard = forwardRef(({ data }, ref) => {
           </div>
 
           {/* Documents and Checklist */}
-          <div className="grid grid-cols-2 gap-4 mt-4">
+          {/* <div className="grid grid-cols-2 gap-4 mt-4">
             <div className="border rounded-lg p-4">
               <div className="font-bold mb-2 text-center bg-gray-100 p-2 rounded">Car Documents</div>
               <div className="space-y-2">
@@ -245,7 +254,7 @@ const JobCard = forwardRef(({ data }, ref) => {
                 ))}
               </div>
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* Work Summary */}
@@ -273,9 +282,16 @@ const JobCard = forwardRef(({ data }, ref) => {
             
             <div className="grid grid-cols-4 gap-4 p-3 bg-gray-50 font-bold border-t border-gray-200">
               <div className="col-span-3 text-right">Grand Total:</div>
-              <div className="text-right">₹ {mergedData.workSummary.reduce((sum, work) => sum + Number(work.total), 0)}</div>
+              <div className="text-right">₹ {mergedData.invoiceSummary.totalPayable}</div>
             </div>
           </div>
+        </div>
+
+        <div className="p-4 border-b border-gray-300">
+          <div className="bg-red-600 text-white py-3 px-4 rounded-lg mb-4 text-center font-semibold">
+            Declaration
+          </div>
+            <div className='flex justify-center px-4 '>{mergedData.additionalWork}</div>
         </div>
 
         {/* Workshop Details */}

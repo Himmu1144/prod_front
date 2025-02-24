@@ -24,6 +24,10 @@ const HomePage = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchMessage, setSearchMessage] = useState('');
     const [alertMessage, setAlertMessage] = useState('');
+    // Add these state variables at the top of your component
+const [currentView, setCurrentView] = useState('default'); // 'default', 'filter', 'search'
+const [savedSearchQuery, setSavedSearchQuery] = useState('');
+const [savedFilterParams, setSavedFilterParams] = useState({});
     const [filterFormData, setFilterFormData] = useState({
         source: '',
         status: '',
@@ -62,47 +66,147 @@ const HomePage = () => {
         return '';
     };
 
+    // const fetchLeads = async () => {
+    //     try {
+    //         setIsLoading(true);
+    //         const response = await axios.get(`https://obc.work.gd/?page=1`, {
+    //             headers: { 'Authorization': `Token ${token}` }
+    //         });
+    
+    //         setLeads(response.data.leads);
+    //         setTotalPages(response.data.total_pages);
+    //         setCurrentPage(1);
+    //         setHasMore(response.data.current_page < response.data.total_pages);
+    //         setSeqNum(response.data.seq_num);
+    //         setCurrentView('default');
+    //         setSavedSearchQuery('');
+    //         setSavedFilterParams({});
+    //     } catch (error) {
+    //         console.error('Error fetching leads:', error);
+    //     } finally {
+    //         setIsLoading(false);
+    //     }
+    // };
+    
+
+    // const fetchMoreLeads = async () => {
+    //     console.log('Fetching more leads. Current page:', currentPage, 'View:', currentView);
+    //     if (isLoading || !hasMore || currentPage >= totalPages) return;
+    
+    //     try {
+    //         setIsLoading(true);
+    //         const nextPage = currentPage + 1;
+    //         let response;
+    
+    //         if (currentView === 'filter') {
+    //             console.log('Fetching filtered leads with params:', savedFilterParams);
+    //             response = await axios.post(
+    //                 'https://obc.work.gd/api/leads/filter/',
+    //                 { ...savedFilterParams, page: nextPage },
+    //                 { headers: { 'Authorization': `Token ${token}` } }
+    //             );
+    //         } else if (currentView === 'search') {
+    //             console.log('Fetching search results with query:', savedSearchQuery);
+    //             response = await axios.get(
+    //                 `https://obc.work.gd/api/leads/search/?query=${savedSearchQuery}&page=${nextPage}`,
+    //                 { headers: { 'Authorization': `Token ${token}` } }
+    //             );
+    //         } else {
+    //             console.log('Fetching default leads');
+    //             response = await axios.get(
+    //                 `https://obc.work.gd/?page=${nextPage}`,
+    //                 { headers: { 'Authorization': `Token ${token}` } }
+    //             );
+    //         }
+    
+    //         console.log('Received response:', response.data);
+    
+    //         // Append only new leads by filtering out any duplicates (using lead.id)
+    //         setLeads(prev => {
+    //             const newLeads = response.data.leads.filter(newLead =>
+    //                 !prev.some(existingLead => existingLead.id === newLead.id)
+    //             );
+    //             return [...prev, ...newLeads];
+    //         });
+    //         setCurrentPage(nextPage);
+    //         setTotalPages(response.data.total_pages);
+    //         setTotalLeads(response.data.total_leads); // Update total leads count
+    //         setHasMore(nextPage < response.data.total_pages);
+    
+    //     } catch (error) {
+    //         console.error('Error fetching more leads:', error);
+    //         setHasMore(false);
+    //     } finally {
+    //         setIsLoading(false);
+    //     }
+    // };
+    
+
     const fetchLeads = async () => {
         try {
             setIsLoading(true);
             const response = await axios.get(`https://obc.work.gd/?page=1`, {
-                headers: {
-                    'Authorization': `Token ${token}`
-                }
+                headers: { 'Authorization': `Token ${token}` }
             });
             setLeads(response.data.leads);
             setTotalPages(response.data.total_pages);
             setCurrentPage(1);
-            setTotalLeads(response.data.total_leads);
+            // Use total_leads if provided; fallback to leads length
+            setTotalLeads(response.data.total_leads || response.data.leads.length);
             setHasMore(response.data.current_page < response.data.total_pages);
             setSeqNum(response.data.seq_num);
+            setCurrentView('default');
+            setSavedSearchQuery('');
+            setSavedFilterParams({});
         } catch (error) {
             console.error('Error fetching leads:', error);
         } finally {
             setIsLoading(false);
         }
     };
-
+    
+    
     const fetchMoreLeads = async () => {
         if (isLoading || !hasMore || currentPage >= totalPages) return;
-
+    
         try {
             setIsLoading(true);
             const nextPage = currentPage + 1;
-            
-            if (nextPage > totalPages) {
-                setHasMore(false);
-                return;
+            let response;
+    
+            if (currentView === 'filter') {
+                response = await axios.post(
+                    'https://obc.work.gd/api/leads/filter/',
+                    { ...savedFilterParams, page: nextPage },
+                    { headers: { 'Authorization': `Token ${token}` } }
+                );
+            } else if (currentView === 'search') {
+                response = await axios.get(
+                    `https://obc.work.gd/api/leads/search/?query=${savedSearchQuery}&page=${nextPage}`,
+                    { headers: { 'Authorization': `Token ${token}` } }
+                );
+            } else {
+                response = await axios.get(
+                    `https://obc.work.gd/?page=${nextPage}`,
+                    { headers: { 'Authorization': `Token ${token}` } }
+                );
             }
-
-            const response = await axios.get(`https://obc.work.gd/?page=${nextPage}`, {
-                headers: {
-                    'Authorization': `Token ${token}`
-                }
+    
+            // Append new leads, filtering out duplicates
+            setLeads(prev => {
+                const newLeads = response.data.leads.filter(newLead =>
+                    !prev.some(existingLead => existingLead.id === newLead.id)
+                );
+                return [...prev, ...newLeads];
             });
-
-            setLeads(prevLeads => [...prevLeads, ...response.data.leads]);
             setCurrentPage(nextPage);
+            setTotalPages(response.data.total_pages);
+            // For additional pages, update the total if provided; otherwise add new count.
+            if (response.data.total_leads) {
+                setTotalLeads(response.data.total_leads);
+            } else {
+                setTotalLeads(prevTotal => prevTotal + response.data.leads.length);
+            }
             setHasMore(nextPage < response.data.total_pages);
         } catch (error) {
             console.error('Error fetching more leads:', error);
@@ -111,6 +215,9 @@ const HomePage = () => {
             setIsLoading(false);
         }
     };
+    
+    
+
 
     const handleScroll = useCallback((e) => {
         const element = e.target;
@@ -130,14 +237,19 @@ const HomePage = () => {
         e.preventDefault();
         setSearchMessage('');
         try {
-            const response = await axios.get(`https://obc.work.gd/api/leads/search/?query=${searchQuery}&page=1`, {
-                headers: {
-                    'Authorization': `Token ${token}`
-                }
-            });
+          const response = await axios.get(
+            `https://obc.work.gd/api/leads/search/?query=${searchQuery}&page=1`,
+            { headers: { 'Authorization': `Token ${token}` } }
+          );
+          
+          // Update state
             setLeads(response.data.leads);
             setTotalPages(response.data.total_pages);
             setCurrentPage(1);
+            setSavedSearchQuery(searchQuery); // Save the query
+            setCurrentView('search'); // Set current view
+            setSearchQuery('');
+                
             setTotalLeads(response.data.total_leads);
             setHasMore(response.data.current_page < response.data.total_pages);
 
@@ -175,22 +287,26 @@ const HomePage = () => {
     const handleFilterSubmit = async (e) => {
         e.preventDefault();
         setSearchMessage('');
+        // Reset total leads (and optionally other pagination states) before filtering
+        setTotalLeads(0);
+        setCurrentPage(1);
+        setTotalPages(1);
         try {
             const response = await axios.post(
                 'https://obc.work.gd/api/leads/filter/',
                 { ...filterFormData, page: 1 },
-                {
-                    headers: {
-                        'Authorization': `Token ${token}`
-                    }
-                }
+                { headers: { 'Authorization': `Token ${token}` } }
             );
+            // Update state with filter results
             setLeads(response.data.leads);
             setTotalPages(response.data.total_pages);
             setCurrentPage(1);
-            setTotalLeads(response.data.total_leads);
+            setSavedFilterParams(filterFormData);
+            setCurrentView('filter');
+            // Use API total_leads if available; otherwise, fallback to the number of leads returned.
+            setTotalLeads(response.data.total_leads || response.data.leads.length);
             setHasMore(response.data.current_page < response.data.total_pages);
-
+    
             if (response.data.leads.length === 0) {
                 setSearchMessage('No leads found for the selected filters');
             }
@@ -199,6 +315,83 @@ const HomePage = () => {
             setSearchMessage('Error occurred while filtering');
         }
     };
+    
+
+    // 18 feb start 
+
+    const formatLeadDataForClipboard = (lead) => {
+        const formatColumns = (label, value, bold = false) => {
+          const leftCol = label.padEnd(15);  
+          const rightCol = (value || 'N/A').padStart(25);  
+          return bold ? `*${leftCol}${rightCol}*` : `${leftCol}${rightCol}`;
+        };
+      
+        const formatMultiLine = (label, value, bold = false) => {
+          const lines = [
+            label,
+            value || 'N/A'
+          ];
+          return bold ? lines.map(line => `*${line}*`).join('\n') : lines.join('\n');
+        };
+      
+        const formattedData = [
+          formatColumns('Name:', lead.name, true),
+          formatColumns('Number:', lead.number, true),
+          '',
+          formatMultiLine('Car:', lead.vehicle, true),
+          formatMultiLine('Variant:', `${lead.type || 'N/A'}`, true),
+          '',
+          formatColumns('Vin No.:', lead.vinNumber),
+          formatColumns('Reg No.:', lead.regNumber),
+          formatColumns('Arrival:', lead.arrival_mode),
+          formatColumns('Date:', lead.arrival_time ? new Date(lead.arrival_time).toLocaleString('en-IN') : 'N/A', true),
+          '',
+          formatMultiLine('Add:', lead.address || 'N/A'),
+          '',
+          formatMultiLine('Map Link:', lead.map_link || 'N/A', true),
+          '',
+          formatMultiLine('Work Summary:', lead.products?.map(product => product.name).join(', ') || 'N/A', true),
+          '',
+          formatColumns('Total Amount:', `₹${lead.estimated_price || 'N/A'}`, true),
+          '',
+          formatMultiLine('Workshop Name:', lead.workshop_details?.name || 'N/A', true),
+          '',
+          formatColumns('Lead Status:', lead.status),
+          formatColumns('Lead Source:', lead.source),
+          formatColumns('Office CCE:', lead.cceName),
+          formatColumns('Technician:', lead.caName),
+          '',
+          formatColumns('Lead ID:', lead.id)
+        ].join('\n');
+      
+        return formattedData;
+      };
+
+
+      const handleCopyClick = async (lead) => {
+        try {
+          const formattedData = formatLeadDataForClipboard(lead);
+          await navigator.clipboard.writeText(formattedData);
+          
+          // Show success message
+          setAlertMessage('Lead details copied to clipboard');
+          setShowSuccessAlert(true);
+          setTimeout(() => {
+            setShowSuccessAlert(false);
+            setAlertMessage('');
+          }, 3000);
+        } catch (error) {
+          console.error('Failed to copy:', error);
+          setAlertMessage('Failed to copy lead details');
+          setShowSuccessAlert(true);
+          setTimeout(() => {
+            setShowSuccessAlert(false);
+            setAlertMessage('');
+          }, 3000);
+        }
+      };
+
+      // 18 feb end
 
     const handleReset = (e) => {
         e.target.form.reset();
@@ -306,6 +499,7 @@ const HomePage = () => {
                             <option value="Instagram">Instagram</option>
                             <option value="Facebook">Facebook</option>
                             <option value="Reference">Reference</option>
+                            <option value="Repeat">Repeat</option>
                             <option value="B2B">B2B</option>
                             <option value="SMS">SMS</option>
 
@@ -352,7 +546,7 @@ const HomePage = () => {
                         </select>
 
                         {/* Language Barrier Checkbox */}
-                        <div className="flex items-center">
+                        {/* <div className="flex items-center">
                             <label className="flex items-center space-x-2 cursor-pointer">
                                 <input
                                     type="checkbox"
@@ -363,7 +557,7 @@ const HomePage = () => {
                                 />
                                 <span className="text-gray-700">Language Barrier</span>
                             </label>
-                        </div>
+                        </div> */}
                     </div>
 
                     <div className="grid grid-cols-5 gap-4">
@@ -415,8 +609,8 @@ const HomePage = () => {
                             className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent"
                         >
                             <option value="">Luxury/Normal</option>
-                            <option value="luxury">Luxury</option>
-                            <option value="normal">Normal</option>
+                            <option value="Luxury">Luxury</option>
+                            <option value="Normal">Normal</option>
                         </select>
                         <input
                             type="date"
@@ -582,7 +776,7 @@ const HomePage = () => {
                                                         hour12: true
                                                     }) : 'NA'}
                                                     <br />
-                                                    {lead.modified_at ? new Date(lead.modified_at).toLocaleString('en-IN', {
+                                                    {lead.updated_at ? new Date(lead.updated_at).toLocaleString('en-IN', {
                                                         day: '2-digit',
                                                         month: '2-digit',
                                                         year: 'numeric',
@@ -595,7 +789,12 @@ const HomePage = () => {
                                             <td className="p-2">
                                                 <div className="flex flex-col gap-2">
                                                     <div className="flex gap-2">
-                                                    <Edit
+                                                        {/* <Edit
+                                                            size={16}
+                                                            className="cursor-pointer hover:text-red-500 transition-colors duration-200"
+                                                            onClick={() => navigate(`/edit/${lead.id}`)}
+                                                        /> */}
+                                                        <Edit
   size={16}
   className="cursor-pointer hover:text-red-500 transition-colors duration-200"
   onClick={() => navigate(`/edit/${lead.id}`, {
@@ -604,10 +803,13 @@ const HomePage = () => {
     }
   })}
 />
-                                                        <Copy 
-                                                            size={16} 
-                                                            className="cursor-pointer hover:text-red-500 transition-colors duration-200" 
-                                                        />
+{/* 18 feb start */}
+<Copy 
+  size={16} 
+  className="cursor-pointer hover:text-red-500 transition-colors" 
+  onClick={() => handleCopyClick(lead)}
+/>
+{/* 18 feb end */}
                                                         <Plus
                                                             size={16}
                                                             className="cursor-pointer hover:text-red-500 transition-colors duration-200"
