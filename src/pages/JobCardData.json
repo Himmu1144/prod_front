@@ -1,0 +1,138 @@
+{
+   "images": [
+      "img_1.jpeg",
+      "img_2.jpeg",
+      "img_3.jpeg",
+      "img_4.jpeg",
+      "img_5.jpeg"
+    ],
+    "inventory": [
+      "Tool Kit",
+      "Head Cushion - 4",
+      "Splash Guard - 4",
+      "Interior Mats - 4",
+      "Spare Tyre",
+      "Rim Cover - 4"
+    ],
+    "carDocuments": [
+      "Road Tax"
+    ],
+    "otherChecklist": [
+      "Umbrella",
+      "Cap"
+    ],
+    "workSummary": [
+      {
+        "description": "General Inspection",
+        "status": "Checked"
+      }
+    ],
+    "additionalWork": [
+      {
+        "details": "General Inspection",
+        "serviceRequired": "Checked"
+      }
+    ],
+    "invoiceSummary": [
+      {
+      "netAmount" :  10400,
+      "discount": 1500,
+      "totalPayable": 8998
+      }
+    ],
+    "invoiceSum": [
+      {
+      "netAmt" :  10400,
+      "dis": 1500,
+      "totalPay": 8998
+      }
+    ],
+    "workDetails": [
+      {
+        "description": "Right Quarter Panel Paint",
+        "workDone": "Door Paint",
+        "labour": 0.0,
+        "quantity": 1.0,
+        "unitPrice": 4200.0,
+        "discount": 605.77,
+        "netAmount": 3594.23
+      },
+      {
+        "description": "Right Rear Door Paint",
+        "workDone": "Paint",
+        "labour": 0.0,
+        "quantity": 1.0,
+        "unitPrice": 3100.0,
+        "discount": 447.12,
+        "netAmount": 2652.88
+      },
+      {
+        "description": "Right Front Door Paint",
+        "workDone": "Paint",
+        "labour": 0.0,
+        "quantity": 1.0,
+        "unitPrice": 3100.0,
+        "discount": 447.12,
+        "netAmount": 2652.88
+      }
+    ],
+    "workDetail": [
+      {
+        "descriptions": "Right Quarter Panel Paint",
+        "workDn": "Door Paint",
+        "quant": 1.0,
+        "unitPr": 4200.0,
+        "dis": 605.77,
+        "netAmt": 3594.23
+      },
+      {
+        "descriptions": "Right Rear Door Paint",
+        "workDn": "Paint",
+        "quant": 1.0,
+        "unitPr": 3100.0,
+        "dis": 447.12,
+        "netAmt": 2652.88
+      },
+      {
+        "descriptions": "Right Front Door Paint",
+        "workDn": "Paint",
+        "quant": 1.0,
+        "unitPr": 3100.0,
+        "dis": 447.12,
+        "netAmt": 2652.88
+      }
+    ],
+    "totalUnitPrice" : [3.0],
+    "totalDiscountedPrice" : [1500.0],
+    "totalLabourCost" :[0.0],
+    "finalPrice" : [8899.99],
+    "totalPayablePrice" : [8899.99],
+    "totalUnitPriceBill" : [3.0],
+    "totalDiscountedPriceBill" : [1500.0],
+    "finalPriceBill" : [8899.99],
+    "totalPayablePriceBill" : [8899.99],
+    "customerName" : ["Rituja Singh"],
+    "carBrand" : ["Mercedes"],
+    "carModel" : ["GLA Class"],
+    "regNumber" : ["MH017889Y67"],
+    "carYearFuel" : ["2012 Petrol"],
+    "handoverDate" : ["10-02-2025"],
+    "orderId" : ["8327472394878238888"],
+    "speedRd" : ["120"],
+    "carColor" : ["Red"],
+    "vinNo" : ["DF99GB94421278"],
+    "customerAdd" : ["SAS Tower, Medcity, Sector-38, Gurugram-122001"],
+    "workshop" : ["OnlyBigCars - Luxury Car Care"],
+    "estimatedTime" : ["03:30:00 PM"],
+    "estimatedDate" : ["08-02-2025"],
+    "invoiceNumber" : ["14562829396298"],
+    "serviceType" : ["Basic Service"],
+    "billType" : ["NA"],
+    "date" : ["08-02-2015"],
+    "customerMobile" : ["9999976591"],
+    "fuelStatus" : ["60.0%"],
+    "batteryfeatures" : ["Varta"],
+    "whatsappNum" : ["7838462692"]
+
+  }
+  

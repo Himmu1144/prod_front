@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Location Detector</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+
+        .container {
+            text-align: center;
+            padding: 2rem;
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 90%;
+            width: 400px;
+        }
+
+        h1 {
+            color: #2d3748;
+            margin-bottom: 1.5rem;
+            font-size: 1.5rem;
+        }
+
+        #detect-location {
+            background: #4299e1;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        #detect-location:hover {
+            background: #3182ce;
+            transform: translateY(-1px);
+        }
+
+        #detect-location:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #location-result {
+            margin-top: 1.5rem;
+            color: #4a5568;
+            font-size: 1.1rem;
+        }
+
+        .location-icon {
+            display: inline-block;
+            margin-right: 0.5rem;
+            animation: bounce 1s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+        }
+
+        .error {
+            color: #e53e3e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Location Detector</h1>
+        <button id="detect-location">
+            <span class="location-icon">📍</span>
+            Detect My Location
+        </button>
+        <div id="location-result"></div>
+    </div>
+
+    <script>
+        // Replace with your valid API key from openweathermap.org
+        const API_KEY = '1720d6679753c86c97e42ac365e158fd';
+        const resultDiv = document.getElementById('location-result');
+        const button = document.getElementById('detect-location');
+
+        async function getGeolocation() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject(new Error('Geolocation is not supported'));
+                }
+                navigator.geolocation.getCurrentPosition(resolve, reject);
+            });
+        }
+
+        async function getCityFromCoords(lat, lon) {
+            try {
+                const url = `https://api.openweathermap.org/geo/1.0/reverse?lat=${lat}&lon=${lon}&limit=1&appid=${API_KEY}`;
+                const response = await fetch(url);
+                
+                if (response.status === 401) {
+                    throw new Error('Invalid API key. Please check your OpenWeatherMap API key');
+                }
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (!data || data.length === 0) {
+                    throw new Error('No location data found');
+                }
+                
+                return data[0];
+            } catch (error) {
+                console.error('Error fetching city data:', error);
+                throw error;
+            }
+        }
+
+        // Initialize with immediate function execution
+        (async function initializeLocationDetector() {
+            button.addEventListener('click', async () => {
+                const originalContent = button.innerHTML;
+                try {
+                    button.disabled = true;
+                    button.innerHTML = '<span class="location-icon">🔍</span>Detecting...';
+                    resultDiv.textContent = '';
+
+                    const position = await getGeolocation();
+                    const { latitude, longitude } = position.coords;
+                    const locationData = await getCityFromCoords(latitude, longitude);
+
+                    resultDiv.innerHTML = `
+                        <span class="success">✅ Location detected:</span><br>
+                        City: ${locationData.name || 'N/A'}<br>
+                        State: ${locationData.state || 'N/A'}<br>
+                        Country: ${locationData.country || 'N/A'}
+                    `;
+                } catch (error) {
+                    resultDiv.innerHTML = `
+                        <span class="error">❌ ${error.message}</span>
+                    `;
+                } finally {
+                    setTimeout(() => {
+                        button.disabled = false;
+                        button.innerHTML = originalContent;
+                    }, 2000);
+                }
+            });
+        })();
+    </script>
+</body>
+</html>

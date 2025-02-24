@@ -1,0 +1,254 @@
+*{
+    font-family:sans-serif;
+    padding: 0px;
+}
+.container.my-container {
+    padding: 20px 200px;
+}
+.header-logo img {
+    width: 260px;
+}
+.top-section {
+    align-items: center;
+    display: flex;
+    padding-bottom: 50px;
+    justify-content: space-between;
+}
+.header-title h1{
+    font-size: 40px;
+    font-weight: 700;
+}
+table.job-card-table-1, table.job-card-table-2{
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+}
+.table thead, .table tbody{
+    width: 50%;
+  }
+table.table.job-card-table-1 tr, table.table.job-card-table-2 tr {
+    display: flex;
+    flex-wrap: wrap;
+    flex-direction: column;
+    text-align: left;
+    line-height: 40px;
+    font-size: 14px;
+}
+.my-table {
+    display: flex;
+    width: 100%;
+    padding-bottom: 30px;
+    justify-content: center;
+}
+.garage-book-head h2,.inventory-text h2,
+.garage-comment-text h2, .inclusions-text h2, .more-car-info-text h2, .undertaking-text h2,
+.car-photos-text h2{
+    color: #ffffff;
+    padding: 5px;
+    text-align: center;
+    font-size: 18px;
+}
+
+.garage-book-head, .inventory-text,
+.garage-comment-text, .inclusions-text, .more-car-info-text, .undertaking-text,
+.car-photos-text{
+    background: #dd3333;
+}
+.my-table table.table th {
+    border: 1px solid #ffffff;
+    background: #777777;
+    color: #ffffff;
+    padding-left: 10px;
+}
+.my-table table.table td {
+    background: #dddddd38;
+    color: #000000;
+    padding-left: 10px;
+    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.1);
+}
+.inventory-content ul, .car-documents-content ul, .other-inventory-content ul, .garage-comment-comment p,
+.inclusions-content p, .more-car-info-content p, .undertaking p{
+    padding: 0px 45px;
+    display: flex;
+    flex-direction: column;
+    flex-wrap: wrap;
+    height: 65px;
+    line-height: 30px;
+}
+.car-photos-img img {
+    height: 300px;
+    padding: 5px;
+    max-height: fit-content;
+}
+.term-condition content ol {
+    padding: 0px 60px;
+    font-size: 14px;
+    line-height: 33px;
+}
+.term-condition h3 {
+    background: #b5a5a514;
+    color: #000000;
+    padding: 5px 40px;
+    font-size: 16px;
+    line-height: 24px;
+}
+.garage-block-content {
+    display: flex;
+}
+.garage-block-content img {
+    width: 80px;
+}
+.garage-block-content {
+    display: flex;
+    justify-content: space-around;
+}
+.workshop-details, .walkin-date, .walkin-time {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+.garage-block-content h3 {
+    font-size: 14px;
+    color: #7c7c7c;
+}
+.garage-block-content span {
+    font-size: 12px;
+}
+.download-pdf, .send-whatsapp{
+    background: #dd3333;
+    border: none;
+    padding: 10px 40px;
+    color: #ffffff;
+    margin: 14px;
+    font-size: 18px;
+    border-radius: 5px;
+  }
+  .download-pdf:hover, .send-whatsapp:hover{
+    color: #dd3333;
+    padding: 8px 38px;
+    background: #ffffff;
+    border: 2px solid #dd3333;
+  }
+  .term-condition div {
+    padding: 5px 50px;
+    line-height: 35px;
+    font-size: 14px;
+}
+.inclusions-content td{
+    background: #dddddd38;
+    color: #000000;
+    line-height: 40px;
+    font-weight: 400;
+    font-size: 14px;
+    padding-left: 10px;
+    width: 100%;
+    border: 1px solid #ffffff;
+    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.1)
+}
+
+.inclusions-content th {
+    border: 1px solid #ffffff;
+    background: #777777;
+    text-align: left;
+    color: #ffffff;
+    line-height: 40px;
+    font-size: 14px;
+    width: 100%;
+    font-weight: 700;
+    padding-left: 10px;
+}
+table.my-table.bill {
+    flex-direction: column;
+    width: 100%;
+    justify-content: space-between;
+}
+table.my-table.bill tr {
+    display: flex;
+    justify-content: space-between;
+}
+ul.car-info-table li {
+    list-style: none;
+    font-size: 14px;
+    padding: 0px 45px;
+}
+.additional-car-det-text h2 {
+    background: #b5a5a514;
+    color: #000000;
+    padding: 5px 40px;
+    font-size: 16px;
+    line-height: 24px;
+    text-align: center;
+}
+
+
+@media screen and (max-width : 480px) and (min-width : 360px){ 
+    table.job-card-table-1, table.job-card-table-2 {
+        width: 100%;
+    }
+
+    .header-title h1 {
+        font-size: 16px;
+    }
+
+    .header-logo img {
+        width: 135px;
+    }
+    .container.my-container {
+        padding: 20px;
+    }
+    .my-table {
+        display: flex;
+    }
+    .garage-block-content img {
+        width: 35px;
+    }
+    table.table.job-card-table-1 tr, table.table.job-card-table-2 tr {
+        line-height: 34px;
+        font-size: 10px;
+    }
+    .garage-block-content h3 {
+        font-size: 8px;
+        line-height: 15px;
+    }
+    .garage-block-content span {
+        font-size: 8px;
+    }
+    .inventory-content ul, .car-documents-content ul, .other-inventory-content ul, .garage-comment-comment p, .inclusions-content p, .more-car-info-content p, .undertaking p {
+        line-height: 25px;
+        font-size: 10px;
+    }
+    .term-condition h3 {
+        font-size: 14px;
+        line-height: 24px;
+    }
+    .term-condition content ol {
+        padding: 0px 40px;
+        font-size: 10px;
+        line-height: 20px;
+    }
+    .garage-book-head h2, .inventory-text h2, .car-documents-text h2, .other-inventory-text h2, .garage-comment-text h2, .inclusions-text h2, .more-car-info-text h2, .undertaking-text h2, .car-photos-text h2 {
+        font-size: 14px;
+    }
+    .car-photos-img img {
+        height: 200px;
+        max-height: fit-content;
+    }
+    .inclusions-content th {
+        line-height: 40px;
+        font-size: 12px;
+    }
+    .inclusions-content td {
+        line-height: 40px;
+        font-size: 10px;
+    }
+    .table-address thead, .table-workshop-name thead {
+        font-size: 10px;
+    }
+    ul.car-info-table li {
+        font-size: 10px;
+    }
+}
+
+
+
