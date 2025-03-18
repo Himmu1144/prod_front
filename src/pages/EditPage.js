@@ -2,14 +2,14 @@ import Layout from '../components/layout';
 import GarageSelector from '../components/GaragePop.js';
 import { Alert } from 'react-bootstrap';
 import './editpage.css';
-import React, { useState, useContext, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext, useMemo, useCallback } from 'react';
 import { Card, Button, Collapse, Form, Row, Col } from 'react-bootstrap';
-import { FaMapMarkerAlt, FaPencilAlt } from 'react-icons/fa';
+import { FaMapMarkerAlt, FaPencilAlt , FaEdit, FaTimes} from 'react-icons/fa';
 import AddNewCar from './addcar';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { FaChevronDown, FaChevronUp, FaEdit } from 'react-icons/fa';
+import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
 import { useParams } from 'react-router-dom';
 import { useLocation } from 'react-router-dom';
 import LocationSearch from './locationsearch.js';
@@ -19,7 +19,9 @@ import { jsPDF } from 'jspdf';
 import JobCard from './JobCard';
 import Bill from './bill.js';
 import Estimate from './estimate.js';
-import { FaCheckCircle, FaTimesCircle } from 'react-icons/fa'; // Add this import 18 feb
+import { FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
+import ImageUploader from '../components/ImageUploader';
+
 
 
 // Add this before the EditPage component definition 18-2
@@ -60,6 +62,7 @@ const initialFormState = {
     jobCardNumber: '',
     estimatedDeliveryTime: '',
     orderId: 'NA', // Add this new field
+    
   },
   workshop: {
     name: '',
@@ -92,8 +95,16 @@ const EditPage = () => {
   const [showPopup, setShowPopup] = useState(false);
   const [discount, setDiscount] = useState(0);
   const [cards, setCards] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [selectedCarIndex, setSelectedCarIndex] = useState(0);
+  // Add this line near the top of your component
+  const [currentCarIndex, setCurrentCarIndex] = useState(0);
+  const [images, setImages] = useState([]);
 
 
+  const [previousLeads, setPreviousLeads] = useState([]);
+  const [isLoadingPreviousLeads, setIsLoadingPreviousLeads] = useState(false);
 
   // const { isLoaded } = useLoadScript({
   //   googleMapsApiKey: "AIzaSyBlzkfa69pC6YAAomHbsYoDrKcrBU-5CQM",
@@ -112,11 +123,11 @@ const EditPage = () => {
   const [selectedService, setSelectedService] = useState('Car Service');
 
   const [selectedGarage, setSelectedGarage] = useState({
-    name: 'Onlybigcars - Own',
+    name: 'Onlybigcars - Own Agra Mathura Road',
     mechanic: 'Sahil',
-    locality: 'Service & Repairing, AC Service & Repaire, Denting & Painting, Windshields & Light, Battery & Tyres',
+    locality: 'Locality: 98V7+C38, Faridabad, Haryana',
     link:'https://g.co/kgs/X7g95w8',
-    mobile: '8368092684'
+    mobile: '9999967591'
   });
 
   const handleGarageSelect = (garage) => {
@@ -144,48 +155,104 @@ const EditPage = () => {
   };
 
   // 18 feb start
-
+  // Update the StatusHistoryDisplay component for better error handling and debugging
   const StatusHistoryDisplay = ({ statusHistory }) => {
+    console.log('StatusHistoryDisplay received:', statusHistory);
+    
+    // Define all possible statuses in your system
+    const allStatuses = [
+      "Assigned", "Follow Up", "Dead", "Duplicate", "Communicate To Ops", 
+      "Referred To Ops", "Walkin", "Pickup", "Doorstep", "At Workshop", 
+      "Job Card", "Payment Due", "Commision Due", "Completed"
+    ];
+    
     const hasStatus = (statusToCheck) => {
-      // Add debug logs
-      console.log('Status History:', statusHistory);
-      console.log('Checking for:', statusToCheck);
-      
-      if (!statusHistory) return false;
-      
-      const found = statusHistory.some(entry => 
-        entry.status.toLowerCase().trim() === statusToCheck.toLowerCase().trim()
-      );
-      
-      console.log(`${statusToCheck} found:`, found);
-      return found;
+      try {
+        // If statusHistory isn't an array or is empty, return false immediately
+        if (!Array.isArray(statusHistory) || statusHistory.length === 0) {
+          console.log(`Status history is empty or not an array. Type: ${typeof statusHistory}`);
+          return false;
+        }
+        
+        // Try to find the status in the array - handle different data structures
+        const found = statusHistory.some(entry => {
+          // Debug the entry structure
+          console.log('Checking entry:', entry);
+          
+          // For object entries with a status property
+          if (entry && typeof entry === 'object' && entry.status) {
+            return entry.status.toLowerCase().trim() === statusToCheck.toLowerCase().trim();
+          }
+          
+          // For string entries
+          if (typeof entry === 'string') {
+            return entry.toLowerCase().trim() === statusToCheck.toLowerCase().trim();
+          }
+          
+          return false;
+        });
+        
+        console.log(`${statusToCheck} found:`, found);
+        return found;
+      } catch (error) {
+        console.error('Error in hasStatus:', error);
+        return false;
+      }
     };
   
-    // Define status checks in display order with exact matching strings
-    const statusChecks = [
-      { name: 'Job Card', present: hasStatus('Job Card') },
-      { name: 'Estimate', present: hasStatus('Estimate') },
-      { name: 'Bill', present: hasStatus('Bill') },
-      { name: 'Completed', present: hasStatus('Completed') }
-    ];
+    // Get the timestamp for a specific status if it exists
+    const getStatusTimestamp = (statusToCheck) => {
+      if (!Array.isArray(statusHistory) || statusHistory.length === 0) {
+        return null;
+      }
+      
+      for (const entry of statusHistory) {
+        if (entry && typeof entry === 'object' && entry.status) {
+          if (entry.status.toLowerCase().trim() === statusToCheck.toLowerCase().trim()) {
+            return new Date(entry.timestamp).toLocaleString();
+          }
+        }
+      }
+      
+      return null;
+    };
   
+    // Render the component based on the status checks
     return (
-      <div className="p-4">
-        <div className="grid gap-4">
-          {statusChecks.map((status, index) => (
-            <div 
-              key={index}
-              className="flex justify-between items-center p-3 bg-gray-50 rounded-lg"
-            >
-              <span className="font-medium">{status.name}</span>
-              {status.present ? (
-                <FaCheckCircle className="text-green-500 text-xl" />
-              ) : (
-                <FaTimesCircle className="text-red-500 text-xl" />
-              )}
-            </div>
-          ))}
-        </div>
+      <div className="status-history-container p-4">
+        {!Array.isArray(statusHistory) || statusHistory.length === 0 ? (
+          <div className="text-center text-gray-500 py-3">
+            No status history available
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            {allStatuses.map((status, index) => {
+              const timestamp = getStatusTimestamp(status);
+              const hasThisStatus = hasStatus(status);
+              
+              return (
+                <div 
+                  key={index}
+                  className={`flex justify-between items-center p-3 rounded-lg ${
+                    hasThisStatus ? 'bg-green-50' : 'bg-gray-50'
+                  }`}
+                >
+                  <div className="flex flex-col">
+                    <span className="font-medium">{status}</span>
+                    {hasThisStatus && timestamp && (
+                      <span className="text-xs text-gray-500">{timestamp}</span>
+                    )}
+                  </div>
+                  {hasThisStatus ? (
+                    <FaCheckCircle className="text-green-500 text-xl" />
+                  ) : (
+                    <FaTimesCircle className="text-red-500 text-xl" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     );
   };
@@ -256,6 +323,11 @@ const EditPage = () => {
       status_history: [], // 18 feb
       finalAmount: 0,
       orderId: 'NA', // Add this new field
+      commissionDue: 0, // Add this new field
+      commissionReceived: 0, // Add this new field
+      commissionPercent: 0, // Add this new field
+      pendingAmount: 0, // Add this new field
+      images: [],
     },
     workshop: {
       name: selectedGarage.name,
@@ -275,9 +347,37 @@ const EditPage = () => {
     },
   });
 
+  const fetchPreviousLeads = async (phoneNumber) => {
+    if (!phoneNumber) return;
+    
+    try {
+      setIsLoadingPreviousLeads(true);
+      const response = await axios.get(
+        `http://localhost:8000/api/customers/${phoneNumber}/leads/?current_lead=${id || ''}`,
+        {
+          headers: {
+            'Authorization': `Token ${token}`
+          }
+        }
+      );
+      setPreviousLeads(response.data || []);
+    } catch (error) {
+      console.error('Error fetching previous leads:', error);
+    } finally {
+      setIsLoadingPreviousLeads(false);
+    }
+  };
+// Add this useEffect hook to the main EditPage component
+useEffect(() => {
+  if (formState.customerInfo.mobileNumber) {
+    fetchPreviousLeads(formState.customerInfo.mobileNumber);
+  }
+}, [formState.customerInfo.mobileNumber, id]);
+
+
   // Fetch lead data if ID exists
   useEffect(() => {
-
+    console.log("Status History data:", formState.arrivalStatus.status_history);
     if (location.state?.customerInfo) {
 
       setFormState(prev => ({
@@ -301,24 +401,54 @@ const EditPage = () => {
 
     } 
 
+    
+
+    if (!id) {
+      axios.get('http://localhost:8000/', {
+        headers: {
+          'Authorization': `Token ${token}`
+        }
+      })
+      .then(response => {
+        // Set admin status and users list
+        setIsAdmin(response.data.is_admin || false);
+        setUsers(response.data.users || []);
+      })
+      .catch(error => {
+        console.error('Error fetching admin status:', error);
+      });
+    }
+
     if (id) {
       const fetchLead = async () => {
         try {
           console.log("Fetching lead with ID:", id); // Debug log
           const response = await axios.get(
-            `https://obc.work.gd/api/leads/${id}/`,
+            `http://localhost:8000/api/leads/${id}/`,
             {
               headers: {
                 'Authorization': `Token ${token}`
               }
             }
           );
+
+        
           
           // Restructure the incoming data to match formState structure
           const leadData = response.data[0];
 
+     // Replace this code block (around line 432):
+if (leadData && leadData.images) {
+  const imageArray = leadData.images.map(imgPath => ({
+    url: imgPath, // Don't prepend localhost - URLs come fully formed from backend
+    file: null
+  }));
+  setImages(imageArray);
+  console.log("Loaded images:", imageArray); // Add debugging
+}
+
           const customerResponse = await axios.get(
-            `https://obc.work.gd/api/customers/${leadData.number}/`,
+            `http://localhost:8000/api/customers/${leadData.number}/`,
             {
               headers: {
                 'Authorization': `Token ${token}`
@@ -333,6 +463,22 @@ const EditPage = () => {
           .filter(Boolean)
           .join('\n') || ''; //14-2
           console.log('This is the legendary lead data',leadData)
+          
+            // Store all customer cars, not just the current car
+        const allCars = leadData.customer_cars || [];
+        
+        // Find current car index in the array
+        const currentCarId = leadData.current_car_id;
+        let currentCarIndex = 0;
+        
+        if (currentCarId && allCars.length > 0) {
+          const foundIndex = allCars.findIndex(car => car.id === currentCarId);
+          if (foundIndex !== -1) {
+            currentCarIndex = foundIndex;
+          }
+        }
+
+
           setFormState({
             ...formState, //14-2
             overview: {
@@ -358,15 +504,7 @@ const EditPage = () => {
               mapLink: leadData.map_link || '',
               landmark: leadData.landmark || ''
             },
-            cars: [{
-              carBrand: leadData.car.brand,
-              carModel: leadData.car.model,
-              fuel: leadData.car.fuel,
-              variant: leadData.car.variant,
-              year: leadData.car.year,
-              chasisNo: leadData.car.chasis_no,
-              regNo: leadData.car.reg_no
-            }],
+            cars: allCars,
             arrivalStatus: {
               leadStatus: leadData.lead_status || '',
               previousStatus: leadData.lead_status,
@@ -377,12 +515,17 @@ const EditPage = () => {
               estimatedDeliveryTime: leadData.estimated_delivery_time ? new Date(leadData.estimated_delivery_time).toISOString().slice(0, 16) : '', // Add this new field
               status_history: leadData.status_history || [], // 18 feb
               finalAmount: leadData.final_amount || 0,
+              commissionDue: leadData.commission_due || 0, // Add this new field
+              commissionReceived: leadData.commission_received || 0, // Add this new field
+              commissionPercent: leadData.commission_percent || 0, // Add this new field
               batteryFeature: leadData.battery_feature || '', // Add this new field
+              pendingAmount: leadData.pending_amount || 0, // Add this new field
               additionalWork: leadData.additional_work || '',
               fuelStatus: leadData.fuel_status || '', // Add this new field 
               speedometerRd: leadData.speedometer_rd || '', // Add this new field
               inventory: leadData.inventory || [],
-              orderId: leadData.orderId || 'NA' // Add this new field
+              orderId: leadData.orderId || 'NA', // Add this new field
+              images: leadData.images || [],
               
             },
             workshop: {
@@ -405,7 +548,8 @@ const EditPage = () => {
           });
 
           setDiscount(leadData.overview.discount || 0); // Add this new field
-          
+          // Set the current car index
+          setSelectedCarIndex(currentCarIndex);
 
           // Check if orderId is not 'NA' and set cards to true
         if (leadData.orderId && leadData.orderId !== 'NA') {
@@ -425,6 +569,15 @@ const EditPage = () => {
           // Update selected service if available
           if (leadData.service_type) {
             setSelectedService(leadData.service_type);
+          }
+
+          // Set admin status and users list if provided in response
+          if (response.data.is_admin !== undefined) {
+            setIsAdmin(response.data.is_admin);
+          }
+          
+          if (response.data.users) {
+            setUsers(response.data.users);
           }
 
 
@@ -596,7 +749,7 @@ const EditPage = () => {
     if (section === 'customerInfo' && field === 'mobileNumber' && value.length === 10) {
       try {
         const response = await axios.get(
-          `https://obc.work.gd/api/customers/${value}/`,
+          `http://localhost:8000/api/customers/${value}/`,
           {
             headers: {
               'Authorization': `Token ${token}`
@@ -625,8 +778,13 @@ const EditPage = () => {
             landmark: customerData.location?.landmark || '',
             mapLink: customerData.location?.mapLink || ''
           },
-          // cars: customerData.cars || []
+          cars: customerData.cars || [] // Set all cars from the customer data
         }));
+         // If we have cars, select the first one by default
+         if (customerData.cars && customerData.cars.length > 0) {
+          setSelectedCarIndex(0);
+        }
+      
       } catch (error) {
         if (error.response?.status !== 404) {
           console.error('Error fetching customer data:', error);
@@ -637,14 +795,13 @@ const EditPage = () => {
 
  
   
-
   const handleAddCar = (carData, isEdit) => {
     if (isEdit) {
       // Update existing car
       setFormState(prev => ({
         ...prev,
-        cars: prev.cars.map(car => 
-          car.chasisNo === editingCar.chasisNo ? carData : car
+        cars: prev.cars.map((car, i) => 
+          i === selectedCarIndex ? carData : car
         )
       }));
     } else {
@@ -653,6 +810,8 @@ const EditPage = () => {
         ...prev,
         cars: [...prev.cars, carData]
       }));
+      // Set the newly added car as selected
+      setSelectedCarIndex(formState.cars.length);
     }
   };
 
@@ -721,15 +880,54 @@ const EditPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-     // Check if the previous status is "Completed"
+  //  Check if the previous status is "Completed"
   if (location.state?.previousStatus === "Completed") {
     setShowPopup(true);
     return;
   }
 
+  // Set the current car index
+  setSelectedCarIndex(currentCarIndex);
+
     setIsSubmitting(true);
     
     const errors = validateForm();
+
+
+
+        // Inside the handleSubmit function, replace the car selection code with this:
+
+// // Create a deep copy of the form state
+// const formData = JSON.parse(JSON.stringify(formState));
+
+// // Debug the cars array and selected index before processing
+// alert(`Before selection:
+// Number of cars: ${formData.cars.length}
+// Selected index: ${selectedCarIndex}
+// First car: ${formData.cars[0]?.carBrand} ${formData.cars[0]?.carModel}
+// ${formData.cars.length > 1 ? 'Second car: ' + formData.cars[1]?.carBrand + ' ' + formData.cars[1]?.carModel : ''}
+// `);
+
+// // Use only the selected car (corrected code)
+// if (formData.cars.length > 0) {
+//   // Make sure selectedCarIndex is valid and within bounds
+//   if (selectedCarIndex >= 0 && selectedCarIndex < formData.cars.length) {
+//     const selectedCar = formData.cars[selectedCarIndex];
+//     formData.cars = [selectedCar];
+//   } else {
+//     // Fallback to the first car if index is invalid
+//     formData.cars = [formData.cars[0]];
+//   }
+// }
+
+
+
+// // Debug the result after selection
+// alert(`After selection:
+// Selected car: ${formData.cars[0]?.carBrand} ${formData.cars[0]?.carModel}
+// Cars array length: ${formData.cars.length}
+// `);
+    
     
     if (Object.keys(errors).length > 0) {
       const errorList = Object.values(errors)
@@ -757,26 +955,65 @@ const EditPage = () => {
       setIsSubmitting(false);
     }
   
+
+
+
+
+// Create a deep copy of submission data
+const submissionData = JSON.parse(JSON.stringify(formState));
+
+
+  
+  // Ensure only the selected car is included in the submission
+  if (submissionData.cars && submissionData.cars.length > 0) {
+    // Use a safe index (if selectedCarIndex is out of bounds, use 0)
+    const safeIndex = Math.min(selectedCarIndex, submissionData.cars.length - 1);
+    // Extract just the selected car
+    const selectedCar = submissionData.cars[safeIndex];
+    // Replace the cars array with just the selected car
+    submissionData.cars = [selectedCar];
+  }
   
 // Starting from here - copy paste update
 
 
-const formatBold = (text) => `*${text}*`;
+// const formatBold = (text) => `*${text}*`;
 
+// const formatColumns = (label, value, bold = false) => {
+//   const leftCol = label.padEnd(10);  // Left-aligned, 20 chars wide
+//   const rightCol = (value || 'N/A').padStart(15);  // Right-aligned, 25 chars wide
+//   return bold ? formatBold(`${leftCol}${rightCol}`) : `${leftCol}${rightCol}`;
+// };
+
+// const formatMultiLine = (label, value, bold = false) => {
+//   const lines = [
+//     label,
+//     value || 'N/A'
+//   ];
+//   return bold ? lines.map(line => formatBold(line)).join('\n') : lines.join('\n');
+// };
+
+
+
+ 
+
+const formatBold = (text) => `*${text}*`;
 const formatColumns = (label, value, bold = false) => {
-  const leftCol = label.padEnd(15);  // Left-aligned, 20 chars wide
-  const rightCol = (value || 'N/A').padStart(25);  // Right-aligned, 25 chars wide
-  return bold ? formatBold(`${leftCol}${rightCol}`) : `${leftCol}${rightCol}`;
+  const leftCol = label;
+  const rightCol = value || 'N/A';
+  // Add exactly 4 spaces between label and value
+  const spacing = '    '; // 4 spaces
+  return `${leftCol}${spacing}${bold ? formatBold(rightCol) : rightCol}`;
 };
 
 const formatMultiLine = (label, value, bold = false) => {
+  const formattedValue = bold ? formatBold(value || 'N/A') : (value || 'N/A');
   const lines = [
     label,
-    value || 'N/A'
+    formattedValue
   ];
-  return bold ? lines.map(line => formatBold(line)).join('\n') : lines.join('\n');
+  return lines.join('\n');
 };
-
 
 
 const formatCarDetails = (cars) => {
@@ -791,23 +1028,28 @@ const formattedData = [
   formatColumns('Name:', formState.customerInfo.customerName, true),
   formatColumns('Number:', formState.customerInfo.mobileNumber, true),
   '',
-  formatMultiLine('Car:', formState.cars.length > 0 ? formState.cars.map(car => `${car.carBrand} ${car.carModel}`).join(', ') : 'N/A', true),
-  formatMultiLine('Variant:', formState.cars.length > 0 ? formState.cars.map(car => `${car.year} ${car.fuel}`).join(', ') : 'N/A', true),
+  // formatMultiLine('Car:', formState.cars.length > 0 ? formState.cars.map(car => `${car.carBrand} ${car.carModel}`).join(', ') : 'N/A', true),
+  // formatMultiLine('Variant:', formState.cars.length > 0 ? formState.cars.map(car => `${car.year} ${car.fuel}`).join(', ') : 'N/A', true),
+  // '',
+  // formatColumns('Vin No.:', formState.cars[0]?.chasisNo),
+  // formatColumns('Reg No.:', formState.cars[0]?.regNo),
+  formatColumns('Car:', formState.cars[selectedCarIndex] ? `${formState.cars[selectedCarIndex].carBrand} ${formState.cars[selectedCarIndex].carModel}` : 'N/A', true),
+  formatColumns('Variant:', formState.cars[selectedCarIndex] ? `${formState.cars[selectedCarIndex].year} ${formState.cars[selectedCarIndex].fuel}` : 'N/A', true),
   '',
-  formatColumns('Vin No.:', formState.cars[0]?.chasisNo),
-  formatColumns('Reg No.:', formState.cars[0]?.regNo),
-  formatColumns('Arrival:', formState.arrivalStatus.arrivalMode),
-  formatColumns('Date:', formState.arrivalStatus.dateTime, true),
+  formatColumns('Vin No.:', formState.cars[selectedCarIndex]?.chasisNo),
+  formatColumns('Reg No.:', formState.cars[selectedCarIndex]?.regNo),
+  formatColumns('Arrival:', formState.arrivalStatus.arrivalMode, true),
+  formatColumns('Date:', formState.arrivalStatus.dateTime ? formState.arrivalStatus.dateTime.replace('T', ' ') : '', true),
   '',
-  formatMultiLine('Add:', formState.location.address),
+  formatColumns('Add:', formState.location.address, true),
   '',
   formatMultiLine('Map Link:', formState.location.mapLink, true),
   '',
-  formatMultiLine('Work Summary:', formState.overview.tableData.map(item => item.name).join(', '), true),
+  formatColumns('Work Summary:', formState.overview.tableData.map(item => item.name).join(', '), true),
   '',
   formatColumns('Total Amount:', `₹${formState.overview.total}`, true),
   '',
-  formatMultiLine('Workshop Name:', formState.workshop.name, true),
+  formatMultiLine('Workshop Name:', formState.workshop.name),
   '',
   formatColumns('Lead Status:', formState.arrivalStatus.leadStatus),
   formatColumns('Lead Source:', formState.customerInfo.source),
@@ -826,29 +1068,79 @@ const formattedData = [
              console.error("Clipboard error:", error);
              
          }
+
+         // Add this before the axios call in handleSubmit
+         // Clean up and format overview data before submission
+const cleanedOverview = {
+  ...submissionData.overview,
+  total: parseFloat(submissionData.overview.total) || 0,
+  discount: parseFloat(submissionData.overview.discount) || 0,
+  finalAmount: parseFloat(submissionData.overview.finalAmount) || 0,
+  tableData: submissionData.overview.tableData.map(item => ({
+    ...item,
+    total: parseFloat(item.total) || 0,
+    determined: !!item.determined
+  }))
+};
+
+submissionData.overview = cleanedOverview;
+         
+         try {
+           const formDataToSubmit = {
+             ...submissionData,
+             leadId: formatLeadId(submissionData.customerInfo.mobileNumber, seqNum)
+            };
+            
+            console.log("Form data being submitted:", JSON.stringify(formDataToSubmit, null, 2));
+     // Create FormData object for the actual request
+     const formData = new FormData();
     
-    try {
-        const formData = {
-          ...formState,
-          leadId: formatLeadId(formState.customerInfo.mobileNumber, seqNum)
-        };
+     // Add the JSON data as a string
+     formData.append('data', JSON.stringify(formDataToSubmit));
+     
+     // Process images
+const imageFiles = images.filter(img => img.file).map(img => img.file);
+const existingImages = images.filter(img => !img.file).map(img => img.url);
+
+// Log for debugging
+console.log("Submitting images:");
+console.log("New files:", imageFiles.map(f => f.name));
+console.log("Existing URLs:", existingImages);
+
+// Add image files
+imageFiles.forEach(file => {
+  formData.append('images', file);
+});
+
+// Add existing images as JSON
+formData.append('existing_images', JSON.stringify(existingImages));
 
         const url = id 
-            ? `https://obc.work.gd/api/leads/${id}/update/`
-            : 'https://obc.work.gd/api/edit-form-submit/';
+            ? `http://localhost:8000/api/leads/${id}/update/`
+            : 'http://localhost:8000/api/edit-form-submit/';
             
         const method = id ? 'put' : 'post';
         
-        const response = await axios[method](
-            url,
-            formData,
-            {
-                headers: {
-                    'Authorization': `Token ${token}`,
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
+        // const response = await axios[method](
+        //     url,
+        //     formDataToSubmit,
+        //     {
+        //         headers: {
+        //             'Authorization': `Token ${token}`,
+        //             'Content-Type': 'application/json'
+        //         }
+        //     }
+        // );
+
+        const response = await axios({
+          method: id ? 'put' : 'post',
+          url: url,
+          data: formData,
+          headers: {
+            'Authorization': `Token ${token}`
+            // Don't set Content-Type when using FormData - it will be set automatically with boundary
+          }
+        });
         
         navigate('/', { 
             state: { 
@@ -1820,6 +2112,38 @@ const formattedData = [
       }
     ]   
 };
+
+const handleDeleteCar = (index) => {
+  setFormState(prev => {
+    const newCars = [...prev.cars];
+    newCars.splice(index, 1);
+    
+    return {
+      ...prev,
+      cars: newCars
+    };
+  });
+  
+  // If the selected car is deleted, select the first car
+  if (selectedCarIndex === index) {
+    setSelectedCarIndex(0);
+  } 
+  // If the deleted car was before the selected one, adjust the index
+  else if (selectedCarIndex > index) {
+    setSelectedCarIndex(selectedCarIndex - 1);
+  }
+};
+
+// Add this to your CarCard component
+{/* <button
+  className="absolute top-2 right-2 p-1 text-gray-500 hover:text-red-500"
+  onClick={(e) => {
+    e.stopPropagation();
+    handleDeleteCar(index);
+  }}
+>
+  <FaTimes size={16} />
+</button> */}
   
   // Get all service cards flattened into a single array
   const allServices = Object.values(serviceCards).flat();
@@ -1887,9 +2211,9 @@ const formattedData = [
 
   const [showAlert, setShowAlert] = useState(true);
   const [isOpen, setIsOpen] = useState(true);
-  const [isOpenRight, setIsOpenRight] = useState(false); // Changed to true for default open state
-  const [isOpenLeft, setIsOpenLeft] = useState(false); // Changed to true for default open state
-
+  const [isOpenRight, setIsOpenRight] = useState(false);
+  const [isOpenLeft, setIsOpenLeft] = useState(false); // Set to true by default to show status history
+  
   const [source, setSource] = useState('Checkout');
   const [customer, setCustomer] = useState('Customer');
   const [customerNumber, setCustomerNumber] = useState('6381234057');
@@ -1958,36 +2282,58 @@ const [activeViews, setActiveViews] = useState({
     );
   };
 
-  // Car Card Component
-  const CarCard = ({ car, onEdit }) => (
-    <div className="border border-gray-200 rounded-lg p-4 bg-white">
-      <div className="flex items-start justify-between">
+  // Car Card Component with Delete Button
+// Update the CarCard component styling:
+
+const CarCard = ({ car, index, isSelected, onEdit, onDelete }) => (
+  <div 
+    className={`border ${isSelected ? 'border-red-500 shadow-md' : 'border-gray-200'} 
+               rounded-lg p-4 bg-white relative transition-all 
+               hover:shadow-lg ${isSelected ? 'scale-102' : 'hover:scale-101'}`}
+  >
+    <input 
+      type="radio"
+      name="selectedCar"
+      checked={isSelected}
+      onChange={() => {}} // This will be handled by parent div click
+      className="absolute top-2 left-2 z-10"
+    />
+    <div className="mt-6">
+      <img
+        src="https://onlybigcars.com/wp-content/uploads/2024/12/image_22.jpeg"
+        alt={`${car.carBrand} ${car.carModel}`}
+        className="mb-2"
+      />
+      <div className='flex justify-between'>
         <div>
-          <img
-            src="https://onlybigcars.com/wp-content/uploads/2024/12/image_22.jpeg"
-            alt={`${car.carBrand} ${car.carModel}`}
-            className="mb-2"
-          />
-          <div className='flex justify-between'>
-            <div>
-              <div className="text-sm font-medium">{`${car.carBrand} ${car.carModel}`}</div>
-              <div className="text-xs text-gray-600">{`${car.fuel} ${car.year} ${car.regNo || ''}`}</div>
-              <div className="text-xs text-gray-500">{car.chasisNo}</div>
-            </div>
-            <div className="flex justify-end mt-2">
-              <button
-                className="p-2 text-gray-600 hover:text-red-500 transition-colors"
-                onClick={() => onEdit(car)}
-              >
-                <FaEdit size={16} />
-              </button>
-            </div>
-          </div>
+          <div className="text-sm font-medium">{`${car.carBrand} ${car.carModel}`}</div>
+          <div className="text-xs text-gray-600">{`${car.fuel} ${car.year} ${car.regNo || ''}`}</div>
+          <div className="text-xs text-gray-500">{car.chasisNo}</div>
+        </div>
+        <div className="flex flex-col space-y-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+            className="text-gray-500 hover:text-blue-500 transition-colors"
+          >
+            <FaEdit size={16} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(index);
+            }}
+            className="text-gray-500 hover:text-red-500 transition-colors"
+          >
+            <FaTimes size={16} />
+          </button>
         </div>
       </div>
     </div>
-  );
-
+  </div>
+);
   // Add this function after other state definitions
   // const handleAddEmptyRow = () => {
   //   const emptyRow = {
@@ -2067,34 +2413,188 @@ const serviceCardStyles = {
   }
 };
 
-const statusHierarchy = [
-  "test", "Assigned", "Follow Up", "Dead", "Communicate To Ops", 
-  "Referred To Ops", "Converted", "At Workshop", 
-  "Walkin", "Pickup", "Doorstep", "Job Card", "Estimate", "Bill", "Completed"
-];
+// const statusHierarchy = [
+//   "test", "Assigned", "Follow Up", "Dead", "Communicate To Ops", 
+//   "Referred To Ops", "Converted", "At Workshop", 
+//   "Walkin", "Pickup", "Doorstep", "Job Card", "Estimate", "Bill", "Completed"
+// ];
 
-// Function to check if an option should be disabled
+// // Function to check if an option should be disabled
+// const shouldDisableOption = (optionValue, previousStatus) => {
+//   if (!previousStatus) return false;
+  
+//   const previousIndex = statusHierarchy.indexOf(previousStatus);
+//   const optionIndex = statusHierarchy.indexOf(optionValue);
+  
+//   // If previous status was one of these, disable all options before it
+//   if (["Job Card", "Estimate", "Bill", "Completed"].includes(previousStatus)) {
+//     return optionIndex < previousIndex;
+//   }
+  
+//   return false;
+// };
+const statusHierarchy = [
+  "test","Assigned", "Follow Up", "Dead", "Communicate To Ops", 
+ "Referred To Ops", "Converted", "At Workshop", 
+ "Walkin", "Pickup", "Doorstep", "Completed", "Job Card", "Estimate","Payment Due" ,"Commision Due"
+];
+const statusHierarchy1 = [
+  "test", "Assigned","Follow Up", "Dead", "Communicate To Ops", 
+ "Referred To Ops" ,"Converted", "At Workshop", 
+ "Walkin", "Pickup", "Doorstep",  "Estimate", "Completed","Payment Due" ,"Commision Due" ,"Job Card"
+];
+const statusHierarchy2 = [
+  "test", "Converted", "At Workshop", 
+ "Walkin", "Pickup", "Doorstep",  "Estimate","Payment Due" ,"Commision Due" ,"Job Card", "Completed","Assigned","Follow Up", "Dead", "Communicate To Ops", 
+ "Referred To Ops" ,"Duplicate"
+];
+const statusHierarchy3 = [
+  "test", "Converted", "At Workshop", 
+ "Walkin", "Pickup", "Doorstep",  "Estimate","Payment Due" ,"Commision Due" ,"Job Card", "Completed","Follow Up","Assigned", "Dead", "Communicate To Ops", 
+ "Referred To Ops" ,"Duplicate"
+];
+const statusHierarchy4 = [
+  "test", "Converted", "At Workshop", 
+ "Walkin", "Pickup", "Doorstep",  "Estimate","Payment Due" ,"Commision Due" ,"Job Card", "Completed","Dead","Assigned","Follow Up",  "Communicate To Ops", 
+ "Referred To Ops" ,"Duplicate"
+];
+const statusHierarchy5 = [
+  "test", "Converted", "At Workshop", 
+ "Walkin", "Pickup", "Doorstep",  "Estimate","Payment Due" ,"Commision Due" ,"Job Card", "Completed","Assigned","Follow Up", "Dead", "Communicate To Ops", 
+ "Referred To Ops" ,"Duplicate"
+];
+const statusHierarchy6 = [
+  "test",  "At Workshop", "Job Card",
+  "Payment Due", "Commision Due", "Completed",
+  "Walkin", "Pickup", "Doorstep","Communicate To Ops","Referred To Ops", "Assigned", "Follow Up", "Dead", "Duplicate", 
+];
+const statusHierarchy7 = [
+  "test",  "At Workshop", "Job Card",
+  "Payment Due", "Commision Due", "Completed",
+  "Referred To Ops", "Walkin", "Pickup", "Doorstep","Assigned", "Follow Up", "Dead", "Duplicate", "Communicate To Ops",
+];
+const statusHierarchy8 = [
+  "test", "Payment Due", "Commision Due", "Completed","Walkin", "At Workshop", "Job Card",
+  "Referred To Ops",  "Pickup", "Doorstep","Assigned", "Follow Up", "Dead", "Duplicate", "Communicate To Ops",
+];
+const statusHierarchy9 = [
+  "test", "Payment Due", "Commision Due", "Completed", "Pickup","Walkin", "At Workshop", "Job Card",
+  "Referred To Ops",  "Doorstep","Assigned", "Follow Up", "Dead", "Duplicate", "Communicate To Ops",
+];
+const statusHierarchy10 = [
+  "test", "Payment Due", "Commision Due", "Completed",  "Doorstep","Pickup","Walkin", "At Workshop", "Job Card",
+  "Referred To Ops", "Assigned", "Follow Up", "Dead", "Duplicate", "Communicate To Ops",
+];
+const statusHierarchy11 = [
+  "test", "Payment Due", "Commision Due", "Completed", "At Workshop",  "Doorstep","Pickup","Walkin", "Job Card",
+  "Referred To Ops", "Assigned", "Follow Up", "Dead", "Duplicate", "Communicate To Ops",
+];// Function to check if an option should be disabled
+const statusHierarchy12 = [
+ "test", "Assigned","Follow Up", "Dead", "Communicate To Ops", 
+ "Referred To Ops" ,"Converted", "At Workshop", 
+ "Walkin", "Pickup", "Doorstep",  "Estimate","Commision Due" ,"Payment Due" ,"Job Card", "Completed"
+];// Function to check if an option should be disabled
 const shouldDisableOption = (optionValue, previousStatus) => {
-  if (!previousStatus) return false;
   
-  const previousIndex = statusHierarchy.indexOf(previousStatus);
-  const optionIndex = statusHierarchy.indexOf(optionValue);
-  
-  // If previous status was one of these, disable all options before it
-  if (["Job Card", "Estimate", "Bill", "Completed"].includes(previousStatus)) {
-    return optionIndex < previousIndex;
+  if (!previousStatus) {
+    const previousIndex2 = statusHierarchy2.indexOf("Assigned");
+    const optionIndex2 = statusHierarchy2.indexOf(optionValue);
+    return optionIndex2 < previousIndex2;
   }
-  
-  return false;
+
+ const previousIndex = statusHierarchy.indexOf(previousStatus);
+ const optionIndex = statusHierarchy.indexOf(optionValue);
+ const previousIndex1 = statusHierarchy1.indexOf(previousStatus);
+ const optionIndex1 = statusHierarchy1.indexOf(optionValue);
+ const previousIndex2 = statusHierarchy2.indexOf(previousStatus);
+ const optionIndex2 = statusHierarchy2.indexOf(optionValue);
+ const previousIndex3 = statusHierarchy3.indexOf(previousStatus);
+ const optionIndex3 = statusHierarchy3.indexOf(optionValue);
+ const previousIndex4 = statusHierarchy4.indexOf(previousStatus);
+ const optionIndex4 = statusHierarchy4.indexOf(optionValue);
+ const previousIndex5 = statusHierarchy5.indexOf(previousStatus);
+ const optionIndex5 = statusHierarchy5.indexOf(optionValue);
+ const previousIndex6 = statusHierarchy6.indexOf(previousStatus);
+ const optionIndex6 = statusHierarchy6.indexOf(optionValue);
+ const previousIndex7 = statusHierarchy7.indexOf(previousStatus);
+ const optionIndex7 = statusHierarchy7.indexOf(optionValue);
+ const previousIndex8 = statusHierarchy8.indexOf(previousStatus);
+ const optionIndex8 = statusHierarchy8.indexOf(optionValue);
+ const previousIndex9 = statusHierarchy9.indexOf(previousStatus);
+ const optionIndex9 = statusHierarchy9.indexOf(optionValue);
+ const previousIndex10 = statusHierarchy10.indexOf(previousStatus); 
+ const optionIndex10 = statusHierarchy10.indexOf(optionValue); // If previous status was one of these, disable all options before it
+ const previousIndex11 = statusHierarchy11.indexOf(previousStatus); 
+ const optionIndex11 = statusHierarchy11.indexOf(optionValue); // If previous status was one of these, disable all options before it
+ const previousIndex12 = statusHierarchy12.indexOf(previousStatus); 
+ const optionIndex12 = statusHierarchy12.indexOf(optionValue); // If previous status was one of these, disable all options before it
+ if (["Job Card"].includes(previousStatus)) {
+   return optionIndex < previousIndex;
+ }
+ if (["Estimate"].includes(previousStatus)) {
+   return optionIndex1 < previousIndex1;
+ }
+ if (["Completed"].includes(previousStatus)) {
+   return optionIndex1 < previousIndex1;
+ }
+ if (["Payment Due"].includes(previousStatus)) {
+   return optionIndex1 < previousIndex1;
+ }
+ if (["Commision Due"].includes(previousStatus)) {
+   return optionIndex12 < previousIndex12;
+ }
+ if (["Assigned"].includes(previousStatus)) {
+   return optionIndex2 < previousIndex2;
+ }
+
+ if (["Follow Up"].includes(previousStatus)) {
+   return optionIndex3 < previousIndex3;
+ }
+ if (["Dead"].includes(previousStatus)) {
+   return optionIndex4 < previousIndex4;
+ }
+ if (["Duplicate"].includes(previousStatus)) {
+   return optionIndex5 < previousIndex5;
+ }
+ if (["Communicate To Ops"].includes(previousStatus)) {
+   return optionIndex6 < previousIndex6;
+ }
+ if (["Referred To Ops"].includes(previousStatus)) {
+   return optionIndex7 < previousIndex7;
+ } 
+ if (["Walkin"].includes(previousStatus)) {
+   return optionIndex8 < previousIndex8;
+ } 
+ if (["Pickup"].includes(previousStatus)) {
+   return optionIndex9 < previousIndex9;
+ } 
+ if (["Doorstep"].includes(previousStatus)) {
+   return optionIndex10 < previousIndex10;
+ } 
+ if (["At Workshop"].includes(previousStatus)) {
+   return optionIndex11 < previousIndex11;
+ } return false;
 };
+
 
 const fetchCustomerData = async (mobileNumber) => {
   try {
-    const response = await fetch(`${process.env.REACT_APP_API_URL}/api/customer/${mobileNumber}`, {
+    const response = await fetch(`http://localhost:8000/api/customers/${mobileNumber}`, {
       headers: {
         'Authorization': `Token ${token}`,
       }
     });
+    // Update formState with customer cars
+    if (response.data.cars && response.data.cars.length > 0) {
+      setFormState(prev => ({
+        ...prev,
+        cars: response.data.cars, // Set all cars from customer data
+        // Other customer fields already being set
+      }));
+      
+      // Set the first car as selected by default
+      setSelectedCarIndex(0);
+    }
     const data = await response.json();
     return data;
   } catch (error) {
@@ -2103,23 +2603,25 @@ const fetchCustomerData = async (mobileNumber) => {
   }
 };
 
-// 3. Add function to handle Generate Card button click
+const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 const handleGenerateCard = async () => {
+  console.log('pdf function is called');
+  setIsGeneratingPDF(true); // Start animation
   setShowJobCard(true);
   try {
     // Wait longer for component to fully render
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 4000));
     
     if (jobCardRef.current) {
       await jobCardRef.current.generatePDF();
-    
+      console.log("Pdf is generated");
     } else {
       throw new Error('Job card reference not available');
     }
   } catch (error) {
     console.error('Error generating job card:', error);
   } finally {
-    setShowJobCard(false);
+    setIsGeneratingPDF(false); // Stop animation regardless of outcome
   }
 };
 
@@ -2138,6 +2640,333 @@ const handleGenerateBill = async () => {
   } catch (error) {
     console.error('Error generating job card:', error);
   } 
+};
+
+// First, create a new function to handle commission calculations
+const calculateCommissionDetails = (finalAmount, commissionDue, commissionReceived) => {
+  const finalAmountNum = parseFloat(finalAmount) || 0;
+  const commissionDueNum = parseFloat(commissionDue) || 0;
+  const commissionReceivedNum = parseFloat(commissionReceived) || 0;
+  
+  // Calculate total commission
+  const totalCommission = commissionDueNum + commissionReceivedNum;
+  
+  // Calculate commission percentage
+  const commissionPercent = finalAmountNum > 0 
+    ? ((totalCommission / finalAmountNum) * 100).toFixed(2)
+    : '0';
+
+  return {
+    totalCommission,
+    commissionPercent
+  };
+};
+
+// Modify the handleInputChange function for commission-related fields
+// const handleCommissionChange = (field, value) => {
+//   const finalAmount = field === 'finalAmount' 
+//     ? value 
+//     : formState.arrivalStatus.finalAmount;
+    
+//   const commissionDue = field === 'commissionDue' 
+//     ? value 
+//     : formState.arrivalStatus.commissionDue;
+    
+//   const commissionReceived = field === 'commissionReceived' 
+//     ? value 
+//     : formState.arrivalStatus.commissionReceived;
+
+//   const { commissionPercent } = calculateCommissionDetails(
+//     finalAmount,
+//     commissionDue,
+//     commissionReceived
+//   );
+
+//   setFormState(prev => ({
+//     ...prev,
+//     arrivalStatus: {
+//       ...prev.arrivalStatus,
+//       [field]: value,
+//       commissionPercent: `${commissionPercent}%`
+//     }
+//   }));
+// };
+
+// Then update the input fields:
+
+// const handleCommissionChange = (field, value) => {
+//   const finalAmount = field === 'finalAmount' 
+//     ? parseFloat(value) || 0 
+//     : parseFloat(formState.arrivalStatus.finalAmount) || 0;
+    
+//   let commissionDue = parseFloat(formState.arrivalStatus.commissionDue) || 0;
+//   let commissionReceived = parseFloat(formState.arrivalStatus.commissionReceived) || 0;
+//   let commissionPercent = parseFloat(formState.arrivalStatus.commissionPercent) || 0;
+
+//   // Handle different field updates
+//   if (field === 'commissionPercent') {
+//     // When percentage is entered, calculate commission received
+//     const percentValue = parseFloat(value) || 0;
+//     commissionReceived = (finalAmount * percentValue) / 100;
+//     commissionDue = 0; // Reset Commision Due
+//     commissionPercent = percentValue;
+//   } else {
+//     // For other fields, calculate percentage normally
+//     if (field === 'commissionDue') {
+//       commissionDue = parseFloat(value) || 0;
+//     }
+//     if (field === 'commissionReceived') {
+//       commissionReceived = parseFloat(value) || 0;
+//     }
+    
+//     const totalCommission = commissionDue + commissionReceived;
+//     commissionPercent = finalAmount > 0 
+//       ? ((totalCommission / finalAmount) * 100).toFixed(2)
+//       : 0;
+//   }
+// Then update the input fields:
+
+  // Update form state with all calculated values
+//   setFormState(prev => ({
+//     ...prev,
+//     arrivalStatus: {
+//       ...prev.arrivalStatus,
+//       finalAmount,
+//       commissionDue,
+//       commissionReceived,
+//       commissionPercent: `${commissionPercent}%`
+//     }
+//   }));
+// };
+
+
+// const handleCommissionChange = (field, value) => {
+//   // Special handling for empty value vs 0
+//   if (value === '') {
+//     // When field is cleared, reset it to empty string to show placeholder
+//     setFormState(prev => ({
+//       ...prev,
+//       arrivalStatus: {
+//         ...prev.arrivalStatus,
+//         [field]: ''
+//       }
+//     }));
+//     return;
+//   }
+  
+//   // Handle zero as a special case
+//   const fieldValue = value === '0' ? 0 : (parseFloat(value) || '');
+  
+//   // Handle each field based on its type
+//   if (field === 'finalAmount') {
+//     const finalAmount = fieldValue !== '' ? fieldValue : 0;
+//     const currentPercent = parseFloat(formState.arrivalStatus.commissionPercent) || 0;
+//     const commissionReceived = finalAmount > 0 ? (finalAmount * currentPercent) / 100 : 0;
+    
+//     setFormState(prev => ({
+//       ...prev,
+//       arrivalStatus: {
+//         ...prev.arrivalStatus,
+//         finalAmount: value, // Keep the original string input
+//         commissionReceived: commissionReceived === 0 ? '' : commissionReceived,
+//         commissionDue: ''
+//       }
+//     }));
+//   } 
+//   else if (field === 'commissionPercent') {
+//     const percentValue = fieldValue !== '' ? fieldValue : 0;
+//     const finalAmount = parseFloat(formState.arrivalStatus.finalAmount) || 0;
+//     const commissionReceived = finalAmount > 0 ? (finalAmount * percentValue) / 100 : 0;
+    
+//     setFormState(prev => ({
+//       ...prev,
+//       arrivalStatus: {
+//         ...prev.arrivalStatus,
+//         commissionPercent: value, // Keep the original string input
+//         commissionReceived: commissionReceived === 0 ? '' : commissionReceived,
+//         commissionDue: ''
+//       }
+//     }));
+//   }
+//   else {
+//     // For commissionDue and commissionReceived
+//     const finalAmount = parseFloat(formState.arrivalStatus.finalAmount) || 0;
+//     let commissionDue = parseFloat(formState.arrivalStatus.commissionDue) || 0;
+//     let commissionReceived = parseFloat(formState.arrivalStatus.commissionReceived) || 0;
+    
+//     if (field === 'commissionDue') commissionDue = fieldValue !== '' ? fieldValue : 0;
+//     if (field === 'commissionReceived') commissionReceived = fieldValue !== '' ? fieldValue : 0;
+    
+//     const totalCommission = commissionDue + commissionReceived;
+//     const percentValue = finalAmount > 0 ? ((totalCommission / finalAmount) * 100) : 0;
+
+//     setFormState(prev => ({
+//       ...prev,
+//       arrivalStatus: {
+//         ...prev.arrivalStatus,
+//         [field]: value, // Keep the original string input
+//         commissionPercent: percentValue === 0 ? '' : percentValue
+//       }
+//     }));
+//   }
+// };
+const handleCommissionChange = (field, value) => {
+  // Handle empty input by clearing the specific field
+  // This allows placeholders to show and zeros to be erased
+  if (value === '') {
+    setFormState(prev => ({
+      ...prev,
+      arrivalStatus: {
+        ...prev.arrivalStatus,
+        [field]: '' // Set to empty string instead of 0 to allow placeholder to show
+      }
+    }));
+    return;
+  }
+  
+  // Convert value to number for calculations
+  const fieldValue = parseFloat(value);
+  
+  // Handle NaN or invalid input
+  if (isNaN(fieldValue)) {
+    return;
+  }
+
+  // Different logic based on which field is being changed
+  if (field === 'finalAmount') {
+    const finalAmount = fieldValue;
+    const currentPercent = parseFloat(formState.arrivalStatus.commissionPercent) || 0;
+    
+    if (finalAmount === 0) {
+      // If finalAmount is set to 0, clear all commission values
+      setFormState(prev => ({
+        ...prev,
+        arrivalStatus: {
+          ...prev.arrivalStatus,
+          finalAmount: 0,
+          commissionDue: '',
+          commissionReceived: '',
+          commissionPercent: ''
+        }
+      }));
+    } else if (currentPercent > 0) {
+      // If percent exists, calculate commission based on new amount
+      const commissionReceived = (finalAmount * currentPercent) / 100;
+      
+      setFormState(prev => ({
+        ...prev,
+        arrivalStatus: {
+          ...prev.arrivalStatus,
+          finalAmount: finalAmount,
+          commissionReceived: commissionReceived,
+          commissionDue: ''
+        }
+      }));
+    } else {
+      // Just update the final amount
+      setFormState(prev => ({
+        ...prev,
+        arrivalStatus: {
+          ...prev.arrivalStatus,
+          finalAmount: finalAmount
+        }
+      }));
+    }
+  } 
+  else if (field === 'commissionPercent') {
+    const percentValue = fieldValue;
+    const finalAmount = parseFloat(formState.arrivalStatus.finalAmount) || 0;
+    
+    if (percentValue === 0) {
+      // If percent is set to 0, clear all commission values
+      setFormState(prev => ({
+        ...prev,
+        arrivalStatus: {
+          ...prev.arrivalStatus,
+          commissionPercent: 0,
+          commissionReceived: '',
+          commissionDue: ''
+        }
+      }));
+    } else if (finalAmount > 0) {
+      // Calculate commission based on percent
+      const commissionReceived = (finalAmount * percentValue) / 100;
+      
+      setFormState(prev => ({
+        ...prev,
+        arrivalStatus: {
+          ...prev.arrivalStatus,
+          commissionPercent: percentValue,
+          commissionReceived: commissionReceived,
+          commissionDue: ''
+        }
+      }));
+    } else {
+      // Just update the percent
+      setFormState(prev => ({
+        ...prev,
+        arrivalStatus: {
+          ...prev.arrivalStatus,
+          commissionPercent: percentValue
+        }
+      }));
+    }
+  }
+  else {
+    // For commissionDue and commissionReceived
+    const finalAmount = parseFloat(formState.arrivalStatus.finalAmount) || 0;
+    let commissionDue = parseFloat(formState.arrivalStatus.commissionDue) || 0;
+    let commissionReceived = parseFloat(formState.arrivalStatus.commissionReceived) || 0;
+    
+    if (field === 'commissionDue') commissionDue = fieldValue;
+    if (field === 'commissionReceived') commissionReceived = fieldValue;
+    
+    // Clear other field when setting one to 0
+    if (fieldValue === 0) {
+      if (field === 'commissionDue') {
+        setFormState(prev => ({
+          ...prev,
+          arrivalStatus: {
+            ...prev.arrivalStatus,
+            commissionDue: 0
+          }
+        }));
+      } else if (field === 'commissionReceived') {
+        setFormState(prev => ({
+          ...prev,
+          arrivalStatus: {
+            ...prev.arrivalStatus,
+            commissionReceived: 0
+          }
+        }));
+      }
+      return;
+    }
+    
+    const totalCommission = commissionDue + commissionReceived;
+    
+    if (finalAmount > 0) {
+      const percentValue = (totalCommission / finalAmount) * 100;
+      
+      setFormState(prev => ({
+        ...prev,
+        arrivalStatus: {
+          ...prev.arrivalStatus,
+          [field]: fieldValue,
+          commissionPercent: percentValue
+        }
+      }));
+    } else {
+      // Just update the field without calculating percent
+      setFormState(prev => ({
+        ...prev,
+        arrivalStatus: {
+          ...prev.arrivalStatus,
+          [field]: fieldValue
+        }
+      }));
+    }
+  }
 };
 
 
@@ -2176,54 +3005,70 @@ const handleGenerateEstimate = async () => {
         )} */}
 
         {/* Left Sidebar - Fixed */}
-
         <div className="flex h-[calc(90vh-76px)]" style={{ padding: "6px", marginBottom: "5em" }}>
           <div className="w-1/4 bg-gray-50 p-2 top-[76px] h-[calc(90vh-76px)] overflow-y-auto">
-            <div className="dropdown-container">
-              <Button
-                onClick={() => setIsOpen(!isOpen)}
-                variant="dark"
-                className={`w-full d-flex justify-content-between align-items-center rounded-bottom-0 ${isOpen ? 'border-bottom-0' : ''}`}
-              >
-                Last Service
-                {isOpen ? <FaChevronUp /> : <FaChevronDown />}
-              </Button>
+          <div className="dropdown-container">
+  <Button
+    onClick={() => setIsOpen(!isOpen)}
+    variant="dark"
+    className={`w-full d-flex justify-content-between align-items-center rounded-bottom-0 ${isOpen ? 'border-bottom-0' : ''}`}
+  >
+    Last Services
+    {isOpen ? <FaChevronUp /> : <FaChevronDown />}
+  </Button>
 
-              <Collapse in={isOpen}>
-                <div>
-                  <Card className="rounded-top-0 border-top-0">
-                    <Card.Body>
-                      <div>
-                        <Button variant="outline-dark" className="w-full text-left cce_btn">
-                          CCE Comments
-                        </Button>
-                      </div>
+  <Collapse in={isOpen}>
+    <div>
+      <Card className="rounded-top-0 border-top-0">
+        <Card.Body>
+          
 
+          <div>
+            {isLoadingPreviousLeads ? (
+              <div className="text-center my-3">
+                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Loading previous services...
+              </div>
+            ) : previousLeads && previousLeads.length > 0 ? (
+              previousLeads.map((lead, index) => (
+                <div 
+                className="mt-3 p-2 border rounded cursor-pointer hover:bg-gray-100 transition-colors" 
+                key={index}
+                onClick={() => navigate(`/edit/${lead.id}`)}
+                style={{ cursor: 'pointer' }}
+                >
 
-                      <div>
-                        <div className="mt-3">
-                          <p className="mb-1">Clutch Set Replacement L 6599 Clutch Bearing Replacement M:2008</p>
-                          <p className="text-muted mb-0">CCE-Gqn HqAmanjeet Kumar</p>
-                          <small className="text-muted">09:52am 15-May-23</small>
-                        </div>
-
-                        <div className="mt-3">
-                          <p className="mb-1">Live-assigned lead to Gqn Hq-Amanjeet Kumar</p>
-                          <p className="text-muted mb-0">CCE:ML User</p>
-                          <small className="text-muted">09:47am 15-May-23</small>
-                        </div>
-
-
-                      </div>
-
-                    </Card.Body>
-                  </Card>
+                  <p className="mb-1">
+                    <strong>Lead ID: {lead.id}</strong> - {lead.products?.map(product => product.name).join(', ')}
+                  </p>
+                  <div className="text-muted mb-0 flex justify-between">
+    <span>CCE: {lead.cceName}</span>
+    <span>{lead.lead_status}</span>
+  </div>
+                  <small className="text-muted">
+                    {new Date(lead.created_at).toLocaleString('en-IN', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      day: '2-digit',
+                      month: 'short',
+                      year: '2-digit'
+                    })}
+                  </small>
                 </div>
-              </Collapse>
-            </div>
+              ))
+            ) : (
+              <div className="mt-3">
+                <p className="text-muted">No previous services found for this customer.</p>
+              </div>
+            )}
+          </div>
+        </Card.Body>
+      </Card>
+    </div>
+  </Collapse>
+</div>
 
-
-            <div className="dropdown-container" style={{ marginTop: "15px" }}>
+            {/* <div className="dropdown-container" style={{ marginTop: "15px" }}>
               <Button
                 onClick={() => setIsOpenRight(!isOpenRight)}
                 variant="dark"
@@ -2242,11 +3087,13 @@ const handleGenerateEstimate = async () => {
                   </Card>
                 </div>
               </Collapse>
-            </div>
+            </div> */}
 
 
             {/* // Update your existing status history section 18 feb */ }
-<div className="dropdown-container" style={{ marginTop: "15px" }}>
+
+            {/* // Then, modify your left sidebar dropdown containers to ensure they stay open properly */}
+            <div className="dropdown-container" style={{ marginTop: "15px" }}>
   <Button
     onClick={() => setIsOpenLeft(!isOpenLeft)}
     variant="dark"
@@ -2256,12 +3103,11 @@ const handleGenerateEstimate = async () => {
     {isOpenLeft ? <FaChevronUp /> : <FaChevronDown />}
   </Button>
 
-  <Collapse in={isOpenLeft}>
+  <Collapse in={isOpenLeft} mountOnEnter={true} unmountOnExit={false}>
     <div>
       <Card className="rounded-top-0 border-top-0">
-        <Card.Body>
-          {/* 18 feb */}
-        <StatusHistoryDisplay statusHistory={formState.arrivalStatus.status_history || []} />  
+        <Card.Body style={{ maxHeight: '300px', overflowY: 'auto' }}>
+          <StatusHistoryDisplay statusHistory={formState.arrivalStatus.status_history || []} />  
         </Card.Body>
       </Card>
     </div>
@@ -2354,9 +3200,11 @@ const handleGenerateEstimate = async () => {
                   {/* Right Side Info */}
                   <div className="text-left p-2">
                     {/* <p className="text-sm m-0">L-6381234057_9FX7U</p> */}
-                    <p className="text-sm my-1 font-bold">{formState.cars[0] 
-    ? `${formState.cars[0].carBrand} ${formState.cars[0].carModel} ${formState.cars[0].year || ''}`
-    : 'No Car Selected'}</p>
+                    <p className="text-sm my-1 font-bold">
+  {formState.cars.length > 0 
+    ? `${formState.cars[selectedCarIndex]?.carBrand || ''} ${formState.cars[selectedCarIndex]?.carModel || ''} ${formState.cars[selectedCarIndex]?.year || ''}`
+    : 'No Car Selected'}
+</p>
                     <p className="text-xs text-gray-500 my-1">Updated At:</p>
 <p className="text-xs m-0">
   {formState.updated_at ? new Date(formState.updated_at).toLocaleString('en-IN', {
@@ -2410,6 +3258,7 @@ const handleGenerateEstimate = async () => {
                       <option value="">Lead Type*</option>
                       <option value="Luxury">Luxury</option>
                       <option value="Normal">Normal</option>
+                      <option value="Insurance">Insurance</option>
                       
                     </select>
                     {validationErrors.carType && (
@@ -2604,7 +3453,7 @@ const handleGenerateEstimate = async () => {
               </div>
 
               {/* Add New Car Button */}
-              <button 
+              {/* <button 
   type='button'
   className={`px-3 py-2 rounded-md mb-6 ${
     formState.cars.length > 0 
@@ -2619,33 +3468,166 @@ const handleGenerateEstimate = async () => {
   disabled={formState.cars.length > 0}
 >
   + Add New Car*
+</button> */}
+
+<button 
+  type='button'
+  className={`px-3 py-2 rounded-md mb-6 bg-red-600 hover:bg-red-700 text-white`}
+  style={{ fontSize: '14px', fontWeight: '500' }}
+  onClick={() => {
+    setEditingCar(null);
+    setShowAddCarModal(true);
+  }}
+>
+  + Add New Car*
 </button>
+
 
               {/* Car Cards Container */}
               {/* <div className="grid grid-cols-1 md:grid-cols-3 gap-6"> */}
                 {/* Car Card 1 */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {formState.cars.map((car, index) => (
-            <CarCard 
-              key={index} 
-              car={car} 
-              onEdit={() => {/* handle edit */
+                {/* // Replace your existing car cards rendering section with this: */}
+                {/* // Replace the cars container with this: */}
 
-                setEditingCar(car);
-                setShowAddCarModal(true);
-              }}
-            />
-          ))}
-        {/* </div> */}
+{/* <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+  {formState.cars.map((car, index) => (
+    <div 
+      key={index} 
+      className="relative cursor-pointer transition-transform hover:transform hover:scale-102"
+      onClick={() => {
+        setSelectedCarIndex(index);
+        console.log(`Car ${index} selected: ${car.carBrand} ${car.carModel}`);
+      }}
+    >
+      <CarCard 
+        car={car}
+        index={index}
+        isSelected={selectedCarIndex === index}
+        onEdit={() => {
+          setEditingCar(car);
+          setShowAddCarModal(true);
+        }}
+        onDelete={handleDeleteCar}
+      />
+    </div>
+  ))} 
+              </div> */}
+              <div className="w-full">
+  {/* Car Slider Navigation */}
+  {formState.cars.length > 3 && (
+    <div className="flex justify-between items-center mb-2">
+      <button 
+        type="button"
+        onClick={() => {
+          const newIndex = Math.max(0, selectedCarIndex - 1);
+          setSelectedCarIndex(newIndex);
+          document.getElementById(`car-card-${newIndex}`)?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest',
+            inline: 'center'
+          });
+        }}
+        className="bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-full"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <path fillRule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
+        </svg>
+      </button>
+      
+      <span className="text-sm font-medium">
+        {selectedCarIndex + 1} of {formState.cars.length}
+      </span>
+      
+      <button 
+        type="button"
+        onClick={() => {
+          const newIndex = Math.min(formState.cars.length - 1, selectedCarIndex + 1);
+          setSelectedCarIndex(newIndex);
+          document.getElementById(`car-card-${newIndex}`)?.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest',
+            inline: 'center'
+          });
+        }}
+        className="bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-full"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <path fillRule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
+        </svg>
+      </button>
+    </div>
+  )}
 
-                {/* Car Card 2 */}
-                
-
-                {/* Car Card 3 */}
-                
-              </div>
+  {/* Car Slider Container */}
+  <div 
+    className="flex overflow-x-auto pb-2 space-x-4 snap-x snap-mandatory scrollbar-hide" 
+    style={{ 
+      scrollbarWidth: 'none',
+      msOverflowStyle: 'none',
+    }}
+  >
+    {formState.cars.map((car, index) => (
+      <div 
+        id={`car-card-${index}`}
+        key={index} 
+        className="flex-none w-[calc(100%-1rem)] sm:w-[calc(50%-0.75rem)] md:w-[calc(33.333%-1rem)] snap-center"
+        onClick={() => {
+          setSelectedCarIndex(index);
+          console.log(`Car ${index} selected: ${car.carBrand} ${car.carModel}`);
+        }}
+      >
+        <CarCard 
+          car={car}
+          index={index}
+          isSelected={selectedCarIndex === index}
+          onEdit={() => {
+            setEditingCar(car);
+            setShowAddCarModal(true);
+          }}
+          onDelete={handleDeleteCar}
+        />
+      </div>
+    ))}
+  </div>
+  
+  {/* Add Dots Navigation for Mobile */}
+  {formState.cars.length > 1 && (
+    <div className="flex justify-center mt-2 space-x-2">
+      {formState.cars.map((_, index) => (
+        <button 
+          key={index}
+          type="button"
+          onClick={() => {
+            setSelectedCarIndex(index);
+            document.getElementById(`car-card-${index}`)?.scrollIntoView({
+              behavior: 'smooth',
+              block: 'nearest',
+              inline: 'center'
+            });
+          }}
+          className={`w-3 h-3 rounded-full ${selectedCarIndex === index ? 'bg-red-500' : 'bg-gray-300'}`}
+          aria-label={`Go to car ${index + 1}`}
+        />
+      ))}
+    </div>
+  )}
+</div>
             </div>
 
+            {/* // Add this after your cars container: */}
+
+            {formState.cars.length > 0 && (
+  <div className="bg-gray-100 p-3 mt-2 rounded-lg">
+    <p className="text-sm font-medium text-center">
+      Selected Car: 
+      <span className="font-bold text-red-600 ml-2">
+        {formState.cars[selectedCarIndex]?.carBrand} {formState.cars[selectedCarIndex]?.carModel}, 
+        {formState.cars[selectedCarIndex]?.year} ({formState.cars[selectedCarIndex]?.fuel})
+      </span>
+    </p>
+  </div>
+)}
+       
             <div className="w-full p-2 rounded-lg">
                       <div className="text-gray-700 mb-4 mt-3" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>Our Feature Services</div>
             <input
@@ -2839,26 +3821,22 @@ const handleGenerateEstimate = async () => {
                       />
                     </td>
                     <td className="p-3">
-  <textarea
-    value={row.workdone}
-    onChange={(e) => {
-      const newTableData = [...formState.overview.tableData];
-      newTableData[index].workdone = e.target.value;
-      setFormState(prev => ({
-        ...prev,
-        overview: {
-          ...prev.overview,
-          tableData: newTableData
-        }
-      }));
-    }}
-    onInput={(e) => {
-      e.target.style.height = 'auto';
-      e.target.style.height = `${e.target.scrollHeight}px`;
-    }}
-    className="w-full p-1 border rounded resize-none"
-    style={{ minHeight: '80px' }}
-  />
+                    <input
+  type="text"
+  value={row.workdone}
+  onChange={(e) => {
+    const newTableData = [...formState.overview.tableData];
+    newTableData[index].workdone = e.target.value;
+    setFormState(prev => ({
+      ...prev,
+      overview: {
+        ...prev.overview,
+        tableData: newTableData
+      }
+    }));
+  }}
+  className="w-full p-1 border rounded"
+/>
 </td>
                     {/* <td className="p-3">
                       <input
@@ -2944,12 +3922,23 @@ const handleGenerateEstimate = async () => {
       value={formState.basicInfo.caComments}
       onChange={(e) => handleInputChange('basicInfo', 'caComments', e.target.value)}
       placeholder="Comments For Technician*"
-      className="w-full p-3 border rounded h-20 resize-none"
+      className="w-full p-3 border rounded h-30 resize-none"
       required
     />
+    <div className="flex-1 flex items-center justify-end">
+    <Button
+      variant="outline-dark"
+      type="button"
+      onClick={handleGenerateEstimate}
+      className="h-fit"
+    >
+      Generate Estimate
+    </Button>
+  </div>
   </div>
 
   <div className="w-70 space-y-4">
+
 
 
 <div className="bg-gray-50 p-4 rounded space-y-4">
@@ -2975,7 +3964,7 @@ const handleGenerateEstimate = async () => {
   </div>
 
   <div className="border-t pt-2 flex justify-between font-bold">
-    <span>Final Amount: </span>
+    <span>Total Amount: </span>
     <span>₹{formState.overview.finalAmount}</span>
   </div>
 </div>
@@ -2984,6 +3973,8 @@ const handleGenerateEstimate = async () => {
 </div>
           </div>
         </div>
+        {/* Add the new always-visible Estimate button here */}
+
 
 
             {/* Last Arrival and Garage Section */}
@@ -2997,6 +3988,31 @@ const handleGenerateEstimate = async () => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 mt-4">
 
               {/* // Replace the wasJobCard condition with this */}
+{/* <select
+  value={formState.arrivalStatus.leadStatus}
+  onChange={(e) => handleInputChange('arrivalStatus', 'leadStatus', e.target.value)}
+  className="p-2 border border-gray-300 rounded-md"
+>
+  <option value="">Lead Status</option>
+  <option value="test" disabled={shouldDisableOption("test", location.state?.previousStatus)}>test</option>
+  <option value="Assigned" disabled={shouldDisableOption("Assigned", location.state?.previousStatus)}>Assigned</option>
+  <option value="Follow Up" disabled={shouldDisableOption("Follow Up", location.state?.previousStatus)}>Follow Up</option>
+  <option value="Dead" disabled={shouldDisableOption("Dead", location.state?.previousStatus)}>Dead</option>
+  <option value="Duplicate" disabled={shouldDisableOption("Duplicate", location.state?.previousStatus)}>Duplicate</option>
+  <option value="Communicate To Ops" disabled={shouldDisableOption("Communicate To Ops", location.state?.previousStatus)}>Communicate To Ops</option>
+  <option value="Referred To Ops" disabled={shouldDisableOption("Referred To Ops", location.state?.previousStatus)}>Referred To Ops</option>
+  
+  <option value="Walkin" disabled={shouldDisableOption("Walkin", location.state?.previousStatus)}>Walkin</option>
+  <option value="Pickup" disabled={shouldDisableOption("Pickup", location.state?.previousStatus)}>Pickup</option>
+  <option value="Doorstep" disabled={shouldDisableOption("Doorstep", location.state?.previousStatus)}>Doorstep</option>
+  <option value="At Workshop" disabled={shouldDisableOption("At Workshop", location.state?.previousStatus)}>At Workshop</option>
+  <option value="Job Card" disabled={shouldDisableOption("Job Card", location.state?.previousStatus)}>Job Card</option>
+  <option value="Estimate" disabled={shouldDisableOption("Estimate", location.state?.previousStatus)}>Estimate</option>
+
+  <option value="Completed" disabled={shouldDisableOption("Completed", location.state?.previousStatus)}>Completed</option>
+
+</select> */}
+ 
 <select
   value={formState.arrivalStatus.leadStatus}
   onChange={(e) => handleInputChange('arrivalStatus', 'leadStatus', e.target.value)}
@@ -3010,19 +4026,45 @@ const handleGenerateEstimate = async () => {
   <option value="Duplicate" disabled={shouldDisableOption("Duplicate", location.state?.previousStatus)}>Duplicate</option>
   <option value="Communicate To Ops" disabled={shouldDisableOption("Communicate To Ops", location.state?.previousStatus)}>Communicate To Ops</option>
   <option value="Referred To Ops" disabled={shouldDisableOption("Referred To Ops", location.state?.previousStatus)}>Referred To Ops</option>
-  {/* <option value="Converted" disabled={shouldDisableOption("Converted", location.state?.previousStatus)}>Converted</option> */}
-  
-  {/* <option value="Completed" disabled={shouldDisableOption("Completed", location.state?.previousStatus)}>Completed</option> */}
   <option value="Walkin" disabled={shouldDisableOption("Walkin", location.state?.previousStatus)}>Walkin</option>
   <option value="Pickup" disabled={shouldDisableOption("Pickup", location.state?.previousStatus)}>Pickup</option>
   <option value="Doorstep" disabled={shouldDisableOption("Doorstep", location.state?.previousStatus)}>Doorstep</option>
   <option value="At Workshop" disabled={shouldDisableOption("At Workshop", location.state?.previousStatus)}>At Workshop</option>
   <option value="Job Card" disabled={shouldDisableOption("Job Card", location.state?.previousStatus)}>Job Card</option>
-  <option value="Estimate" disabled={shouldDisableOption("Estimate", location.state?.previousStatus)}>Estimate</option>
-  {/* <option value="Bill" disabled={shouldDisableOption("Bill", location.state?.previousStatus)}>Bill</option> */}
+  {/* <option value="Estimate" disabled={shouldDisableOption("Estimate", location.state?.previousStatus)}>Estimate</option> */}
+  <option value="Payment Due" disabled={shouldDisableOption("Payment Due", location.state?.previousStatus)}>Payment Due</option>
+  <option value="Commision Due" disabled={shouldDisableOption("Commision Due", location.state?.previousStatus)}>Commision Due</option>
   <option value="Completed" disabled={shouldDisableOption("Completed", location.state?.previousStatus)}>Completed</option>
 
-</select>
+</select> 
+
+
+{/* 
+<select
+  value={formState.arrivalStatus.leadStatus}
+  onChange={(e) => handleInputChange('arrivalStatus', 'leadStatus', e.target.value)}
+  className="p-2 border border-gray-300 rounded-md"
+>
+<option value="">Lead Status</option>
+<option value="test">test</option>
+<option value="Assigned">Assigned</option>
+<option value="Follow Up">Follow Up</option>
+<option value="Dead">Dead</option>
+<option value="Duplicate">Duplicate</option>
+<option value="Communicate To Ops">Communicate To Ops</option>
+<option value="Referred To Ops">Referred To Ops</option>
+<option value="Walkin">Walkin</option>
+<option value="Pickup">Pickup</option>
+<option value="Doorstep">Doorstep</option>
+<option value="At Workshop">At Workshop</option>
+<option value="Job Card">Job Card</option>
+<option value="Estimate">Estimate</option>
+<option value="Payment Due">Payment Due</option>
+<option value="Commision Due">Commision Due</option>
+<option value="Completed">Completed</option>
+
+</select> */}
+
 
 <select
                     value={formState.arrivalStatus.arrivalMode}
@@ -3080,6 +4122,7 @@ const handleGenerateEstimate = async () => {
           onChange={(e) => handleInputChange('arrivalStatus', 'batteryFeature', e.target.value)}
           placeholder="Battery Feature"
           className="p-2 border border-gray-300 rounded-md w-full"
+          required
         />
         <input
           type="text"
@@ -3087,6 +4130,7 @@ const handleGenerateEstimate = async () => {
           onChange={(e) => handleInputChange('arrivalStatus', 'fuelStatus', e.target.value)}
           placeholder="Fuel Status (Ex. 50%)"
           className="p-2 border border-gray-300 rounded-md w-full"
+          required
         />
         
 
@@ -3128,8 +4172,10 @@ const handleGenerateEstimate = async () => {
           type="text"
           value={formState.arrivalStatus.speedometerRd}
           onChange={(e) => handleInputChange('arrivalStatus', 'speedometerRd', e.target.value)}
-          placeholder="Speedmometer Rd"
+          placeholder="Odometer"
           className="p-2 border border-gray-300 rounded-md w-full"
+          required
+          
         />
        <input
           type="text"
@@ -3137,8 +4183,31 @@ const handleGenerateEstimate = async () => {
           onChange={(e) => handleInputChange('arrivalStatus', 'additionalWork', e.target.value)}
           placeholder="Additional Work"
           className="p-2 border border-gray-300 rounded-md w-full"
+          
         />
 
+ 
+<div className="w-full p-2 rounded-lg">
+  <div className="text-gray-700 mb-2" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>
+    Car Images
+  </div>
+  <div className="mt-2">
+    <ImageUploader 
+      images={images}
+      setImages={(newImages) => {
+        setImages(newImages);
+        setFormState(prev => ({
+          ...prev,
+          arrivalStatus: {
+            ...prev.arrivalStatus,
+            images: newImages
+          }
+        }));
+      }}
+      maxImages={5}
+    />
+  </div>
+</div> 
 
         
         {/* <input
@@ -3157,6 +4226,114 @@ const handleGenerateEstimate = async () => {
       </>
     )}
 
+{(formState.arrivalStatus.leadStatus === 'Payment Due' || formState.arrivalStatus.leadStatus === 'Commision Due' || formState.arrivalStatus.leadStatus === 'Completed') && (
+  <>
+    <div className="relative border border-gray-300 rounded-md bg-white group">
+      <input
+        type="text"
+        value={formState.arrivalStatus.finalAmount === 0 ? '0' : (formState.arrivalStatus.finalAmount || '')}
+        onChange={(e) => handleCommissionChange('finalAmount', e.target.value)}
+        className="w-full p-2 border-0 focus:outline-none rounded-md peer"
+        disabled={location.state?.previousStatus === "Completed"}
+        required
+        id="finalAmount"
+      />
+      <label 
+        htmlFor="finalAmount" 
+        className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+      >
+        Final Amount
+      </label>
+    </div>
+   
+
+    
+  </> 
+)}
+
+
+{(formState.arrivalStatus.leadStatus === 'Payment Due') && (
+  <>
+<div className="relative border border-gray-300 rounded-md bg-white group">
+      <input
+        type="text"
+        value={formState.arrivalStatus.pendingAmount === 0 ? '0' : (formState.arrivalStatus.pendingAmount || '')}
+        onChange={(e) => handleInputChange('arrivalStatus', 'pendingAmount', e.target.value)}
+        className="w-full p-2 border-0 focus:outline-none rounded-md peer"
+        // disabled={location.state?.previousStatus === "Completed"}
+        required
+        id="pendingAmount"
+      />
+      <label 
+        htmlFor="finalAmount" 
+        className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+      >
+        Pending Amount
+      </label>
+    </div>
+  
+    </> 
+  )}
+
+    {/* Add this code after the existing lead status conditional renders */}
+
+{(formState.arrivalStatus.leadStatus === 'Commision Due' || formState.arrivalStatus.leadStatus === 'Completed') && (
+  <>
+ <div className="relative border border-gray-300 rounded-md bg-white group">
+      <input
+        type="text" 
+        value={formState.arrivalStatus.commissionDue === 0 ? '0' : formState.arrivalStatus.commissionDue}
+        onChange={(e) => handleCommissionChange('commissionDue', e.target.value)}
+        className="w-full p-2 border-0 focus:outline-none rounded-md peer"
+        disabled={location.state?.previousStatus === "Completed"}
+        required
+        id="commissionDue"
+      />
+      <label 
+        htmlFor="commissionDue" 
+        className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+      >
+        Commision Due
+      </label>
+    </div>
+
+    <div className="relative border border-gray-300 rounded-md bg-white group">
+      <input
+        type="text" 
+        value={formState.arrivalStatus.commissionReceived === 0 ? '0' : formState.arrivalStatus.commissionReceived}
+        onChange={(e) => handleCommissionChange('commissionReceived', e.target.value)}
+        className="w-full p-2 border-0 focus:outline-none rounded-md peer"
+        disabled={location.state?.previousStatus === "Completed"}
+        required
+        id="commissionReceived"
+      />
+      <label 
+        htmlFor="commissionReceived" 
+        className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+      >
+        Commission Received
+      </label>
+    </div>
+
+
+
+<div className="relative">
+  <input
+    type="text"
+    value={formState.arrivalStatus.commissionPercent === 0 ? '0' : formState.arrivalStatus.commissionPercent}
+    onChange={(e) => handleCommissionChange('commissionPercent', e.target.value)}
+    placeholder="Commission Percent"
+    className="p-2 pr-7 border border-gray-300 rounded-md w-full"
+    disabled={location.state?.previousStatus === "Completed"}
+    required
+  />
+  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
+    %
+  </div>
+</div>
+  </>
+)}
+{/* 
 {formState.arrivalStatus.leadStatus === 'Completed' && (
   <div className="mt-4 p-3 flex gap-4">
     <div className="flex-1">
@@ -3170,7 +4347,7 @@ const handleGenerateEstimate = async () => {
       />
     </div>
   </div>
-)}
+)} */}
 
 {/* {formState.arrivalStatus.leadStatus === 'Completed' && (
   <div className="mt-4 p-3 flex gap-4">
@@ -3267,12 +4444,32 @@ const handleGenerateEstimate = async () => {
                   <Col md={6}>
                     <div className="bg-light p-3 rounded">
                       <div className="text-muted mb-2">CCE*</div>
-                      <Form.Control
+                      {/* <Form.Control
   value={formState.basicInfo.cceName || user?.username}
   onChange={(e) => handleInputChange('basicInfo', 'cceName', e.target.value)}
   className="bg-light"
   disabled
-/>
+/> */}
+
+{isAdmin ? (
+  <Form.Select
+    value={formState.basicInfo.cceName}
+    onChange={(e) => handleInputChange('basicInfo', 'cceName', e.target.value)}
+    className="bg-light"
+  >
+    <option value="">Select CCE</option>
+    {users.map(user => (
+      <option key={user.id} value={user.username}>{user.username}</option>
+    ))}
+  </Form.Select>
+) : (
+  <Form.Control
+    value={formState.basicInfo.cceName || user?.username}
+    onChange={(e) => handleInputChange('basicInfo', 'cceName', e.target.value)}
+    className="bg-light"
+    disabled
+  />
+)}
                     </div>
                   </Col>
                 </Row>
@@ -3307,22 +4504,30 @@ const handleGenerateEstimate = async () => {
                   </Button>
                   
                   {/* Add Generate Card button when lead status is Job Card */}
-                  {cards && (['Job Card', 'Estimate', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
+                  {cards && (['Job Card', 'Estimate', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
         <Button
-            variant="outline-dark"
-            type="button"
-            disabled={isSubmitting}
-            onClick={handleGenerateCard}
-        >
-            Generate Card
-        </Button>
+        variant="outline-dark"
+        type="button"
+        disabled={isSubmitting || isGeneratingPDF}
+        onClick={handleGenerateCard}
+        className="position-relative"
+      >
+        {isGeneratingPDF ? (
+          <>
+            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+            <span className="animate-pulse">Generating PDF...</span>
+          </>
+        ) : (
+          'Generate Card'
+        )}
+      </Button>
 
         
                   
         
     )}
 
-{ cards && (['Job Card', 'Estimate', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
+{/* { cards && (['Job Card', 'Estimate', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
    
    
    <Button
@@ -3334,7 +4539,7 @@ const handleGenerateEstimate = async () => {
    Generate Estimate
    </Button>
 
-)}
+)} */}
 
     
 {/* <button 
@@ -3357,13 +4562,16 @@ Generate Bill
 
 
                   
-                  <Button 
-                    variant="danger" 
-                    type="submit" 
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? 'Saving...' : 'Save & Copy'}
-                  </Button>
+       <Button 
+              variant={location.state?.previousStatus === "Completed" ? "secondary" : "danger"}
+              type="submit" 
+              disabled={isSubmitting || location.state?.previousStatus === "Completed" || 
+                (formState.basicInfo.cceName !== user?.username && !isAdmin)}
+              title={formState.basicInfo.cceName !== user?.username && !isAdmin ? 
+                "You can only save leads assigned to you" : ""}
+            >
+              {isSubmitting ? 'Saving...' : 'Save & Copy'}
+            </Button>
               </div>
 
               {/* {error && (
@@ -3438,6 +4646,8 @@ Generate Bill
         batteryFeature: formState.arrivalStatus.batteryFeature,
         additionalWork: formState.arrivalStatus.additionalWork,
         inventory: formState.arrivalStatus.inventory,
+        // Add this line to pass image URLs to JobCard
+        images: images.map(img => img.url),
         // carDocumentDetails: formState.arrivalStatus.carDocumentDetails,
         // otherCheckList: formState.arrivalStatus.otherCheckList,
         fuelStatus: formState.arrivalStatus.fuelStatus,
@@ -3548,6 +4758,17 @@ Generate Bill
           month: 'short',
           year: 'numeric'
         }),
+        // Add these two properly formatted fields
+    estimatedTime: new Date(formState.arrivalStatus.dateTime).toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    }),
+    estimatedDate: new Date(formState.arrivalStatus.dateTime).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    }),
        
         speedRd: formState.arrivalStatus.speedometerRd,
         // If you have these fields in your formState, else use fallback values
@@ -3556,27 +4777,25 @@ Generate Bill
         customerAdd: formState.location.address || '',
         workshop: formState.workshop.name,
         // Convert invoiceSummary to an array as expected in Bill.js
-        invoiceSum: [
+        invoiceSummary: [
           {
-            netAmt: formState.overview.total,
-            dis: formState.overview.discount,
-            totalPay: formState.overview.finalAmount
+            netAmount: formState.overview.total,
+            discount: formState.overview.discount,
+            totalPayable: formState.overview.finalAmount
           }
         ],
         // Adjust work details field names to match Bill.js
-        workDetail: formState.overview.tableData.map(item => ({
-          descriptions: item.type,
-          workDn: item.workdone,
-          quant: 1,
-          unitPr: parseFloat(item.total) || 0,
-          dis: 0,
-          netAmt: parseFloat(item.total) || 0
+        workDetails: formState.overview.tableData.map(item => ({
+          description: item.type,
+          workDone: item.workdone,
+          quantity: 1,
+          netAmount: parseFloat(item.total) || 0
         })),
-        totalUnitPriceBill: formState.overview.total,
-        totalDiscountedPriceBill: 0,
+        totalUnitPrice: formState.overview.total,
+        totalDiscountedPrice: 0,
         finalPriceBill: formState.overview.total,
-        totalPayablePriceBill: formState.overview.total,
-        totalPayable: formState.overview.finalAmount
+        totalPayable: formState.overview.finalAmount,
+        date: formState.arrivalStatus.dateTime, // Add the full arrival date time
       }}
     />
   </div>

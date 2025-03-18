@@ -91,6 +91,24 @@ const Header = () => {
                                 >
                                     Break
                                 </Dropdown.Item>
+                                <Dropdown.Item 
+                                    onClick={() => handleStatusChange('Lunch')}
+                                    active={status === 'Lunch'}
+                                >
+                                    Lunch
+                                </Dropdown.Item>
+                                <Dropdown.Item 
+                                    onClick={() => handleStatusChange('Training')}
+                                    active={status === 'Training'}
+                                >
+                                    Training
+                                </Dropdown.Item>
+                                <Dropdown.Item 
+                                    onClick={() => handleStatusChange('Meeting')}
+                                    active={status === 'Meeting'}
+                                >
+                                    Meeting
+                                </Dropdown.Item>
                             </Dropdown.Menu>
                         </Dropdown>
 

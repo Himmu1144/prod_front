@@ -44,16 +44,75 @@ thead, tbody tr {
     background: #555;
 }
 
+.designer-container {
+    background-color: #ff0000; /* Red background */
+    color: #ffffff; /* White text */
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.designer-container .content {
+    background-color: #ffffff; /* White background */
+    color: #000000; /* Black text */
+    padding: 15px;
+    border-radius: 5px;
+}
+
+.designer-container .content table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.designer-container .content th, .designer-container .content td {
+    border: 1px solid #ddd;
+    padding: 8px;
+}
+
+.designer-container .content th {
+    background-color: #ff0000; /* Red background */
+    color: white;
+}
+
+.designer-container .content tr:nth-child(even) {
+    background-color: #f2f2f2;
+}
+
+.designer-container .content tr:hover {
+    background-color: #ddd;
+}
 
 
+/* // Add this to your CSS file */
+.lead-stats-container {
+  margin-bottom: 20px;
+  background-color: #f8f9fa;
+  border-radius: 5px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
 
+.lead-stats-container h2 {
+  margin-bottom: 10px;
+  color: #333;
+}
 
+.lead-stats-container table {
+  width: 100%;
+  border-collapse: collapse;
+}
 
+.lead-stats-container th {
+  background-color: #f1f1f1;
+  padding: 10px;
+  text-align: center;
+  font-weight: 600;
+}
 
-
-
-
-
+.lead-stats-container td {
+  padding: 10px;
+  text-align: center;
+  font-weight: 500;
+}
 
 
 

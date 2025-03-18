@@ -30,7 +30,7 @@ const HomePage = () => {
 
     useEffect(() => {
         // Fetch welcome message
-        axios.get('https://obc.work.gd7.0.0.1:8000/', {
+        axios.get('https://obc.work.gd/', {
             headers: {
                 Authorization: `Token ${token}`
             }

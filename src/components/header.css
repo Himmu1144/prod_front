@@ -38,3 +38,27 @@
     width: 130px!important;
     font-size: 14px!important;
 }
+
+/* Add these CSS rules at the end of your file to override any other styles */
+
+.collapse {
+    visibility: visible !important; /* Override any visibility: collapse */
+  }
+  
+  .collapse:not(.show) {
+    display: none !important;
+  }
+  
+  .collapse.show {
+    display: block !important;
+  }
+  
+  .dropdown-container .collapse,
+  .dropdown-container .collapse.show {
+    visibility: visible !important;
+  }
+  
+  /* Add this to ensure the content is visible */
+  .card-body {
+    visibility: visible !important;
+  }

@@ -1,12 +1,157 @@
-import React, { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
-import obcLogo from '../assets/images/OBC-logo.webp';
+import React, { forwardRef, useImperativeHandle, useState, useEffect } from 'react';
+import { PDFViewer, usePDF, Document, Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
+import obcLogo from '../assets/images/OBC-logo.png';
 
-const Estimate = forwardRef(({ data }, ref) => {
+// Define styles for PDF rendering
+const styles = StyleSheet.create({
+  boldText: {
+    fontWeight: 900,
+  },
+  page: {
+    padding: 15,
+    fontSize: 10,
+    backgroundColor: '#ffffff',
+  },
+  container: {
+    border: '1pt solid #d1d5db', // border-gray-300
+    borderRadius: 5,
+    boxShadow: '0 1pt 2pt rgba(0,0,0,0.05)', // shadow-sm
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 7.5, // p-2
+    paddingHorizontal: 15, // px-4
+    borderBottom: '1pt solid #d1d5db',
+  },
+  logo: {
+    width: 135, // 180px * 0.75pt
+    height: 15, // 20px * 0.75pt
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 9.25, // mb-3
+    marginTop:5,
+  },
+  section: {
+    padding: 15,
+    borderBottom: '1pt solid #d1d5db',
+  },
+  grid2: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  column: {
+    width: '48%',
+  },
+  row: {
+    flexDirection: 'row',
+    marginBottom: 7.5, // space-y-2
+    gap: 3,
+  },
+  label: {
+    width: '40%',
+    backgroundColor: '#f3f4f6', // bg-gray-100
+    padding: 7.5, // p-2
+    borderRadius: 5,
+    fontWeight: 'medium',
+    textAlign: 'center',
+
+  },
+  value: {
+    width: '60%',
+    padding: 7.5, // p-2
+    border: '1pt solid #e5e7eb', // border-gray-200
+    borderRadius: 5,
+  },
+  addressBox: {
+    padding: 7.5,
+    border: '1pt solid #e5e7eb',
+    borderRadius: 5,
+    color: '#4b5563', // text-gray-600
+  },
+  redHeader: {
+    backgroundColor: '#dc2626', // bg-red-600
+    color: '#ffffff',
+    paddingVertical: 11.25, // py-3
+    paddingHorizontal: 15, // px-4
+    borderRadius: 5,
+    textAlign: 'center',
+    fontWeight: 'medium',
+    marginBottom: 15, // mb-4
+  },
+  table: {
+    borderCollapse: 'collapse',
+    width: '100%',
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#f3f4f6', // bg-gray-100
+    padding: 7.5, // p-2
+    borderBottom: '1pt solid #e5e7eb', // border
+  },
+  tableRow: {
+    flexDirection: 'row',
+    padding: 7.5, // p-2
+    borderBottom: '1pt solid #e5e7eb',
+  },
+  tableFooter: {
+    flexDirection: 'row',
+    padding: 7.5,
+    backgroundColor: '#f9fafb', // bg-gray-50
+    fontWeight: 'bold',
+    borderBottom: '1pt solid #e5e7eb',
+  },
+  tableCell: {
+    flex: 1,
+    textAlign: 'left',
+  },
+  italicText: {
+    textAlign: 'center',
+    color: '#4b5563', // text-gray-600
+    fontStyle: 'italic',
+    marginTop: 15, // mt-4
+  },
+  termsHeader: {
+    backgroundColor: '#f3f4f6', // bg-gray-100
+    padding: 7.5, // p-2
+    borderRadius: 5,
+    textAlign: 'center',
+    fontWeight: 'bold',
+    marginBottom: 15, // mb-4
+  },
+  listItem: {
+    flexDirection: 'row',
+    marginBottom: 7.5, // space-y-2
+    paddingLeft: 15, // pl-5
+    color: '#4b5563', // text-gray-600
+  },
+  bullet: {
+    marginRight: 7.5,
+  },
+  footer: {
+    padding: 15,
+    textAlign: 'center',
+    borderTop: '1pt solid #d1d5db',
+  },
+  footerTitle: {
+    fontSize: 15, // text-xl
+    fontWeight: 'bold',
+    marginBottom: 7.5, // mb-2
+  },
+  footerText: {
+    color: '#4b5563', // text-gray-600
+    marginBottom: 3.75, // space-y-1 approximation
+  },
+});
+
+// PDF Document Component
+const PDFDocument = ({ data }) => {
   const defaultData = {
     customerName: '',
-    date: '',             // Estimate date
+    date: '',
     regNumber: '',
     invoiceNumber: '',
     orderId: '',
@@ -23,8 +168,8 @@ const Estimate = forwardRef(({ data }, ref) => {
     estimatedDate: '',
     customerAdd: '',
     workshop: '',
-    invoiceSummary: [],   // Array of objects with: netAmount, discount, totalPayable
-    workDetails: [],      // Array of objects with: description, workDone, labour, quantity, unitPrice, discount, netAmount
+    invoiceSummary: [],
+    workDetails: [],
     totalLabourCost: 0,
     totalUnitPrice: 0,
     totalDiscountedPrice: 0,
@@ -32,58 +177,228 @@ const Estimate = forwardRef(({ data }, ref) => {
     totalPayablePrice: 0,
     totalPayable: 0,
   };
+  const mergedData = { ...defaultData, ...data };
+
+  const disclaimers = [
+    "All prices are inclusive of taxes",
+    "Workshop will provide the tax invoice directly",
+    "The colour of engine oil may appear black after servicing in diesel vehicles",
+  ];
+
+  return (
+    <Document>
+      <Page size="A4" style={styles.page}>
+        <View style={styles.container}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Image src={obcLogo} style={styles.logo} />
+            <Text style={styles.title}>ORDER ESTIMATE</Text>
+          </View>
+
+          {/* Customer & Estimate Details */}
+          <View style={styles.section}>
+            <View style={styles.grid2}>
+              <View style={styles.column}>
+                <View style={styles.row}>
+                  <Text style={styles.label}>Name</Text>
+                  <Text style={styles.value}>{mergedData.customerName}</Text>
+                </View>
+                <View style={styles.row}>
+                  <Text style={styles.label}>Mobile</Text>
+                  <Text style={styles.value}>{mergedData.customerMobile}</Text>
+                </View>
+                <View style={styles.row}>
+                  <Text style={styles.label}>Order ID</Text>
+                  <Text style={styles.value}>{mergedData.orderId || 'N/A'}</Text>
+                </View>
+                <View style={styles.row}>
+                  <Text style={styles.label}>Reg. No.</Text>
+                  <Text style={styles.value}>{mergedData.regNumber || 'N/A'}</Text>
+                </View>
+                <View style={styles.row}>
+                  <Text style={styles.label}>Battery Features</Text>
+                  <Text style={styles.value}>{mergedData.batteryFeature || 'N/A'}</Text>
+                </View>
+                <View style={styles.row}>
+                  <Text style={styles.label}>Date</Text>
+                  <Text style={styles.value}>{mergedData.estimatedDate || 'N/A'}</Text>
+                </View>
+              </View>
+              <View style={styles.column}>
+                <View style={styles.row}>
+                  <Text style={styles.label}>Brand</Text>
+                  <Text style={styles.value}>{mergedData.carBrand}</Text>
+                </View>
+                <View style={styles.row}>
+                  <Text style={styles.label}>Model</Text>
+                  <Text style={styles.value}>{mergedData.carModel}</Text>
+                </View>
+                <View style={styles.row}>
+                  <Text style={styles.label}>Fuel Type</Text>
+                  <Text style={styles.value}>{mergedData.carYearFuel}</Text>
+                </View>
+                <View style={styles.row}>
+                  <Text style={styles.label}>Fuel Status</Text>
+                  <Text style={styles.value}>{mergedData.fuelStatus}</Text>
+                </View>
+                <View style={styles.row}>
+                  <Text style={styles.label}>Odometer</Text>
+                  <Text style={styles.value}>{mergedData.speedRd}</Text>
+                </View>
+                <View style={styles.row}>
+                  <Text style={styles.label}>Time</Text>
+                  <Text style={styles.value}>{mergedData.estimatedTime || 'N/A'}</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Address & Workshop Section */}
+          <View style={styles.section}>
+            <View style={styles.addressBox}>
+            <Text>
+  <Text style={styles.boldText}>Address: </Text>
+  {mergedData.customerAdd || 'N/A'}
+</Text>
+              <Text style={{ marginTop: 7.5 }}>
+                <Text style={{ fontWeight: 'bold' }}>Workshop: </Text>
+                {mergedData.workshop || 'N/A'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Invoice Summary Section */}
+          <View style={styles.section}>
+            <Text style={styles.redHeader}>INVOICE SUMMARY</Text>
+            <View style={styles.table}>
+              <View style={styles.tableHeader}>
+                <Text style={styles.tableCell}>Net Amount</Text>
+                <Text style={styles.tableCell}>Discount</Text>
+                <Text style={styles.tableCell}>Total Payable</Text>
+              </View>
+              {mergedData.invoiceSummary.map((sum, index) => (
+                <View key={index} style={styles.tableRow}>
+                  <Text style={styles.tableCell}>Rs. {sum.netAmount || 0}</Text>
+                  <Text style={styles.tableCell}>Rs. {sum.discount || 0}</Text>
+                  <Text style={styles.tableCell}>Rs. {sum.totalPayable || 0}</Text>
+                </View>
+              ))}
+            </View>
+            <Text style={styles.italicText}>
+              Precision in every detail, because your car deserves the best.
+            </Text>
+          </View>
+
+          {/* Work Summary Section */}
+          <View style={styles.section}>
+            <Text style={styles.redHeader}>WORK SUMMARY</Text>
+            <View style={styles.table}>
+              <View style={styles.tableHeader}>
+                <Text style={styles.tableCell}>Description</Text>
+                <Text style={styles.tableCell}>Work Done</Text>
+                <Text style={styles.tableCell}>Qty</Text>
+                <Text style={styles.tableCell}>Net Amount</Text>
+              </View>
+              {mergedData.workDetails.map((work, index) => (
+                <View key={index} style={styles.tableRow}>
+                  <Text style={styles.tableCell}>{work.description || ''}</Text>
+                  <Text style={styles.tableCell}>{work.workDone || ''}</Text>
+                  <Text style={styles.tableCell}>{work.quantity || 0}</Text>
+                  <Text style={styles.tableCell}>Rs. {work.netAmount || 0}</Text>
+                </View>
+              ))}
+              <View style={styles.tableFooter}>
+                <Text style={{ ...styles.tableCell, flex: 3 }}>Total</Text>
+                <Text style={styles.tableCell}>Rs. {mergedData.finalPriceBill|| 0}</Text>
+              </View>
+              <View style={styles.tableFooter}>
+                <Text style={{ ...styles.tableCell, flex: 3 }}>After Discount</Text>
+                <Text style={styles.tableCell}>Rs. {mergedData.totalPayable || 0}</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Terms & Conditions */}
+          <View style={styles.section}>
+            <Text style={styles.termsHeader}>Disclaimer</Text>
+            {disclaimers.map((item, index) => (
+              <View key={index} style={styles.listItem}>
+                <Text style={styles.bullet}>•</Text>
+                <Text>{item}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Company Footer */}
+          <View style={styles.footer}>
+            <Text style={styles.footerTitle}>OnlyBigCars</Text>
+            <Text style={styles.footerText}>
+              SAS Tower, Medcity, Sector - 38, Gurugram - 122001
+            </Text>
+            <Text style={styles.footerText}>Contact: 9999967591</Text>
+            <Text style={styles.footerText}>Website: https://onlybigcars.com/</Text>
+          </View>
+        </View>
+      </Page>
+    </Document>
+  );
+};
+
+// Estimate Component
+const Estimate = forwardRef(({ data }, ref) => {
+  const defaultData = {
+    customerName: '',
+    date: '',
+    regNumber: '',
+    invoiceNumber: '',
+    orderId: '',
+    customerMobile: '',
+    serviceType: '',
+    estimatedTime: '',
+    carBrand: '',
+    carYearFuel: '',
+    fuelStatus: '',
+    carModel: '',
+    speedRd: '',
+    batteryFeature: '',
+    billType: '',
+    estimatedDate: '',
+    customerAdd: '',
+    workshop: '',
+    invoiceSummary: [],
+    workDetails: [],
+    totalLabourCost: 0,
+    totalUnitPrice: 0,
+    totalDiscountedPrice: 0,
+    finalPriceBill: 0,
+    totalPayablePrice: 0,
+    totalPayable: 0,
+  };
 
   const mergedData = { ...defaultData, ...data };
   const [details, setDetails] = useState(mergedData);
+  const [instance, updateInstance] = usePDF({ document: <PDFDocument data={mergedData} /> });
 
   useEffect(() => {
     if (data) {
       setDetails({ ...defaultData, ...data });
+      updateInstance(<PDFDocument data={mergedData} />);
     }
   }, [data]);
 
   const generatePDF = async () => {
     try {
-      const input = document.getElementById('pdf-content-est');
-      const downloadButton = document.querySelector('.download-pdf');
-      if (downloadButton) downloadButton.style.display = 'none';
-
-      const canvas = await html2canvas(input, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff'
-      });
-      const imgData = canvas.toDataURL('image/jpeg', 1.0);
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = pageWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      const pageCount = Math.ceil(imgHeight / pageHeight);
-
-      for (let i = 0; i < pageCount; i++) {
-        if (i > 0) pdf.addPage();
-        const sourceY = i * pageHeight * (canvas.width / imgWidth);
-        const destY = 0;
-        pdf.addImage(
-          imgData,
-          'JPEG',
-          0,
-          destY - (i * pageHeight),
-          imgWidth,
-          imgHeight,
-          undefined,
-          'FAST'
-        );
+      if (instance.loading) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        return generatePDF();
       }
-
-      pdf.save('estimate.pdf');
-      if (downloadButton) downloadButton.style.display = 'block';
+      const blob = instance.blob;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'estimate.pdf';
+      link.click();
+      URL.revokeObjectURL(url);
       return true;
     } catch (error) {
       console.error('PDF generation error:', error);
@@ -92,228 +407,15 @@ const Estimate = forwardRef(({ data }, ref) => {
   };
 
   useImperativeHandle(ref, () => ({
-    generatePDF
+    generatePDF,
   }));
 
-  if (!details) return <p>Loading...</p>;
+  if (!details) return <div>Loading...</div>;
 
   return (
-    <div id="pdf-content-est" className="bg-white p-4 w-[210mm] mx-auto text-sm">
-      <div className="border border-gray-300 rounded-lg shadow-sm">
-        {/* Header */}
-        <div className="flex justify-between items-center p-2 px-4 border-b border-gray-300">
-          <div className="flex items-center">
-            <img
-              src={obcLogo}
-              alt="ONLY BIG CARS"
-              className="h-12 w-auto object-contain"
-              style={{ maxWidth: '180px', maxHeight: '20px' }}
-            />
-          </div>
-          <div className="font-bold text-xl flex items-center mb-3">
-            ORDER ESTIMATE
-          </div>
-        </div>
-
-        {/* Customer & Estimate Details */}
-        <div className="grid grid-cols-2 gap-4 p-4 border-b border-gray-300">
-          {/* Left Column */}
-          <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-gray-100 p-2 rounded font-semibold text-center">Name</div>
-              <div className="p-2 border border-gray-200 rounded">{details.customerName}</div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-gray-100 p-2 rounded font-semibold text-center">Mobile</div>
-              <div className="p-2 border border-gray-200 rounded">{details.customerMobile}</div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-      <div className="bg-gray-100 p-2 rounded font-semibold text-center">Order ID</div>
-      <div className="p-2 border border-gray-200 rounded">{details.orderId || 'N/A'}</div>
-    </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-gray-100 p-2 rounded font-semibold text-center">Reg. No.</div>
-              <div className="p-2 border border-gray-200 rounded">{details.regNumber}</div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-      <div className="bg-gray-100 p-2 rounded font-semibold text-center">Battery Features</div>
-      <div className="p-2 border border-gray-200 rounded">{details.batteryFeature || 'N/A'}</div>
-    </div>
-            
-          </div>
-
-          {/* Right Column */}
-          <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-gray-100 p-2 rounded font-semibold text-center">Brand</div>
-              <div className="p-2 border border-gray-200 rounded">{details.carBrand}</div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-gray-100 p-2 rounded font-semibold text-center">Model</div>
-              <div className="p-2 border border-gray-200 rounded">{details.carModel}</div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-gray-100 p-2 rounded font-semibold text-center">Fuel Type</div>
-              <div className="p-2 border border-gray-200 rounded">{details.carYearFuel}</div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-      <div className="bg-gray-100 p-2 rounded font-semibold text-center">Fuel Status</div>
-      <div className="p-2 border border-gray-200 rounded">{details.fuelStatus}</div>
-    </div>
-            
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-gray-100 p-2 rounded font-semibold text-center">Speedometer</div>
-              <div className="p-2 border border-gray-200 rounded">{details.speedRd}</div>
-            </div>
-           
-          </div>
-        </div>
-
-        {/* Address & Workshop Section */}
-        <div className="p-4 border-b border-gray-300">
-          <div className="text-gray-600 text-left p-2 border border-gray-200 rounded">
-            <div className="p-2"><strong>Address : </strong>{details.customerAdd || 'N/A'}</div>
-            <div className="p-2"><strong>Workshop : </strong>{details.workshop || 'N/A'}</div>
-          </div>
-        </div>
-
-         {/* Invoice Summary Section */}
-         <div className="p-4 border-b border-gray-300">
-          <div className="bg-red-600 text-white py-3 px-4 rounded-lg mb-4 text-center font-semibold">
-            INVOICE SUMMARY
-          </div>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="border p-2 text-left">Net Amount</th>
-                  <th className="border p-2 text-left">Discount</th>
-                  <th className="border p-2 text-left">Total Payable</th>
-                </tr>
-              </thead>
-              <tbody>
-                {details.invoiceSum.map((sum, index) => (
-                  <tr key={index}>
-                    <td className="border p-2">₹{sum.netAmt}</td>
-                    <td className="border p-2">₹{sum.dis}</td>
-                    <td className="border p-2">₹{sum.totalPay}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          
-          <div className="text-center mt-4 text-gray-600 italic">
-            Precision in every detail, because your car deserves the best.
-          </div>
-        </div>
-
-        {/* Work Summary Section */}
-        <div className="p-4 border-b border-gray-300">
-          <div className="bg-red-600 text-white py-3 px-4 rounded-lg mb-4 text-center font-semibold">
-            WORK SUMMARY
-          </div>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="border p-2 text-left">Description</th>
-                  <th className="border p-2 text-left">Work Done</th>
-                  <th className="border p-2 text-left">Qty</th>
-                  {/* <th className="border p-2 text-left">Unit Price</th> */}
-                  {/* <th className="border p-2 text-left">Discount</th> */}
-                  <th className="border p-2 text-left">Net Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {details.workDetail.map((work, index) => (
-                  <tr key={index}>
-                    <td className="border p-2">{work.descriptions}</td>
-                    <td className="border p-2">{work.workDn}</td>
-                    <td className="border p-2">{work.quant}</td>
-                    {/* <td className="border p-2">₹{work.unitPr}</td> */}
-                    {/* <td className="border p-2">₹{work.dis}</td> */}
-                    <td className="border p-2">₹{work.netAmt}</td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-gray-50 font-bold">
-                <tr>
-                  <td className="border p-2" colSpan="3">Total</td>
-                  {/* <td className="border p-2">₹{details.totalUnitPriceBill}</td> */}
-                  {/* <td className="border p-2">₹{details.totalDiscountedPriceBill}</td> */}
-                  <td className="border p-2">₹{details.finalPriceBill}</td>
-                </tr>
-                <tr>
-                  <td className="border p-2" colSpan="3">After Discount</td>
-                  {/* <td className="border p-2">₹{details.totalUnitPriceBill}</td> */}
-                  {/* <td className="border p-2"></td> */}
-                  <td className="border p-2">₹{details.totalPayable}</td>
-                </tr>
-              </tfoot>
-            </table>
-
-            {/* Final Amount Section */}
-        {/* <div className="p-2 border-b border-gray-300">
-          <div className="bg-gray-100 p-4 rounded-lg">
-            <div className="flex justify-between items-center text-lg font-bold">
-              <span>Total Payable Amount:</span>
-              <span>₹{details.totalPayablePriceBill}</span>
-            </div>
-          </div>
-        </div> */}
-
-
-          </div>
-        </div>
-
-        {/* Additional Work Requirements */}
-        {/* <div className="p-4 border-b border-gray-300">
-          <div className="bg-red-600 text-white py-3 px-4 rounded-lg mb-4 text-center font-semibold">
-            ADDITIONAL WORK REQUIREMENTS
-          </div>
-          <p className="text-gray-600 text-center">
-            Review the extra care services required for your vehicle.
-          </p>
-        </div> */}
-
-        
-
-        {/* Terms & Conditions */}
-        <div className="p-4">
-          <div className="font-bold mb-4 text-center bg-gray-100 p-2 rounded">Disclaimer</div>
-          <ul className="list-disc pl-5 space-y-2 text-sm text-gray-600">
-            <li>All prices are inclusive of taxes</li>
-            <li>Workshop will provide the tax invoice directly</li>
-            {/* <li>Payment to be made at the time of delivery</li> */}
-            <li>The colour of engine oil may appear black after servicing in diesel vehicles</li>
-          </ul>
-        </div>
-
-        {/* Company Footer */}
-        <div className="p-4 text-center border-t border-gray-300">
-          <h3 className="text-xl font-bold mb-2">OnlyBigCars</h3>
-          <address className="text-gray-600 mb-2">
-            SAS Tower, Medcity, Sector - 38, Gurugram - 122001
-          </address>
-          <div className="space-y-1 text-gray-600">
-            <div>Contact: 9999967591</div>
-            <div>Website: https://onlybigcars.com/</div>
-          </div>
-        </div>
-
-      </div>
-      
-
-      {/* <button
-        onClick={() => generatePDF()}
-        className="download-pdf mt-8 mx-auto block bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-      >
-        Download PDF
-      </button> */}
-    </div>
+    <PDFViewer style={{ width: '100%', height: '100vh' }}>
+      <PDFDocument data={mergedData} />
+    </PDFViewer>
   );
 });
 

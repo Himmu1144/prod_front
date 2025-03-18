@@ -4,6 +4,7 @@ import { User, Lock } from "lucide-react";
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import obcLogo from '../assets/images/OBC-logo_main.png';
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -63,7 +64,7 @@ const LoginPage = () => {
           {/* Logo */}
           <div className="text-center mb-4">
             <img
-              src="https://onlybigcars.com/wp-content/uploads/2024/11/OnlyBigCars-Logo.png"
+              src={obcLogo}
               width="210"
               className="d-inline-block align-top"
               alt="OnlyBigCars"
