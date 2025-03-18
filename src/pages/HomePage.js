@@ -96,7 +96,7 @@ const [savedFilterParams, setSavedFilterParams] = useState({});
     // const fetchLeads = async () => {
     //     try {
     //         setIsLoading(true);
-    //         const response = await axios.get(`http://localhost:8000/?page=1`, {
+    //         const response = await axios.get(`https://obc.work.gd/?page=1`, {
     //             headers: { 'Authorization': `Token ${token}` }
     //         });
     
@@ -128,20 +128,20 @@ const [savedFilterParams, setSavedFilterParams] = useState({});
     //         if (currentView === 'filter') {
     //             console.log('Fetching filtered leads with params:', savedFilterParams);
     //             response = await axios.post(
-    //                 'http://localhost:8000/api/leads/filter/',
+    //                 'https://obc.work.gd/api/leads/filter/',
     //                 { ...savedFilterParams, page: nextPage },
     //                 { headers: { 'Authorization': `Token ${token}` } }
     //             );
     //         } else if (currentView === 'search') {
     //             console.log('Fetching search results with query:', savedSearchQuery);
     //             response = await axios.get(
-    //                 `http://localhost:8000/api/leads/search/?query=${savedSearchQuery}&page=${nextPage}`,
+    //                 `https://obc.work.gd/api/leads/search/?query=${savedSearchQuery}&page=${nextPage}`,
     //                 { headers: { 'Authorization': `Token ${token}` } }
     //             );
     //         } else {
     //             console.log('Fetching default leads');
     //             response = await axios.get(
-    //                 `http://localhost:8000/?page=${nextPage}`,
+    //                 `https://obc.work.gd/?page=${nextPage}`,
     //                 { headers: { 'Authorization': `Token ${token}` } }
     //             );
     //         }
@@ -172,7 +172,7 @@ const [savedFilterParams, setSavedFilterParams] = useState({});
     const fetchLeads = async () => {
         try {
             setIsLoading(true);
-            const response = await axios.get(`http://localhost:8000/?page=1`, {
+            const response = await axios.get(`https://obc.work.gd/?page=1`, {
                 headers: { 'Authorization': `Token ${token}` }
             });
             setLeads(response.data.leads);
@@ -217,18 +217,18 @@ const [savedFilterParams, setSavedFilterParams] = useState({});
     
             if (currentView === 'filter') {
                 response = await axios.post(
-                    'http://localhost:8000/api/leads/filter/',
+                    'https://obc.work.gd/api/leads/filter/',
                     { ...savedFilterParams, page: nextPage },
                     { headers: { 'Authorization': `Token ${token}` } }
                 );
             } else if (currentView === 'search') {
                 response = await axios.get(
-                    `http://localhost:8000/api/leads/search/?query=${savedSearchQuery}&page=${nextPage}`,
+                    `https://obc.work.gd/api/leads/search/?query=${savedSearchQuery}&page=${nextPage}`,
                     { headers: { 'Authorization': `Token ${token}` } }
                 );
             } else {
                 response = await axios.get(
-                    `http://localhost:8000/?page=${nextPage}`,
+                    `https://obc.work.gd/?page=${nextPage}`,
                     { headers: { 'Authorization': `Token ${token}` } }
                 );
             }
@@ -279,7 +279,7 @@ const [savedFilterParams, setSavedFilterParams] = useState({});
         setSearchMessage('');
         try {
             const response = await axios.get(
-                `http://localhost:8000/api/leads/search/?query=${searchQuery}&page=1`,
+                `https://obc.work.gd/api/leads/search/?query=${searchQuery}&page=1`,
                 { headers: { 'Authorization': `Token ${token}` } }
             );
           
@@ -353,7 +353,7 @@ const handleGarageChange = (garageName) => {
         setIsLoading(true); // Add loading state here
         try {
             const response = await axios.post(
-                'http://localhost:8000/api/leads/filter/',
+                'https://obc.work.gd/api/leads/filter/',
                 { ...filterFormData, page: 1 },
                 { headers: { 'Authorization': `Token ${token}` } }
             );
@@ -526,7 +526,7 @@ formatColumns('Date:', lead.arrival_time ?
     useEffect(() => {
         console.log('Here we are - ')
         // Fetch welcome message and users
-        axios.get('http://localhost:8000/', {
+        axios.get('https://obc.work.gd/', {
             headers: {
                 Authorization: `Token ${token}`
             }
@@ -594,7 +594,7 @@ useEffect(() => {
         // Get recent calls (implement this API endpoint in your backend)
         console.log("📞 Calling API: /api/recent-calls/");
         const response = await axios.get(
-          'http://localhost:8000/api/recent-calls/',
+          'https://obc.work.gd/api/recent-calls/',
           {
             headers: {
               'Authorization': `Token ${token}`
@@ -651,8 +651,8 @@ useEffect(() => {
                 let data = null;    // Default to no data (for GET requests)
         
                 // if (currentView === 'filter') {
-                //     // url = 'http://localhost:8000/api/leads/export/filtered/';
-                //     url = 'http://localhost:8000/api/leads/filter/';
+                //     // url = 'https://obc.work.gd/api/leads/export/filtered/';
+                //     url = 'https://obc.work.gd/api/leads/filter/';
                 //     method = 'POST';
                 //     // Ensure we're sending a properly formatted object with all required filter parameters
                     // data = {
@@ -666,17 +666,17 @@ useEffect(() => {
                 // } 
                 // else if (currentView === 'search') {
                     
-                //     url = `http://localhost:8000/api/leads/search/?query=${encodeURIComponent(savedSearchQuery)}`;
+                //     url = `https://obc.work.gd/api/leads/search/?query=${encodeURIComponent(savedSearchQuery)}`;
                 //     // method remains GET, no data needed
                 // } 
                 // else {
-                //     url = 'http://localhost:8000/api/leads/export/';
+                //     url = 'https://obc.work.gd/api/leads/export/';
                 //     // method remains GET, no data needed
                 // }
     
                 if (currentView === 'filter') {
                     
-                       url= 'http://localhost:8000/api/leads/export/filter/';
+                       url= 'https://obc.work.gd/api/leads/export/filter/';
                        method = 'POST';
                        data = {
                         ...savedFilterParams,
@@ -690,12 +690,12 @@ useEffect(() => {
                         
                 } else if (currentView === 'search') {
                     
-                       url= `http://localhost:8000/api/leads/export/search/?query=${encodeURIComponent(savedSearchQuery)}`;
+                       url= `https://obc.work.gd/api/leads/export/search/?query=${encodeURIComponent(savedSearchQuery)}`;
                         
                 } else {
                     
-                    // url = 'http://localhost:8000/api/leads/export/';
-                    url= 'http://localhost:8000/api/leads/export/filter/';
+                    // url = 'https://obc.work.gd/api/leads/export/';
+                    url= 'https://obc.work.gd/api/leads/export/filter/';
                     method = 'POST';
                     
                         

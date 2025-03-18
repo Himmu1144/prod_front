@@ -353,7 +353,7 @@ const EditPage = () => {
     try {
       setIsLoadingPreviousLeads(true);
       const response = await axios.get(
-        `http://localhost:8000/api/customers/${phoneNumber}/leads/?current_lead=${id || ''}`,
+        `https://obc.work.gd/api/customers/${phoneNumber}/leads/?current_lead=${id || ''}`,
         {
           headers: {
             'Authorization': `Token ${token}`
@@ -404,7 +404,7 @@ useEffect(() => {
     
 
     if (!id) {
-      axios.get('http://localhost:8000/', {
+      axios.get('https://obc.work.gd/', {
         headers: {
           'Authorization': `Token ${token}`
         }
@@ -424,7 +424,7 @@ useEffect(() => {
         try {
           console.log("Fetching lead with ID:", id); // Debug log
           const response = await axios.get(
-            `http://localhost:8000/api/leads/${id}/`,
+            `https://obc.work.gd/api/leads/${id}/`,
             {
               headers: {
                 'Authorization': `Token ${token}`
@@ -448,7 +448,7 @@ if (leadData && leadData.images) {
 }
 
           const customerResponse = await axios.get(
-            `http://localhost:8000/api/customers/${leadData.number}/`,
+            `https://obc.work.gd/api/customers/${leadData.number}/`,
             {
               headers: {
                 'Authorization': `Token ${token}`
@@ -749,7 +749,7 @@ if (leadData && leadData.images) {
     if (section === 'customerInfo' && field === 'mobileNumber' && value.length === 10) {
       try {
         const response = await axios.get(
-          `http://localhost:8000/api/customers/${value}/`,
+          `https://obc.work.gd/api/customers/${value}/`,
           {
             headers: {
               'Authorization': `Token ${token}`
@@ -1116,8 +1116,8 @@ imageFiles.forEach(file => {
 formData.append('existing_images', JSON.stringify(existingImages));
 
         const url = id 
-            ? `http://localhost:8000/api/leads/${id}/update/`
-            : 'http://localhost:8000/api/edit-form-submit/';
+            ? `https://obc.work.gd/api/leads/${id}/update/`
+            : 'https://obc.work.gd/api/edit-form-submit/';
             
         const method = id ? 'put' : 'post';
         
@@ -2579,7 +2579,7 @@ const shouldDisableOption = (optionValue, previousStatus) => {
 
 const fetchCustomerData = async (mobileNumber) => {
   try {
-    const response = await fetch(`http://localhost:8000/api/customers/${mobileNumber}`, {
+    const response = await fetch(`https://obc.work.gd/api/customers/${mobileNumber}`, {
       headers: {
         'Authorization': `Token ${token}`,
       }
