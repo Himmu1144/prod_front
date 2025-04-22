@@ -34,7 +34,7 @@ const filteredModels = modelSearchQuery
   useEffect(() => {
     const fetchCarData = async () => {
       try {
-        const response = await axios.get('https://obc.work.gd/api/car-data/');
+        const response = await axios.get('https://admin.onlybigcars.com/api/car-data/');
     console.log('API Response:', response.data);
         
         // Create mappings and collect all unique models

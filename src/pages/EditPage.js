@@ -18,9 +18,15 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import JobCard from './JobCard';
 import Bill from './bill.js';
+import { toast } from 'react-toastify';
 import Estimate from './estimate.js';
 import { FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
-import ImageUploader from '../components/ImageUploader';
+
+
+
+
+import { useServicePrices } from '../components/useServicePrices';
+
 
 
 
@@ -100,7 +106,19 @@ const EditPage = () => {
   const [selectedCarIndex, setSelectedCarIndex] = useState(0);
   // Add this line near the top of your component
   const [currentCarIndex, setCurrentCarIndex] = useState(0);
-  const [images, setImages] = useState([]);
+  const [isFromWorkshop, setIsFromWorkshop] = useState(false);
+
+  const [selectedImages, setSelectedImages] = useState([]);
+  const [existingImageUrls, setExistingImageUrls] = useState([]);
+  const [imageTooltipText, setImageTooltipText] = useState('');
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
+
+  
+  
+
+  // Add this near your other state definitions in EditPage component
+
+
 
 
   const [previousLeads, setPreviousLeads] = useState([]);
@@ -110,11 +128,51 @@ const EditPage = () => {
   //   googleMapsApiKey: "AIzaSyBlzkfa69pC6YAAomHbsYoDrKcrBU-5CQM",
   //   libraries: ["places"]
   // });
-
+  const prevStatusRef = useRef(null);
   const addressInputRef = useRef(null);
   const jobCardRef = useRef(null);
   const billRef = useRef(null);
   const estimateRef = useRef(null);
+
+  const handleImageChange = (e) => {
+    const files = Array.from(e.target.files);
+    
+    // Validate file types and sizes
+    const validFiles = files.filter(file => {
+      const isValidType = file.type.startsWith('image/');
+      const isValidSize = file.size <= 5 * 1024 * 1024; // 5MB max size
+      
+      if (!isValidType) {
+        setImageTooltipText('Only image files are allowed');
+        setTimeout(() => setImageTooltipText(''), 3000);
+        return false;
+      }
+      
+      if (!isValidSize) {
+        setImageTooltipText('Images must be under 5MB each');
+        setTimeout(() => setImageTooltipText(''), 3000);
+        return false;
+      }
+      
+      return true;
+    });
+    
+    setSelectedImages(prev => [...prev, ...validFiles]);
+  };
+
+// Function to remove a newly selected image
+const handleRemoveImage = (index) => {
+  const updatedImages = [...selectedImages];
+  updatedImages.splice(index, 1);
+  setSelectedImages(updatedImages);
+};
+
+// Function to remove an existing image
+const handleRemoveExistingImage = (index) => {
+  const updatedExistingImages = [...existingImageUrls];
+  updatedExistingImages.splice(index, 1);
+  setExistingImageUrls(updatedExistingImages);
+};
 
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -176,9 +234,6 @@ const EditPage = () => {
         
         // Try to find the status in the array - handle different data structures
         const found = statusHistory.some(entry => {
-          // Debug the entry structure
-          console.log('Checking entry:', entry);
-          
           // For object entries with a status property
           if (entry && typeof entry === 'object' && entry.status) {
             return entry.status.toLowerCase().trim() === statusToCheck.toLowerCase().trim();
@@ -192,7 +247,6 @@ const EditPage = () => {
           return false;
         });
         
-        console.log(`${statusToCheck} found:`, found);
         return found;
       } catch (error) {
         console.error('Error in hasStatus:', error);
@@ -200,13 +254,16 @@ const EditPage = () => {
       }
     };
   
-    // Get the timestamp for a specific status if it exists
-    const getStatusTimestamp = (statusToCheck) => {
+    // Get the timestamp for the LAST occurrence of a status
+    const getLatestStatusTimestamp = (statusToCheck) => {
       if (!Array.isArray(statusHistory) || statusHistory.length === 0) {
         return null;
       }
       
-      for (const entry of statusHistory) {
+      // Go through history in reverse to find the last occurrence
+      for (let i = statusHistory.length - 1; i >= 0; i--) {
+        const entry = statusHistory[i];
+        
         if (entry && typeof entry === 'object' && entry.status) {
           if (entry.status.toLowerCase().trim() === statusToCheck.toLowerCase().trim()) {
             return new Date(entry.timestamp).toLocaleString();
@@ -217,7 +274,46 @@ const EditPage = () => {
       return null;
     };
   
-    // Render the component based on the status checks
+    // Get all unique comments for a status, from newest to oldest
+    const getStatusComments = (statusToCheck) => {
+      if (!Array.isArray(statusHistory) || statusHistory.length === 0) {
+        return [];
+      }
+      
+      // Get all entries for this status, in reverse order (newest first)
+      const matchingEntries = statusHistory
+        .filter(entry => 
+          entry && 
+          typeof entry === 'object' && 
+          entry.status && 
+          entry.status.toLowerCase().trim() === statusToCheck.toLowerCase().trim()
+        )
+        .reverse();
+      
+      // Extract unique comments
+      const uniqueComments = [];
+      
+      matchingEntries.forEach(entry => {
+        const comment = entry.comment;
+        
+        // Skip entries without comments
+        if (!comment) return;
+        
+        // Check if this comment is contained in any comment that's already in our list
+        const isContainedInExisting = uniqueComments.some(existingComment => 
+          existingComment.includes(comment) && existingComment !== comment
+        );
+        
+        // If not already contained in a previous comment, add it
+        if (!isContainedInExisting) {
+          uniqueComments.push(comment);
+        }
+      });
+      
+      return uniqueComments;
+    };
+  
+    // Render component with updated logic
     return (
       <div className="status-history-container p-4">
         {!Array.isArray(statusHistory) || statusHistory.length === 0 ? (
@@ -227,27 +323,62 @@ const EditPage = () => {
         ) : (
           <div className="grid gap-4">
             {allStatuses.map((status, index) => {
-              const timestamp = getStatusTimestamp(status);
               const hasThisStatus = hasStatus(status);
+              
+              if (!hasThisStatus) {
+                // If status doesn't exist, render the gray version
+                return (
+                  <div 
+                    key={index}
+                    className="flex justify-between items-center p-3 rounded-lg bg-gray-50"
+                  >
+                    <div className="flex flex-col w-[85%]">
+                      <span className="font-medium">{status}</span>
+                    </div>
+                    <FaTimesCircle className="text-red-500 text-xl" />
+                  </div>
+                );
+              }
+              
+              // Get timestamp of latest occurrence
+              const timestamp = getLatestStatusTimestamp(status);
+              
+              // Get all unique comments for this status
+              const comments = getStatusComments(status);
               
               return (
                 <div 
                   key={index}
-                  className={`flex justify-between items-center p-3 rounded-lg ${
-                    hasThisStatus ? 'bg-green-50' : 'bg-gray-50'
-                  }`}
+                  className="flex justify-between items-center p-3 rounded-lg bg-green-50"
                 >
-                  <div className="flex flex-col">
+                  <div className="flex flex-col w-[85%]">
                     <span className="font-medium">{status}</span>
-                    {hasThisStatus && timestamp && (
+                    {timestamp && (
                       <span className="text-xs text-gray-500">{timestamp}</span>
                     )}
+                    
+                    {/* // Inside the StatusHistoryDisplay component's return statement, find this section: */}
+{comments.length > 0 && (
+  <div className="text-sm text-gray-600 mt-1">
+    {/* Replace this code */}
+    {/*
+    {comments.map((comment, commentIndex) => (
+      <div key={commentIndex} className={commentIndex > 0 ? "mt-2" : ""}>
+        {comment.length > 100 ? (
+          <CommentWithReadMore text={comment} maxLength={100} />
+        ) : (
+          `"${comment}"`
+        )}
+      </div>
+    ))}
+    */}
+    
+    {/* With this code */}
+    <CommentWithReadMore text={comments} maxLength={100} />
+  </div>
+)}
                   </div>
-                  {hasThisStatus ? (
-                    <FaCheckCircle className="text-green-500 text-xl" />
-                  ) : (
-                    <FaTimesCircle className="text-red-500 text-xl" />
-                  )}
+                  <FaCheckCircle className="text-green-500 text-xl" />
                 </div>
               );
             })}
@@ -256,30 +387,71 @@ const EditPage = () => {
       </div>
     );
   };
-  // 18 feb end
-
-
-//   const generateOrderId = (mobileNumber) => {
-//   // Get current time in IST
-//   const now = new Date();
-//   // Add 5 hours and 30 minutes for IST offset
-//   now.setHours(now.getHours() + 5);
-//   now.setMinutes(now.getMinutes() + 30);
   
-//   const year = now.getFullYear().toString().slice(-2);
-//   const month = (now.getMonth() + 1).toString().padStart(2, '0');
-//   const day = now.getDate().toString().padStart(2, '0');
-//   const hour = now.getHours().toString().padStart(2, '0');
-//   const minute = now.getMinutes().toString().padStart(2, '0');
-  
-//   // Get last 4 digits of mobile number
-//   const lastFour = mobileNumber.slice(-4).padStart(4, '0');
-  
-//   // Combine all parts
-//   return `${year}${lastFour}${month}${day}${hour}${minute}`;
-// };
-
-
+  const CommentWithReadMore = ({ text, maxLength }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    
+    const toggleReadMore = (e) => {
+      e.preventDefault();
+      setIsExpanded(!isExpanded);
+    };
+    
+    if (!text) return null;
+    
+    // Check if text is an array and join with newlines
+    const combinedText = Array.isArray(text) ? text.join("\n\n") : text;
+    
+    // Instead of truncating at an arbitrary character count,
+    // we'll show a reasonable block of text
+    let displayText = combinedText;
+    let shouldShowButton = false;
+    
+    if (!isExpanded && combinedText.length > maxLength) {
+      // Try to find a natural breakpoint before maxLength
+      const breakpoints = ['\n\n', '\n', '. ', '! ', '? '];
+      let cutoffIndex = maxLength;
+      
+      for (const breakpoint of breakpoints) {
+        const index = combinedText.indexOf(breakpoint, Math.floor(maxLength/2));
+        if (index > 0 && index < maxLength) {
+          cutoffIndex = index + breakpoint.length - (breakpoint === '\n' ? 0 : 1);
+          break;
+        }
+      }
+      
+      displayText = combinedText.substring(0, cutoffIndex);
+      shouldShowButton = true;
+    }
+    
+    // Replace newlines with line break elements for display
+    const formattedText = isExpanded ? 
+      combinedText.split('\n').map((line, i) => (
+        <React.Fragment key={i}>
+          {i > 0 && <br />}
+          {line}
+        </React.Fragment>
+      )) :
+      displayText.split('\n').map((line, i) => (
+        <React.Fragment key={i}>
+          {i > 0 && <br />}
+          {line}
+        </React.Fragment>
+      ));
+    
+    return (
+      <>
+        <span className="whitespace-pre-line">"{formattedText}{!isExpanded && shouldShowButton ? "..." : ""}"</span>
+        {combinedText.length > maxLength && (
+          <button
+            onClick={toggleReadMore}
+            className="ml-2 text-xs text-red-500 font-medium hover:text-red-700 focus:outline-none"
+          >
+            {isExpanded ? "Show Less" : "Read More"}
+          </button>
+        )}
+      </>
+    );
+  };
   
   const [formState, setFormState] = useState({
     overview: {
@@ -327,7 +499,7 @@ const EditPage = () => {
       commissionReceived: 0, // Add this new field
       commissionPercent: 0, // Add this new field
       pendingAmount: 0, // Add this new field
-      images: [],
+     
     },
     workshop: {
       name: selectedGarage.name,
@@ -353,7 +525,7 @@ const EditPage = () => {
     try {
       setIsLoadingPreviousLeads(true);
       const response = await axios.get(
-        `https://obc.work.gd/api/customers/${phoneNumber}/leads/?current_lead=${id || ''}`,
+        `https://admin.onlybigcars.com/api/customers/${phoneNumber}/leads/?current_lead=${id || ''}`,
         {
           headers: {
             'Authorization': `Token ${token}`
@@ -373,6 +545,153 @@ useEffect(() => {
     fetchPreviousLeads(formState.customerInfo.mobileNumber);
   }
 }, [formState.customerInfo.mobileNumber, id]);
+
+
+useEffect(() => {
+  const fetchCarData = async () => {
+      try {
+          // Assuming '/api/car-data/' endpoint returns data structured like [{ name: 'Brand', models: [{ name: 'Model', image_url: '...' }] }]
+          const response = await axios.get(`https://admin.onlybigcars.com/api/car-data/`, {
+              headers: { Authorization: `Token ${token}` },
+          });
+          setCarBrandsData(response.data);
+          console.log("Fetched car brand data:", response.data); // For debugging
+      } catch (error) {
+          console.error("Error fetching car brand/model data:", error);
+          // Handle error (e.g., show a message to the user)
+      }
+  };
+  if (token) {
+      fetchCarData();
+  }
+}, [token]); // Dependency on token
+
+useEffect(() => {
+  const currentStatus = formState.arrivalStatus.leadStatus;
+  
+  // Check if status was changed to "Duplicate" and wasn't Duplicate before
+  if (currentStatus === 'Duplicate' && prevStatusRef.current !== 'Duplicate') {
+    console.log("Lead status changed to Duplicate, fetching previous lead data");
+    
+    // Get customer phone number
+    const mobileNumber = formState.customerInfo.mobileNumber;
+    console.log(`Customer mobile number: ${mobileNumber}, Lead ID: ${id}`);
+    
+    if (mobileNumber) {
+      // Show loading indicator
+      setIsSubmitting(true);
+      
+      // Use axios instead of fetch for better error handling and consistency
+      axios.get(`https://admin.onlybigcars.com/api/customers/${mobileNumber}/leads/`, {
+        params: { current_lead: id },
+        headers: {
+          'Authorization': `Token ${token}`
+        }
+      })
+      .then(response => {
+        console.log("API Response received:", response.data);
+        const data = response.data;
+        
+        if (data && data.length > 0) {
+          // Get most recent lead
+          const previousLead = data[0];
+          console.log("Found previous lead data:", previousLead);
+          
+          // Debug all key fields we're trying to copy
+          console.log("Fields to copy from previous lead:");
+          console.log("- Source:", previousLead.source);
+          console.log("- Address:", previousLead.address);
+          console.log("- City:", previousLead.city);
+          console.log("- State:", previousLead.state);
+          console.log("- Building:", previousLead.building);
+          console.log("- Landmark:", previousLead.landmark);
+          console.log("- Map Link:", previousLead.map_link);
+          console.log("- Lead Type:", previousLead.lead_type);
+          console.log("- Arrival Mode:", previousLead.arrival_mode);
+          console.log("- Products:", previousLead.products);
+          
+          // Update form state with data from previous lead
+          setFormState(prevState => {
+            const updatedState = {
+              ...prevState,
+              customerInfo: {
+                ...prevState.customerInfo,
+                source: previousLead.source || prevState.customerInfo.source, // Copy source from previous lead
+              },
+              location: {
+                address: previousLead.address || prevState.location.address,
+                city: previousLead.city || prevState.location.city,
+                state: previousLead.state || prevState.location.state,
+                buildingName: previousLead.building || prevState.location.buildingName,
+                landmark: previousLead.landmark || prevState.location.landmark,
+                mapLink: previousLead.map_link || prevState.location.mapLink
+              },
+              basicInfo: {
+                ...prevState.basicInfo,
+                carType: previousLead.lead_type || prevState.basicInfo.carType,
+                caName: previousLead.caName || prevState.caName,
+                cceComments: `${prevState.basicInfo.cceComments || ''}\n[AUTO] Data copied from previous lead ${previousLead.id || previousLead.lead_id} on ${new Date().toLocaleString()}`.trim(),
+                caComments: `${prevState.basicInfo.caComments || ''}\n[AUTO] Data copied from previous lead ${previousLead.id || previousLead.lead_id} on ${new Date().toLocaleString()}`.trim(),
+              },
+              arrivalStatus: {
+                ...prevState.arrivalStatus,
+                leadStatus: 'Duplicate',
+                arrivalMode: previousLead.arrival_mode || prevState.arrivalStatus.arrivalMode,
+                disposition: previousLead.disposition || prevState.arrivalStatus.disposition,
+                batteryFeature: previousLead.battery_feature || prevState.arrivalStatus.batteryFeature,
+                fuelStatus: previousLead.fuel_status || prevState.arrivalStatus.fuelStatus,
+                speedometerRd: previousLead.speedometer_rd || prevState.arrivalStatus.speedometerRd,
+                inventory: previousLead.inventory || prevState.arrivalStatus.inventory,
+                additionalWork: previousLead.additional_work || prevState.arrivalStatus.additionalWork,
+                // arrival_time: previousLead.arrival_time ,
+              },
+              workshop: previousLead.workshop_details || prevState.workshop,
+              overview: {
+                ...prevState.overview,
+                tableData: previousLead.products || prevState.overview.tableData,
+                total:previousLead.estimated_price || prevState.overview.total,
+                discount: previousLead.overview.discount || prevState.overview.discount,
+                finalAmount: previousLead.overview.finalAmount || prevState.overview.finalAmount,
+              }
+            };
+            
+              // Update the discount UI state as well
+              setDiscount(previousLead.overview.discount || prevState.overview.discount || 0);
+            
+            console.log("Form state updated with previous lead data");
+            return updatedState;
+          });
+          
+          // Add a message to indicate successful auto-fill
+          toast.success(`Auto-filled data from previous lead ${previousLead.id || previousLead.lead_id}`);
+          console.log(`Auto-filled data from previous lead ${previousLead.id || previousLead.lead_id}`);
+        } else {
+          console.log("No previous leads found for this customer");
+          toast.info("No previous leads found for this customer to auto-fill");
+        }
+        setIsSubmitting(false);
+      })
+      .catch(error => {
+        console.error("Error fetching previous lead data:", error);
+        
+        // Enhanced error logging
+        if (error.response) {
+          console.error("API Error response:", {
+            status: error.response.status,
+            data: error.response.data
+          });
+        }
+        
+        toast.error("Failed to fetch previous lead data");
+        setIsSubmitting(false);
+      });
+    }
+  }
+  
+  // Update the previous status reference
+  prevStatusRef.current = currentStatus;
+}, [formState.arrivalStatus.leadStatus, id, token, formState.customerInfo.mobileNumber]);
+
 
 
   // Fetch lead data if ID exists
@@ -402,9 +721,10 @@ useEffect(() => {
     } 
 
     
+    
 
     if (!id) {
-      axios.get('https://obc.work.gd/', {
+      axios.get('https://admin.onlybigcars.com/', {
         headers: {
           'Authorization': `Token ${token}`
         }
@@ -424,7 +744,7 @@ useEffect(() => {
         try {
           console.log("Fetching lead with ID:", id); // Debug log
           const response = await axios.get(
-            `https://obc.work.gd/api/leads/${id}/`,
+            `https://admin.onlybigcars.com/api/leads/${id}/`,
             {
               headers: {
                 'Authorization': `Token ${token}`
@@ -437,18 +757,15 @@ useEffect(() => {
           // Restructure the incoming data to match formState structure
           const leadData = response.data[0];
 
-     // Replace this code block (around line 432):
-if (leadData && leadData.images) {
-  const imageArray = leadData.images.map(imgPath => ({
-    url: imgPath, // Don't prepend localhost - URLs come fully formed from backend
-    file: null
-  }));
-  setImages(imageArray);
-  console.log("Loaded images:", imageArray); // Add debugging
-}
-
+           // If the lead has images, store them in state
+        if (leadData.images && Array.isArray(leadData.images)) {
+          setExistingImageUrls(leadData.images);
+          console.log("Loaded existing images:", leadData.images);
+        }
+        
+          
           const customerResponse = await axios.get(
-            `https://obc.work.gd/api/customers/${leadData.number}/`,
+            `https://admin.onlybigcars.com/api/customers/${leadData.number}/`,
             {
               headers: {
                 'Authorization': `Token ${token}`
@@ -525,7 +842,7 @@ if (leadData && leadData.images) {
               speedometerRd: leadData.speedometer_rd || '', // Add this new field
               inventory: leadData.inventory || [],
               orderId: leadData.orderId || 'NA', // Add this new field
-              images: leadData.images || [],
+            
               
             },
             workshop: {
@@ -580,6 +897,34 @@ if (leadData && leadData.images) {
             setUsers(response.data.users);
           }
 
+         
+// need prod check
+  //         const shouldAddDummyCar = isAdmin && id && formState.cars.length === 0 && !dummyCarAddedRef.current;
+  
+  // if (shouldAddDummyCar) {
+  //   // Add dummy car for admin
+  //   const dummyCar = {
+  //     carBrand: 'Audi',
+  //     carModel: 'A3',
+  //     fuel: 'petrol',
+  //     year: '2000',
+  //     chasisNo: '',
+  //     regNo: '',
+  //     variant: ''
+  //   };
+    
+  //   setFormState(prev => ({
+  //     ...prev,
+  //     cars: [...prev.cars, dummyCar]
+  //   }));
+    
+  //   // Set the dummy car as selected
+  //   setSelectedCarIndex(0);
+    
+  //   // Mark that we've added a dummy car to prevent infinite loop
+  //   dummyCarAddedRef.current = true;
+  // }
+
 
             // Update source if available
         if (leadData.source) {
@@ -601,6 +946,8 @@ if (leadData && leadData.images) {
     }
   }, [id, token]);
 
+  
+
   // useEffect(() => {
   //   if (isLoaded && addressInputRef.current) {
   //     const autocomplete = new window.google.maps.places.Autocomplete(addressInputRef.current);
@@ -619,38 +966,45 @@ if (leadData && leadData.images) {
   //   }
   // }, [isLoaded]);
 
+  
+
+  // Update the calculateTotalAmount function
   const calculateTotalAmount = (tableData) => {
     return tableData.reduce((sum, row) => {
-      const rowTotal = parseFloat(row.total) || 0;
+      const quantity = parseInt(row.quantity) || 1;
+      const price = parseFloat(row.pricePerItem || row.total / quantity) || 0;
+      const rowTotal = price * quantity;
       return sum + rowTotal;
     }, 0);
   };
 
-  // Modify the existing table row total change handler
-  const handleTotalChange = (index, value) => {
-    const newTableData = [...formState.overview.tableData];
-    newTableData[index].total = value === '' ? 0 : parseFloat(value) || 0;
-    
-    // Calculate new total amount
-    const newTotal = calculateTotalAmount(newTableData);
-    
-    setFormState(prev => ({
-      ...prev,
-      overview: {
-        ...prev.overview,
-        tableData: newTableData,
-
-        total: newTotal || 0,
-        finalAmount: newTotal || 0 // Sync final amount with total
-      },
-      basicInfo: {
-        ...prev.basicInfo,
-        total: newTotal || 0// Sync total with basicInfo
-      }
-
-    }));
-  };
-
+  // Modify handleTotalChange to preserve price per item
+const handleTotalChange = (index, value) => {
+  const newTableData = [...formState.overview.tableData];
+  const newTotal = value === '' ? 0 : parseFloat(value) || 0;
+  const quantity = newTableData[index].quantity || 1;
+  
+  // Calculate and store price per item
+  newTableData[index].pricePerItem = newTotal / quantity;
+  newTableData[index].total = newTotal;
+  
+  // Calculate new total amount
+  const newTotalAmount = calculateTotalAmount(newTableData);
+  
+  setFormState(prev => ({
+    ...prev,
+    overview: {
+      ...prev.overview,
+      tableData: newTableData,
+      total: newTotalAmount,
+      finalAmount: newTotalAmount
+    },
+    basicInfo: {
+      ...prev.basicInfo,
+      total: newTotalAmount
+    }
+  }));
+};
   // Add this new function after handleTotalChange 14-2
   const updateTechnicianComments = (tableData) => {
     const names = tableData
@@ -667,6 +1021,8 @@ if (leadData && leadData.images) {
     }));
   };
 
+  const [userLocation, setUserLocation] = useState(null);
+
   const handlePlaceSelect = (addressData) => {
     setFormState(prev => ({
       ...prev,
@@ -678,6 +1034,10 @@ if (leadData && leadData.images) {
         mapLink: addressData.mapLink
       }
     }));
+    setUserLocation({
+      lat: addressData.lat,
+      lng: addressData.lng
+    });
   };
 
   const addServiceToTable = (service) => {
@@ -711,13 +1071,23 @@ if (leadData && leadData.images) {
     }
   
     };
+    
+    // Check if a price is available for this service
+  const serviceKey = `${service.id}-${service.title}`;
+  let servicePrice = 0;
+  
+  if (servicePrices[serviceKey] && servicePrices[serviceKey] !== "Determine") {
+    // Extract numerical value from the price string (removing the ₹ symbol)
+    const priceString = servicePrices[serviceKey].replace('₹', '');
+    servicePrice = parseFloat(priceString) || 0;
+  }
   
     const newTableRow = {
     type: selectedService,
     name: service.title,
     workdone: cleanWorkdone(),
     determined: false, 
-    total: 0
+    total: servicePrice  // Use the extracted price rather than always 0
     };
 
     const newTableData = [...formState.overview.tableData, newTableRow]; //14-2
@@ -726,7 +1096,9 @@ if (leadData && leadData.images) {
       ...prev,
       overview: {
         ...prev.overview,
-        tableData: newTableData
+        tableData: newTableData,
+        total: calculateTotalAmount(newTableData),  // Recalculate total
+        finalAmount: calculateTotalAmount(newTableData) // Sync final amount with total
       }
     }));
 
@@ -749,7 +1121,7 @@ if (leadData && leadData.images) {
     if (section === 'customerInfo' && field === 'mobileNumber' && value.length === 10) {
       try {
         const response = await axios.get(
-          `https://obc.work.gd/api/customers/${value}/`,
+          `https://admin.onlybigcars.com/api/customers/${value}/`,
           {
             headers: {
               'Authorization': `Token ${token}`
@@ -758,6 +1130,9 @@ if (leadData && leadData.images) {
         );
   
         const customerData = response.data;
+
+        const cars = customerData.cars || [];
+        
         
         // Update form state with fetched data
         setFormState(prev => ({
@@ -778,7 +1153,7 @@ if (leadData && leadData.images) {
             landmark: customerData.location?.landmark || '',
             mapLink: customerData.location?.mapLink || ''
           },
-          cars: customerData.cars || [] // Set all cars from the customer data
+          cars: cars || [] // Set all cars from the customer data
         }));
          // If we have cars, select the first one by default
          if (customerData.cars && customerData.cars.length > 0) {
@@ -796,78 +1171,157 @@ if (leadData && leadData.images) {
  
   
   const handleAddCar = (carData, isEdit) => {
-    if (isEdit) {
-      // Update existing car
-      setFormState(prev => ({
-        ...prev,
-        cars: prev.cars.map((car, i) => 
-          i === selectedCarIndex ? carData : car
-        )
-      }));
+    console.log("handleAddCar called with:", carData, "isEdit:", isEdit); // Log input
+    console.log("Current carBrandsData:", carBrandsData); // Log available brand data
+
+    // Find the image URL from carBrandsData
+    let imageUrl = null; // Default to null
+    const brandData = carBrandsData.find(b => b.name === carData.carBrand); // Case-insensitive comparison
+    if (!carBrandsData || carBrandsData.length === 0) {
+  alert("Car brand data not loaded yet. Please wait a moment and try again.");
+  return;
+}
+    console.log("Found brandData:", brandData); // Log found brand
+
+    if (brandData) {
+        // Ensure brandData.models is an array before using find
+        const modelsArray = Array.isArray(brandData.models) ? brandData.models : [];
+        const modelData = modelsArray.find(m => m.name === carData.carModel);
+        console.log("Found modelData:", modelData); // Log found model
+
+        if (modelData && modelData.image_url) {
+            imageUrl = modelData.image_url;
+            console.log("Found imageUrl:", imageUrl); // Log the found URL
+        } else {
+            console.warn("imageUrl not found in modelData or modelData is missing.");
+        }
     } else {
-      // Add new car
-      setFormState(prev => ({
-        ...prev,
-        cars: [...prev.cars, carData]
-      }));
-      // Set the newly added car as selected
-      setSelectedCarIndex(formState.cars.length);
+        console.warn("brandData not found for:", carData.carBrand);
     }
+
+    // Log if image URL wasn't found (for debugging)
+    if (!imageUrl) {
+        console.warn(`Final imageUrl for ${carData.carBrand} ${carData.carModel} is null. Using default.`);
+    }
+
+    // Add the imageUrl to the carData object
+    const carWithImage = { ...carData, imageUrl: imageUrl };
+    console.log("Car object being added/updated:", carWithImage); // Log the final car object
+
+    setFormState(prev => {
+        // ... (rest of the state update logic remains the same) ...
+        let updatedCars;
+        let editIndex = -1; // Initialize editIndex
+
+        if (isEdit && editingCar) {
+            // Find the index using a reliable unique identifier (id)
+             editIndex = prev.cars.findIndex(car => car.id === editingCar.id);
+
+            if (editIndex !== -1) {
+                updatedCars = [...prev.cars];
+                // Ensure existing car data is preserved, only update fields from carWithImage
+                updatedCars[editIndex] = { ...updatedCars[editIndex], ...carWithImage };
+            } else {
+                console.warn("Editing car not found in state, adding as new.");
+                // Add as new if not found, generate a temporary client-side ID if needed
+                const newCar = { ...carWithImage, id: `temp-${Date.now()}` };
+                updatedCars = [...prev.cars, newCar];
+                editIndex = updatedCars.length - 1; // Set index to the newly added car
+            }
+        } else {
+            // Check if car already exists (optional, prevents duplicates on add)
+            const exists = prev.cars.some(car =>
+                car.carBrand === carWithImage.carBrand &&
+                car.carModel === carWithImage.carModel &&
+                car.year === carWithImage.year &&
+                car.regNo === carWithImage.regNo // Add more fields if needed for uniqueness
+            );
+            if (!exists) {
+                 // Add new car with image, generate a temporary client-side ID if needed
+                 const newCar = { ...carWithImage, id: `temp-${Date.now()}` };
+                 updatedCars = [...prev.cars, newCar];
+                 editIndex = updatedCars.length - 1; // Set index to the newly added car
+            } else {
+                 console.warn("Attempted to add a duplicate car.");
+                 updatedCars = [...prev.cars]; // Keep existing cars if duplicate
+                 // Find the index of the existing car to select it
+                 editIndex = prev.cars.findIndex(car =>
+                    car.carBrand === carWithImage.carBrand &&
+                    car.carModel === carWithImage.carModel &&
+                    car.year === carWithImage.year &&
+                    car.regNo === carWithImage.regNo
+                 );
+            }
+        }
+
+        // Ensure selectedCarIndex is valid after adding/editing
+        const newSelectedCarIndex = editIndex !== -1 ? editIndex : Math.max(0, updatedCars.length - 1);
+        setSelectedCarIndex(newSelectedCarIndex); // Update selectedCarIndex state
+
+        return {
+            ...prev,
+            cars: updatedCars
+        };
+    });
+    setShowAddCarModal(false);
+    setEditingCar(null);
   };
-
   // Add this function before the handleSubmit function
-  const validateForm = () => {
-    const errors = {};
+const validateForm = () => {
+  const errors = {};
+  
+  // Required fields validation with specific styling
+  const requiredFields = [
+    { field: 'carType', value: formState.basicInfo.carType, label: 'Lead type' },
+    { field: 'mobileNumber', value: formState.customerInfo.mobileNumber, label: 'Mobile number' },
+    // { field: 'customerName', value: formState.customerInfo.customerName, label: 'Customer name' },
+    { field: 'source', value: formState.customerInfo.source, label: 'Source' },
+    { field: 'address', value: formState.location.address, label: 'Address' },
+    { field: 'caComments', value: formState.basicInfo.caComments, label: 'Technician comments' },
+    { field: 'leadStatus', value: formState.arrivalStatus.leadStatus, label: 'Lead status' },
+    { field: 'arrivalMode', value: formState.arrivalStatus.arrivalMode, label: 'Arrival mode' },
+    { field: 'dateTime', value: formState.arrivalStatus.dateTime, label: 'Date and time' },
+    { field: 'caName', value: formState.basicInfo.caName, label: 'Technician' },
+    { field: 'cceName', value: formState.basicInfo.cceName, label: 'CCE name' },
+  ];
+
+  // For non-admin users, enforce all validations
+  if (!isAdmin) {
+    const missingFields = requiredFields.filter(({ value }) => !value || value.trim() === '');
     
-    // Required fields validation with specific styling
-    const requiredFields = [
-      { field: 'carType', value: formState.basicInfo.carType, label: 'Lead type' },
-      { field: 'mobileNumber', value: formState.customerInfo.mobileNumber, label: 'Mobile number' },
-      // { field: 'customerName', value: formState.customerInfo.customerName, label: 'Customer name' },
-      { field: 'source', value: formState.customerInfo.source, label: 'Source' },
-      { field: 'address', value: formState.location.address, label: 'Address' },
-      { field: 'caComments', value: formState.basicInfo.caComments, label: 'Technician comments' },
-      { field: 'leadStatus', value: formState.arrivalStatus.leadStatus, label: 'Lead status' },
-      { field: 'arrivalMode', value: formState.arrivalStatus.arrivalMode, label: 'Arrival mode' },
-      { field: 'dateTime', value: formState.arrivalStatus.dateTime, label: 'Date and time' },
-      { field: 'caName', value: formState.basicInfo.caName, label: 'Technician' },
-      { field: 'cceName', value: formState.basicInfo.cceName, label: 'CCE name' },
-    ];
-  
-  //   requiredFields.forEach(({ field, value, label }) => {
-  //     if (!value || value.trim() === '') {
-  //       errors[field] = `${label} is required`;
-  //     }
-  //   });
-  
-  //   if (!formState.cars || formState.cars.length === 0) {
-  //     errors.car = 'At least one car is required';
-  //   }
-  
-  //   return errors;
-  // };
+    if (missingFields.length > 0) {
+      errors.required = (
+        <ul>
+          {missingFields.map(({ label }, index) => (
+            <li key={index}>{`${label} is required`}</li>
+          ))}
+        </ul>
+      );
+    }
+    
+    if (!formState.cars || formState.cars.length === 0) {
+      errors.car = 'At least one car is required';
+    }
 
-  const missingFields = requiredFields.filter(({ value }) => !value || value.trim() === '');
-  
-  if (missingFields.length > 0) {
-    errors.required = (
-      <ul>
-        {missingFields.map(({ label }, index) => (
-          <li key={index}>{`${label} is required`}</li>
-        ))}
-      </ul>
-    );
+    if(formState.basicInfo.cceComments.length < 30) { 
+      errors.cceComments = 'CCE Comments should be at least 30 characters long';
+    }
+    
+    // Table rows validation
+    if (!formState.overview.tableData || formState.overview.tableData.length === 0) {
+      errors.table = 'At least one service must be added to the overview table';
+    }
+  } else {
+    // For admin users, only validate mobile number as it's essential for the system
+    if (!formState.customerInfo.mobileNumber || formState.customerInfo.mobileNumber.trim() === '') {
+      errors.required = (
+        <ul>
+          <li>Mobile number is required even for admin users</li>
+        </ul>
+      );
+    }
   }
-
-  if (!formState.cars || formState.cars.length === 0) {
-    errors.car = 'At least one car is required';
-  }
-
-  // Table rows validation
-  if (!formState.overview.tableData || formState.overview.tableData.length === 0) {
-    errors.table = 'At least one service must be added to the overview table';
-  }
-
+  
   return errors;
 };
 
@@ -964,16 +1418,6 @@ const submissionData = JSON.parse(JSON.stringify(formState));
 
 
   
-  // Ensure only the selected car is included in the submission
-  if (submissionData.cars && submissionData.cars.length > 0) {
-    // Use a safe index (if selectedCarIndex is out of bounds, use 0)
-    const safeIndex = Math.min(selectedCarIndex, submissionData.cars.length - 1);
-    // Extract just the selected car
-    const selectedCar = submissionData.cars[safeIndex];
-    // Replace the cars array with just the selected car
-    submissionData.cars = [selectedCar];
-  }
-  
 // Starting from here - copy paste update
 
 
@@ -1023,42 +1467,35 @@ const formatCarDetails = (cars) => {
   const variantDetails = `${car.year} ${car.fuel}`;
   return [carName, variantDetails];
 };
-
 const formattedData = [
-  formatColumns('Name:', formState.customerInfo.customerName, true),
-  formatColumns('Number:', formState.customerInfo.mobileNumber, true),
+  formatColumns('Name:', (formState.customerInfo.customerName || '').trim(), true),
+  formatColumns('Number:', (formState.customerInfo.mobileNumber || '').trim(), true),
   '',
-  // formatMultiLine('Car:', formState.cars.length > 0 ? formState.cars.map(car => `${car.carBrand} ${car.carModel}`).join(', ') : 'N/A', true),
-  // formatMultiLine('Variant:', formState.cars.length > 0 ? formState.cars.map(car => `${car.year} ${car.fuel}`).join(', ') : 'N/A', true),
-  // '',
-  // formatColumns('Vin No.:', formState.cars[0]?.chasisNo),
-  // formatColumns('Reg No.:', formState.cars[0]?.regNo),
-  formatColumns('Car:', formState.cars[selectedCarIndex] ? `${formState.cars[selectedCarIndex].carBrand} ${formState.cars[selectedCarIndex].carModel}` : 'N/A', true),
-  formatColumns('Variant:', formState.cars[selectedCarIndex] ? `${formState.cars[selectedCarIndex].year} ${formState.cars[selectedCarIndex].fuel}` : 'N/A', true),
+  formatColumns('Car:', formState.cars[selectedCarIndex] ? `${formState.cars[selectedCarIndex].carBrand} ${formState.cars[selectedCarIndex].carModel}`.trim() : 'N/A', true),
+  formatColumns('Variant:', formState.cars[selectedCarIndex] ? `${formState.cars[selectedCarIndex].year} ${formState.cars[selectedCarIndex].fuel}`.trim() : 'N/A', true),
   '',
   formatColumns('Vin No.:', formState.cars[selectedCarIndex]?.chasisNo),
   formatColumns('Reg No.:', formState.cars[selectedCarIndex]?.regNo),
-  formatColumns('Arrival:', formState.arrivalStatus.arrivalMode, true),
-  formatColumns('Date:', formState.arrivalStatus.dateTime ? formState.arrivalStatus.dateTime.replace('T', ' ') : '', true),
+  formatColumns('Arrival:', (formState.arrivalStatus.arrivalMode || '').trim(), true),
+  formatColumns('Date:', formState.arrivalStatus.dateTime ? formState.arrivalStatus.dateTime.replace('T', ' ').trim() : '', true),
   '',
-  formatColumns('Add:', formState.location.address, true),
+  formatColumns('Add:', (formState.location.address || '').trim(), true),
   '',
-  formatMultiLine('Map Link:', formState.location.mapLink, true),
+  formatMultiLine('Map Link:', (formState.location.mapLink || '').trim(), true),
   '',
-  formatColumns('Work Summary:', formState.overview.tableData.map(item => item.name).join(', '), true),
+  formatColumns('Work Summary:', formState.overview.tableData.map(item => item.name).join(', ').trim(), true),
   '',
-  formatColumns('Total Amount:', `₹${formState.overview.total}`, true),
+  formatColumns('Total Amount:', `₹${formState.overview.finalAmount}`.trim(), true),
   '',
-  formatMultiLine('Workshop Name:', formState.workshop.name),
+  formatMultiLine('Workshop Name:', (formState.workshop.name || '').trim()),
   '',
-  formatColumns('Lead Status:', formState.arrivalStatus.leadStatus),
-  formatColumns('Lead Source:', formState.customerInfo.source),
-  formatColumns('Office CCE:', formState.basicInfo.cceName),
-  formatColumns('Technician:', formState.basicInfo.caName),
+  formatColumns('Lead Status:', formState.arrivalStatus.leadStatus, true),
+  formatColumns('Lead Source:', formState.customerInfo.source, true),
+  formatColumns('Office CCE:', formState.basicInfo.cceName, true),
+  formatColumns('Technician:', formState.basicInfo.caName, true),
   '',
   formatColumns('Lead ID:', id ? id : formatLeadId(formState.customerInfo.mobileNumber, seqNum))
-].join('\n');// Ending here - copy paste update
-
+].join('\n');
   
          // Copy to clipboard
          try {
@@ -1092,32 +1529,43 @@ submissionData.overview = cleanedOverview;
             };
             
             console.log("Form data being submitted:", JSON.stringify(formDataToSubmit, null, 2));
-     // Create FormData object for the actual request
-     const formData = new FormData();
-    
-     // Add the JSON data as a string
-     formData.append('data', JSON.stringify(formDataToSubmit));
      
-     // Process images
-const imageFiles = images.filter(img => img.file).map(img => img.file);
-const existingImages = images.filter(img => !img.file).map(img => img.url);
 
-// Log for debugging
-console.log("Submitting images:");
-console.log("New files:", imageFiles.map(f => f.name));
-console.log("Existing URLs:", existingImages);
+  // Ensure only the selected car is included in the submission
+  if (submissionData.cars && submissionData.cars.length > 0) {
+    // Use a safe index (if selectedCarIndex is out of bounds, use 0)
+    const safeIndex = Math.min(selectedCarIndex, submissionData.cars.length - 1);
+    // Extract just the selected car
+    const selectedCar = submissionData.cars[safeIndex];
+    // Replace the cars array with just the selected car
+    submissionData.cars = [selectedCar];
+  }
+  
 
-// Add image files
-imageFiles.forEach(file => {
-  formData.append('images', file);
-});
+  const formData = new FormData();
 
-// Add existing images as JSON
-formData.append('existing_images', JSON.stringify(existingImages));
+  // Create a copy of submissionData to include existing images
+  const formDataWithImages = {
+    ...submissionData,  // <-- Use submissionData instead of formState
+    // Add the existing images to the data being sent
+    existingImages: existingImageUrls
+  };
+  
+  // Add form data as JSON (including existingImages)
+  formData.append('data', JSON.stringify(formDataWithImages));
+    
+ // Add new images if any
+ if (selectedImages.length > 0) {
+   setIsUploadingImages(true);
+   selectedImages.forEach(image => {
+     formData.append('images', image);
+   });
+ }
+
 
         const url = id 
-            ? `https://obc.work.gd/api/leads/${id}/update/`
-            : 'https://obc.work.gd/api/edit-form-submit/';
+            ? `https://admin.onlybigcars.com/api/leads/${id}/update/`
+            : 'https://admin.onlybigcars.com/api/edit-form-submit/';
             
         const method = id ? 'put' : 'post';
         
@@ -1137,7 +1585,7 @@ formData.append('existing_images', JSON.stringify(existingImages));
           url: url,
           data: formData,
           headers: {
-            'Authorization': `Token ${token}`
+            'Authorization': `Token ${token}`,
             // Don't set Content-Type when using FormData - it will be set automatically with boundary
           }
         });
@@ -1302,7 +1750,7 @@ formData.append('existing_images', JSON.stringify(existingImages));
       {
         id: 2,
         title: "Regular AC Service",
-        description: "<ul><li>Engine Oil Replacement (Fully Synthetic)</li><li>Air Filter Replacement</li><li>Interior Vacuuming (Carpet & Seats)</li><li>Oil Filter Replacement</li><li>AC Filter Cleaning</li><li>AC Vent Cleaning</li><li>AC Gas (upto 400 grams)</li><li>Condenser Cleaning</li><li>AC Inspection</li></ul>",
+        description: "<ul><li>AC Filter Cleaning</li><li>AC Vent Cleaning</li><li>AC Gas (upto 400 grams)</li><li>Condenser Cleaning</li><li>AC Inspection</li></ul>",
         price: "Determine"
       },
       {
@@ -2155,12 +2603,14 @@ const handleDeleteCar = (index) => {
   // Modify the overview table section in the return statement to include row deletion
   const handleDeleteRow = (index) => {
     const newTableData = formState.overview.tableData.filter((_, i) => i !== index); //14-2
+    const newTotal = calculateTotalAmount(newTableData) || 0;
     setFormState(prev => ({
       ...prev,
       overview: {
         ...prev.overview,
         tableData: newTableData,
-        total: calculateTotalAmount(newTableData) || 0
+        total: calculateTotalAmount(newTableData) || 0,
+        finalAmount: calculateTotalAmount(newTableData) 
       }
     }));
 
@@ -2191,23 +2641,44 @@ const handleDeleteCar = (index) => {
   };
 
   // Get the appropriate cards based on selected service
-  const getDisplayCards = () => {
+  // const getDisplayCards = () => {
+  //   if (!selectedService || !serviceCards[selectedService]) {
+  //     return [];
+  //   }
+  //   return serviceCards[selectedService];
+  // };
+
+  const getDisplayCards = useCallback(() => {
     if (!selectedService || !serviceCards[selectedService]) {
       return [];
     }
     return serviceCards[selectedService];
-  };
+  }, [selectedService]); // Only depend on selectedService
+  
 
-   // Filter services based on search query
-   const filteredServices = useMemo(() => {
-    const allServices = Object.values(serviceCards).flat();
-    if (!searchQuery) {
-      return getDisplayCards();
-    }
-    return allServices.filter(service =>
-      service.title.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [searchQuery, selectedService, serviceCards]);
+   // Simplified implementation to prevent infinite updates
+// const filteredServices = useMemo(() => {
+//   const baseServices = serviceCards[selectedService] || [];
+//   if (!searchQuery) {
+//     return baseServices;
+//   }
+//   return baseServices.filter(service =>
+//     service.title.toLowerCase().includes(searchQuery.toLowerCase())
+//   );
+// }, [searchQuery, selectedService]); // Remove serviceCards from dependencies
+
+const filteredServices = useMemo(() => {
+  if (!searchQuery) {
+    return getDisplayCards();
+  }
+  
+  // Only flatten the services when actually searching
+  const allServices = Object.values(serviceCards).flat();
+  return allServices.filter(service =>
+    service.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+}, [searchQuery, getDisplayCards]); // No longer depends on serviceCards
+
 
   const [showAlert, setShowAlert] = useState(true);
   const [isOpen, setIsOpen] = useState(true);
@@ -2219,6 +2690,7 @@ const handleDeleteCar = (index) => {
   const [customerNumber, setCustomerNumber] = useState('6381234057');
   const [dateValue, setDateValue] = useState('')
   const [showGaragePopup, setShowGaragePopup] = useState(false);
+   const [carBrandsData, setCarBrandsData] = useState([]); 
   const [showAddCarModal, setShowAddCarModal] = useState(false);
 
 // 2. Add state for job card modal
@@ -2299,11 +2771,12 @@ const CarCard = ({ car, index, isSelected, onEdit, onDelete }) => (
       className="absolute top-2 left-2 z-10"
     />
     <div className="mt-6">
-      <img
-        src="https://onlybigcars.com/wp-content/uploads/2024/12/image_22.jpeg"
-        alt={`${car.carBrand} ${car.carModel}`}
-        className="mb-2"
-      />
+    <img
+      src={car.imageUrl || "https://onlybigcars.com/wp-content/uploads/2024/12/image_22.jpeg"} // Use car.imageUrl or a default placeholder
+      alt={`${car.carBrand || 'Car'} ${car.carModel || ''}`}
+      className="mb-2 h-32 w-full object-contain rounded" // Added height, width, object-fit, and rounded corners
+      onError={(e) => { e.target.onerror = null; e.target.src="https://onlybigcars.com/wp-content/uploads/2024/12/image_22.jpeg"; }} // Fallback on image load error
+    />
       <div className='flex justify-between'>
         <div>
           <div className="text-sm font-medium">{`${car.carBrand} ${car.carModel}`}</div>
@@ -2359,6 +2832,42 @@ const CarCard = ({ car, index, isSelected, onEdit, onDelete }) => (
   //   });
   // };
 
+  
+// Add new handler for quantity changes
+// Add this function to handle quantity changes
+const handleQuantityChange = (index, value) => {
+  const newQuantity = parseInt(value) || 1; // Default to 1 if invalid
+  const newTableData = [...formState.overview.tableData];
+  
+  // Store the original price per item if not already saved
+  if (!newTableData[index].pricePerItem) {
+    newTableData[index].pricePerItem = parseFloat(newTableData[index].total) || 0;
+  }
+  
+  // Update quantity
+  newTableData[index].quantity = newQuantity;
+  
+  // Calculate new row total based on price per item × quantity
+  const pricePerItem = newTableData[index].pricePerItem;
+  newTableData[index].total = pricePerItem * newQuantity;
+  
+  // Update form state with new table data and recalculated totals
+  setFormState(prev => ({
+    ...prev,
+    overview: {
+      ...prev.overview,
+      tableData: newTableData,
+      total: calculateTotalAmount(newTableData),
+      finalAmount: calculateTotalAmount(newTableData) - (parseFloat(discount) || 0)
+    },
+    basicInfo: {
+      ...prev.basicInfo,
+      total: calculateTotalAmount(newTableData)
+    }
+  }));
+};
+
+
 // Add this function after other state definitions
 const handleAddEmptyRow = () => {
   const emptyRow = {
@@ -2367,7 +2876,7 @@ const handleAddEmptyRow = () => {
     comments: '',
     workdone: 'Work to be done',
     determined: false,
-    qt: 1,
+    quantity: 1,
     total: 0
   };
 
@@ -2579,7 +3088,7 @@ const shouldDisableOption = (optionValue, previousStatus) => {
 
 const fetchCustomerData = async (mobileNumber) => {
   try {
-    const response = await fetch(`https://obc.work.gd/api/customers/${mobileNumber}`, {
+    const response = await fetch(`https://admin.onlybigcars.com/api/customers/${mobileNumber}`, {
       headers: {
         'Authorization': `Token ${token}`,
       }
@@ -2969,6 +3478,16 @@ const handleCommissionChange = (field, value) => {
   }
 };
 
+const selectedCarBrand = formState.cars[selectedCarIndex]?.carBrand || '';
+const selectedCarModel = formState.cars[selectedCarIndex]?.carModel || '';
+const [priceError, setPriceError] = useState(null);
+
+// Use our custom hook to get prices
+const { servicePrices, loading: loadingPrices } = useServicePrices(
+  filteredServices, 
+  selectedCarBrand, 
+  selectedCarModel
+);
 
 
 const handleGenerateEstimate = async () => {
@@ -3193,7 +3712,7 @@ const handleGenerateEstimate = async () => {
                     {/* Payment Status Box */}
                     <div className="mt-3 p-3 rounded" style={{ background: "#DEE1E6" }}>
                       {/* <p className="text-sm m-0">Payment Status: Payment Failed</p> */}
-                      <p className="text-sm my-1">Amount Paid: {formState.overview.total || 0} Rs.</p>
+                      <p className="text-sm my-1">Amount Paid: {formState.overview.finalAmount || 0} Rs.</p>
                     </div>
                   </div>
 
@@ -3252,7 +3771,7 @@ const handleGenerateEstimate = async () => {
                       className={`p-2 border rounded min-w-[120px] ${
                         !formState.basicInfo.carType ? 'border-red-300' : 'border-gray-200'
                       }`}
-                      required
+                      required={!isAdmin}
                       
                     >
                       <option value="">Lead Type*</option>
@@ -3407,7 +3926,7 @@ const handleGenerateEstimate = async () => {
   onPlaceSelect={handlePlaceSelect}
   className="p-2 border border-gray-300 rounded-md"
   placeholder="Address*"
-  required 
+  required={!isAdmin} 
 />
   <input
     type="text"
@@ -3415,7 +3934,7 @@ const handleGenerateEstimate = async () => {
     onChange={(e) => handleInputChange('location', 'city', e.target.value)}
     className="p-2 border border-gray-300 rounded-md"
     placeholder="City"
-    required
+    required={!isAdmin}
   />
   <input
     type="text"
@@ -3423,7 +3942,7 @@ const handleGenerateEstimate = async () => {
     onChange={(e) => handleInputChange('location', 'state', e.target.value)}
     className="p-2 border border-gray-300 rounded-md"
     placeholder="State"
-    required
+    required={!isAdmin}
   />
 </div>
 
@@ -3728,7 +4247,12 @@ const handleGenerateEstimate = async () => {
     )}
 
     <div className="flex items-center justify-between">
-      <span className="text-gray-600">Price: {service.price}</span>
+    <span className="text-gray-600">
+  Price: {
+    priceError ? "Determine" : 
+    (loadingPrices ? "Loading..." : servicePrices[`${service.id}-${service.title}`] || "Determine")
+  }
+</span>
       <button 
         type="button"
         onClick={() => addServiceToTable(service)}
@@ -3762,16 +4286,14 @@ const handleGenerateEstimate = async () => {
           <div className="w-full mt-3">
             <table className="w-full">
               <thead>
-                <tr className="bg-red-500 text-white">
-                  <th className="p-3 text-left">Category</th>
-                  <th className="p-3 text-left">Sub Category</th>
-                  {/* <th className="p-3 text-left">Comments</th> */}
-                  <th className="p-3 text-left">Workdone</th>
-                  {/* <th className="p-3 text-left">Determined</th> */}
-                  {/* <th className="p-3 text-left">Qt</th> */}
-                  <th className="p-3 text-left">Total</th>
-                  <th className="p-3 text-left">Action</th>
-                </tr>
+              <tr className="bg-red-500 text-white">
+  <th className="p-3 text-left">Category</th>
+  <th className="p-3 text-left">Sub Category</th>
+  <th className="p-3 text-left">Workdone</th>
+  <th className="p-3 text-left">Qty</th> {/* New column */}
+  <th className="p-3 text-left">Total</th>
+  <th className="p-3 text-left">Action</th>
+</tr>
               </thead>
               <tbody>
                 {formState.overview.tableData.map((row, index) => (
@@ -3893,6 +4415,15 @@ const handleGenerateEstimate = async () => {
                       />
                     </td> */}
                     <td className="p-3">
+  <input
+    type="number"
+    value={row.quantity || 1}
+    onChange={(e) => handleQuantityChange(index, e.target.value)}
+    min="1"
+    className="w-16 text-center p-1 border rounded"
+  />
+</td>
+                    <td className="p-3">
       <input
         type="number"
         value={row.total}
@@ -3923,7 +4454,7 @@ const handleGenerateEstimate = async () => {
       onChange={(e) => handleInputChange('basicInfo', 'caComments', e.target.value)}
       placeholder="Comments For Technician*"
       className="w-full p-3 border rounded h-30 resize-none"
-      required
+      required={!isAdmin}
     />
     <div className="flex-1 flex items-center justify-end">
     <Button
@@ -4070,7 +4601,7 @@ const handleGenerateEstimate = async () => {
                     value={formState.arrivalStatus.arrivalMode}
                     onChange={(e) => handleInputChange('arrivalStatus', 'arrivalMode', e.target.value)}
                     className="p-2 border border-gray-300 rounded-md"
-                    required
+                    required={!isAdmin}
                   >
                     <option value="">Arrival Mode*</option>
                     <option value="Walkin">Walkin</option>
@@ -4108,7 +4639,7 @@ const handleGenerateEstimate = async () => {
                   onChange={(e) => handleInputChange('arrivalStatus', 'dateTime', e.target.value)}
                   placeholder="Date and Time*"
                   className="p-2 border border-gray-300 rounded-md w-full"
-                  required
+                  required={!isAdmin}
                 />
 
 
@@ -4185,44 +4716,6 @@ const handleGenerateEstimate = async () => {
           className="p-2 border border-gray-300 rounded-md w-full"
           
         />
-
- 
-<div className="w-full p-2 rounded-lg">
-  <div className="text-gray-700 mb-2" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>
-    Car Images
-  </div>
-  <div className="mt-2">
-    <ImageUploader 
-      images={images}
-      setImages={(newImages) => {
-        setImages(newImages);
-        setFormState(prev => ({
-          ...prev,
-          arrivalStatus: {
-            ...prev.arrivalStatus,
-            images: newImages
-          }
-        }));
-      }}
-      maxImages={5}
-    />
-  </div>
-</div> 
-
-        
-        {/* <input
-          type="text"
-          onFocus={(e) => e.target.type = 'datetime-local'}
-          onBlur={(e) => {
-            if (!e.target.value) {
-              e.target.type = 'text'
-            }
-          }}
-          value={formState.arrivalStatus.estimatedDeliveryTime}
-          onChange={(e) => handleInputChange('arrivalStatus', 'estimatedDeliveryTime', e.target.value)}
-          placeholder="Estimated Delivery Time"
-          className="p-2 border border-gray-300 rounded-md w-full"
-        /> */}
       </>
     )}
 
@@ -4333,6 +4826,99 @@ const handleGenerateEstimate = async () => {
 </div>
   </>
 )}
+
+{formState.arrivalStatus.leadStatus === "Job Card" && (
+  <div className="mt-4 p-3 border border-gray-200 rounded-md">
+    <h3 className="text-md font-medium mb-3">Vehicle Images</h3>
+    
+    {/* Image upload section - no changes needed here */}
+    <div className="mb-4">
+      <label 
+        htmlFor="imageUpload" 
+        className="flex justify-center items-center p-4 border-2 border-dashed border-gray-300 rounded-md cursor-pointer hover:bg-gray-50"
+      >
+         <div className="text-center">
+          <svg className="mx-auto h-10 w-10 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <p className="mt-1 text-sm text-gray-600">
+            Click to upload images or drag and drop
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            PNG, JPG
+          </p>
+        </div>
+        <input 
+          type="file" 
+          id="imageUpload" 
+          multiple 
+          accept="image/*" 
+          onChange={handleImageChange} 
+          className="hidden"
+        />
+      </label>
+    </div>
+    
+    {/* Display existing images with X button */}
+    {existingImageUrls.length > 0 && (
+      <div className="mb-4">
+        <div className="text-sm font-medium mb-2">Saved Images ({existingImageUrls.length})</div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          {existingImageUrls.map((imageUrl, index) => (
+            <div key={`existing-${index}`} className="relative group">
+              <img
+                src={imageUrl}
+                alt={`Saved ${index}`}
+                className="h-24 w-24 object-cover rounded-md border border-gray-200"
+              />
+              <button
+                type="button"
+                onClick={() => handleRemoveExistingImage(index)}
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-100 hover:bg-red-600 transition-opacity"
+                aria-label="Remove image"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+    
+    {/* Display newly selected images with X button */}
+    {selectedImages.length > 0 && (
+      <div>
+        <div className="text-sm font-medium mb-2">New Images ({selectedImages.length})</div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          {selectedImages.map((image, index) => (
+            <div key={`new-${index}`} className="relative group">
+              <img
+                src={URL.createObjectURL(image)}
+                alt={`Preview ${index}`}
+                className="h-24 w-24 object-cover rounded-md border border-gray-200"
+              />
+              <button
+                type="button"
+                onClick={() => handleRemoveImage(index)}
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-100 hover:bg-red-600 transition-opacity"
+                aria-label="Remove image"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <p className="text-xs mt-1 truncate">{image.name}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+)}
+
+
 {/* 
 {formState.arrivalStatus.leadStatus === 'Completed' && (
   <div className="mt-4 p-3 flex gap-4">
@@ -4413,6 +4999,7 @@ const handleGenerateEstimate = async () => {
                             <GarageSelector 
                               onClose={() => setShowGaragePopup(false)} 
                               onSelectGarage={handleGarageSelect}
+                              userLocation={userLocation}
                             />
                             )}
                             </div>
@@ -4429,7 +5016,7 @@ const handleGenerateEstimate = async () => {
   value={formState.basicInfo.caName}
   onChange={(e) => handleInputChange('basicInfo', 'caName', e.target.value)}
   className="bg-light"
-  required
+  required={!isAdmin}
 >
 <option value="">Select Technician</option>
   <option value="Anjali">Anjali</option>
@@ -4481,7 +5068,7 @@ const handleGenerateEstimate = async () => {
                     value={formState.basicInfo.cceComments}
                     onChange={(e) => handleInputChange('basicInfo', 'cceComments', e.target.value)}
                     placeholder="Comments From CCE*"
-                    required
+                    required={!isAdmin}
                     style={{ height: '120px', resize: 'none' }}
                   />
                 </Form.Group>
@@ -4493,6 +5080,46 @@ const handleGenerateEstimate = async () => {
             {/* Sticky Footer */}
             <div className="fixed bottom-0 right-0  w-full border-t shadow-lg p-3 flex justify-end gap-3" style={{background:"#F3F4F6"}}>
            
+
+            {!id && (
+                      <div className="flex items-center">
+                      <label className="flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isFromWorkshop}
+                          onChange={(e) => {
+                            setIsFromWorkshop(e.target.checked);
+                            // When checkbox is checked, set the CCE name to "workshop"
+                            if (e.target.checked) {
+                              setFormState(prev => ({
+                                ...prev,
+                                basicInfo: {
+                                  ...prev.basicInfo,
+                                  cceName: "workshop"
+                                }
+                              }));
+                            } else {
+                              // When unchecked, restore the original user's username
+                              setFormState(prev => ({
+                                ...prev,
+                                basicInfo: {
+                                  ...prev.basicInfo,
+                                  cceName: user?.username || ''
+                                }
+                              }));
+                            }
+                          }}
+                          className="w-4 h-4 text-red-500 border-gray-300 rounded focus:ring-red-500 mr-2"
+                        />
+                        <span className="text-gray-700 font-medium">From workshop?</span>
+                      </label>
+                    </div>
+                    )}
+                    
+                    {/* Add empty div for spacing when id exists (editing mode) */}
+                    {id && <div></div>}
+                                    {/* Right side with buttons */}
+                    <div className="flex justify-end gap-3">
 
                   <Button 
                     variant="outline-danger" 
@@ -4563,15 +5190,15 @@ Generate Bill
 
                   
        <Button 
-              variant={location.state?.previousStatus === "Completed" ? "secondary" : "danger"}
-              type="submit" 
-              disabled={isSubmitting || location.state?.previousStatus === "Completed" || 
-                (formState.basicInfo.cceName !== user?.username && !isAdmin)}
-              title={formState.basicInfo.cceName !== user?.username && !isAdmin ? 
-                "You can only save leads assigned to you" : ""}
-            >
-              {isSubmitting ? 'Saving...' : 'Save & Copy'}
-            </Button>
+                    variant={location.state?.previousStatus === "Completed" ? "secondary" : "danger"}
+                    type="submit" 
+                    disabled={isSubmitting || location.state?.previousStatus === "Completed" || 
+                      (formState.basicInfo.cceName !== user?.username && formState.basicInfo.cceName !== "workshop" && !isAdmin)}
+                    title={formState.basicInfo.cceName !== user?.username && formState.basicInfo.cceName !== "workshop" && !isAdmin ? 
+                      "You can only save leads assigned to you or from workshop" : ""}
+                  >
+                    {isSubmitting ? 'Saving...' : 'Save & Copy'}
+                  </Button></div>
               </div>
 
               {/* {error && (
@@ -4625,6 +5252,7 @@ Generate Bill
         onClose={() => setShowAddCarModal(false)}
         onSubmit={handleAddCar}
         editingCar={editingCar}
+        carBrandsData={carBrandsData} 
       />
     )}
         </div>
@@ -4646,8 +5274,7 @@ Generate Bill
         batteryFeature: formState.arrivalStatus.batteryFeature,
         additionalWork: formState.arrivalStatus.additionalWork,
         inventory: formState.arrivalStatus.inventory,
-        // Add this line to pass image URLs to JobCard
-        images: images.map(img => img.url),
+       
         // carDocumentDetails: formState.arrivalStatus.carDocumentDetails,
         // otherCheckList: formState.arrivalStatus.otherCheckList,
         fuelStatus: formState.arrivalStatus.fuelStatus,
@@ -4667,7 +5294,6 @@ Generate Bill
           description: item.type,
           workDone: item.workdone,
           labour: 0,
-          quantity: 1,
           unitPrice: parseFloat(item.total) || 0,
           discount: 0,
           netAmount: parseFloat(item.total) || 0
@@ -4683,7 +5309,8 @@ Generate Bill
           discount: parseFloat(discount) || 0,
           // totalAmount: formState.overview.finalAmount,
           totalPayable: formState.overview.finalAmount
-        }
+        },
+        images: existingImageUrls
       }}
     />
   </div>
@@ -4788,7 +5415,7 @@ Generate Bill
         workDetails: formState.overview.tableData.map(item => ({
           description: item.type,
           workDone: item.workdone,
-          quantity: 1,
+          quantity: item.quantity || 1,
           netAmount: parseFloat(item.total) || 0
         })),
         totalUnitPrice: formState.overview.total,
@@ -4807,3 +5434,11 @@ Generate Bill
 };
 
 export default EditPage;
+
+
+
+
+
+// https://admin.onlybigcars.com/api/callerdesk-webhook/?type=call_report&coins=4&Status=ANSWER&campid=&CallSid=1744881973.2699220&EndTime=2025-04-17%2015:00:02&Uniqueid=&Direction=IVR&StartTime=2025-04-17%2014:56:13&key_press=&call_group=callgroup1&error_code=0&CallDuration=231&SourceNumber=09958134912&TalkDuration=215&hangup_cause=ANSWER(16)&receiver_name=loknath&DialWhomNumber=09218028154&LegB_Start_time=2025-04-17%2014:56:16&CallRecordingUrl=https://newcallrecords.callerdesk.io/incoming/04_2025/17/86070/20250417-145615-4912-8062649373-1744881973.2699220.wav&LegA_Picked_time=2025-04-17%2014:56:13&LegB_Picked_time=2025-04-17%2014:56:28&DestinationNumber=9999967591
+
+// https://admin.onlybigcars.com/api/callerdesk-webhook/?type=call_report&coins=4&Status=CANCEL&campid=&CallSid=1744881973.2699220&EndTime=2025-04-17%2015:00:02&Uniqueid=&Direction=IVR&StartTime=2025-04-17%2014:56:13&key_press=&call_group=callgroup1&error_code=0&CallDuration=231&SourceNumber=09958134912&TalkDuration=215&hangup_cause=ANSWER(16)&receiver_name=Anjali&DialWhomNumber=09218028154&LegB_Start_time=2025-04-17%2014:56:16&CallRecordingUrl=https://newcallrecords.callerdesk.io/incoming/04_2025/17/86070/20250417-145615-4912-8062649373-1744881973.2699220.wav&LegA_Picked_time=2025-04-17%2014:56:13&LegB_Picked_time=2025-04-17%2014:56:28&DestinationNumber=9999967591

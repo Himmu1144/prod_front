@@ -85,21 +85,20 @@ const styles = StyleSheet.create({
   table: {
     borderCollapse: 'collapse',
     width: '100%',
+    border: '1pt solid #e5e7eb',
+    borderRadius: 4,
   },
   tableHeader: {
     flexDirection: 'row',
     backgroundColor: '#f3f4f6', // bg-gray-100
-    padding: 7.5, // p-2
     borderBottom: '1pt solid #e5e7eb', // border
   },
   tableRow: {
     flexDirection: 'row',
-    padding: 7.5, // p-2
     borderBottom: '1pt solid #e5e7eb',
   },
   tableFooter: {
     flexDirection: 'row',
-    padding: 7.5,
     backgroundColor: '#f9fafb', // bg-gray-50
     fontWeight: 'bold',
     borderBottom: '1pt solid #e5e7eb',
@@ -107,6 +106,14 @@ const styles = StyleSheet.create({
   tableCell: {
     flex: 1,
     textAlign: 'left',
+    padding: 7.5,
+    borderRight: '1pt solid #e5e7eb',
+  },
+  tableCellLast: {
+    flex: 1,
+    textAlign: 'left',
+    padding: 7.5,
+    borderRight: 'none',
   },
   italicText: {
     textAlign: 'center',
@@ -294,26 +301,26 @@ const PDFDocument = ({ data }) => {
             <Text style={styles.redHeader}>WORK SUMMARY</Text>
             <View style={styles.table}>
               <View style={styles.tableHeader}>
-                <Text style={styles.tableCell}>Description</Text>
-                <Text style={styles.tableCell}>Work Done</Text>
+                <Text style={{...styles.tableCell, flex: 2}}>Description</Text>
+                <Text style={{...styles.tableCell, flex: 2}}>Work Done</Text>
                 <Text style={styles.tableCell}>Qty</Text>
-                <Text style={styles.tableCell}>Net Amount</Text>
+                <Text style={styles.tableCellLast}>Net Amount</Text>
               </View>
               {mergedData.workDetails.map((work, index) => (
                 <View key={index} style={styles.tableRow}>
-                  <Text style={styles.tableCell}>{work.description || ''}</Text>
-                  <Text style={styles.tableCell}>{work.workDone || ''}</Text>
+                  <Text style={{...styles.tableCell, flex: 2}}>{work.description || ''}</Text>
+                  <Text style={{...styles.tableCell, flex: 2}}>{work.workDone || ''}</Text>
                   <Text style={styles.tableCell}>{work.quantity || 0}</Text>
-                  <Text style={styles.tableCell}>Rs. {work.netAmount || 0}</Text>
+                  <Text style={styles.tableCellLast}>Rs. {work.netAmount || 0}</Text>
                 </View>
               ))}
               <View style={styles.tableFooter}>
-                <Text style={{ ...styles.tableCell, flex: 3 }}>Total</Text>
-                <Text style={styles.tableCell}>Rs. {mergedData.finalPriceBill|| 0}</Text>
+                <Text style={{ ...styles.tableCell, flex: 5 }}>Total</Text>
+                <Text style={styles.tableCellLast}>Rs. {mergedData.finalPriceBill || 0}</Text>
               </View>
               <View style={styles.tableFooter}>
-                <Text style={{ ...styles.tableCell, flex: 3 }}>After Discount</Text>
-                <Text style={styles.tableCell}>Rs. {mergedData.totalPayable || 0}</Text>
+                <Text style={{ ...styles.tableCell, flex: 5 }}>After Discount</Text>
+                <Text style={styles.tableCellLast}>Rs. {mergedData.totalPayable || 0}</Text>
               </View>
             </View>
           </View>

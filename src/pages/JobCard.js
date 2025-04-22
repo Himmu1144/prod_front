@@ -110,30 +110,37 @@ const styles = StyleSheet.create({
     marginRight: 7.5,
   },
   table: {
+    borderCollapse: 'collapse',
+    width: '100%',
     border: '1pt solid #e5e7eb',
-    borderRadius: 5,
+    borderRadius: 4,
   },
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: '#f3f4f6',
-    padding: 11.25,
-    fontWeight: 'medium',
+    backgroundColor: '#f3f4f6', // bg-gray-100
+    borderBottom: '1pt solid #e5e7eb',
   },
   tableRow: {
     flexDirection: 'row',
-    padding: 11.25,
-    borderTop: '1pt solid #e5e7eb',
+    borderBottom: '1pt solid #e5e7eb',
   },
   tableCell: {
-    width: '25%',
-    textAlign: 'center',
+    flex: 1,
+    textAlign: 'left',
+    padding: 7.5,
+    borderRight: '1pt solid #e5e7eb',
+  },
+  tableCellLast: {
+    flex: 1,
+    textAlign: 'left',
+    padding: 7.5,
+    borderRight: 'none',
   },
   tableTotal: {
     flexDirection: 'row',
-    padding: 11.25,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#f9fafb', // bg-gray-50
     fontWeight: 'bold',
-    borderTop: '1pt solid #e5e7eb',
+    borderBottom: '1pt solid #e5e7eb',
   },
   workshopItem: {
     alignItems: 'center',
@@ -203,6 +210,7 @@ const PDFDocument = ({ data }) => {
     batteryFeature: '',
     workSummary: [{ type: '', name: '', workdone: '', total: 0 }],
     invoiceSummary: { total: 0, discount: 0, totalPayable: 0 },
+    images:[],
   };
   const mergedData = { ...defaultData, ...data };
 
@@ -308,28 +316,18 @@ const PDFDocument = ({ data }) => {
 
           {/* Work Summary */}
           <View style={styles.section}>
-  <Text style={styles.redHeader}>WORK SUMMARY</Text>
-  <View style={styles.table}>
-    <View style={styles.tableHeader}>
-      {/* <Text style={styles.tableCell}>Type</Text> */}
-      <Text style={{ ...styles.tableCell, width: '50%' }}>Work Detail</Text>
-      <Text style={{ ...styles.tableCell, width: '50%' }}>Work to be done</Text>
-      {/* <Text style={styles.tableCell}>Total</Text> */}
-    </View>
-    {mergedData.workSummary.map((work, index) => (
-      <View key={index} style={styles.tableRow}>
-        {/* <Text style={styles.tableCell}>{work.type}</Text> */}
-        <Text style={{ ...styles.tableCell, width: '40%' }}>{work.name}</Text>
-        <Text style={{ ...styles.tableCell, width: '60%', textAlign: 'left' }}>{work.workdone}</Text>
-        {/* <Text style={{ ...styles.tableCell, textAlign: 'right' }}>{work.total}</Text> */}
-      </View>
-    ))}
-              {/* <View style={styles.tableTotal}>
-                <Text style={{ width: '75%', textAlign: 'right', fontWeight: 'bold' }}>Grand Total:</Text>
-                <Text style={{ width: '25%', textAlign: 'right', fontWeight: 'bold' }}>
-                  ₹ {mergedData.invoiceSummary.totalPayable}
-                </Text>
-              </View> */}
+            <Text style={styles.redHeader}>WORK SUMMARY</Text>
+            <View style={styles.table}>
+              <View style={styles.tableHeader}>
+                <Text style={{...styles.tableCell, flex: 2}}>Work Detail</Text>
+                <Text style={{...styles.tableCellLast, flex: 3}}>Work to be done</Text>
+              </View>
+              {mergedData.workSummary.map((work, index) => (
+                <View key={index} style={styles.tableRow}>
+                  <Text style={{...styles.tableCell, flex: 2}}>{work.name || ''}</Text>
+                  <Text style={{...styles.tableCellLast, flex: 3}}>{work.workdone || ''}</Text>
+                </View>
+              ))}
             </View>
           </View>
 
@@ -363,25 +361,24 @@ const PDFDocument = ({ data }) => {
             </View>
           </View>
 
+          {/* Vehicle Images */}
           <View style={styles.section}>
-  <Text style={styles.redHeader}>Vehicle Images</Text>
+  <Text style={styles.redHeader}>VEHICLE IMAGES</Text>
   
-  {/* Images Grid */}
-  <View style={styles.imageGrid}>
-    {mergedData.images && mergedData.images.map((imageUrl, index) => (
-      <Image
-        key={index}
-        src={imageUrl}
-        style={styles.vehicleImage}
-        cache
-      />
-    ))}
-    
-    {/* Show placeholder if no images */}
-    {(!mergedData.images || mergedData.images.length === 0) && (
-      <Text style={styles.noImagesText}>No vehicle images available</Text>
-    )}
-  </View>
+  {mergedData.images && mergedData.images.length > 0 ? (
+    <View style={styles.imageGrid}>
+      {mergedData.images.map((imageUrl, index) => (
+        <Image 
+          key={index}
+          src={imageUrl} 
+          style={styles.vehicleImage}
+          cache={false}
+        />
+      ))}
+    </View>
+  ) : (
+    <Text style={styles.noImagesText}>No vehicle images available</Text>
+  )}
 </View>
 
           {/* Declaration */}
@@ -424,6 +421,7 @@ const JobCard = forwardRef(({ data }, ref) => {
     batteryFeature: '',
     workSummary: [{ type: '', name: '', workdone: '', total: 0 }],
     invoiceSummary: { total: 0, discount: 0, totalPayable: 0 },
+    images:[],
   };
 
   const mergedData = { ...defaultData, ...data };

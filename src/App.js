@@ -6,6 +6,7 @@ import PublicRoute from './components/PublicRoute';
 import HomePage from './pages/HomePage';
 import EditPage from './pages/EditPage';
 import LoginPage from './pages/LoginPage';
+import GraphPage from './components/GraphPage';
 
 const App = () => {
     return (
@@ -16,6 +17,7 @@ const App = () => {
                     <Route path="/" element={<PrivateRoute element={HomePage} />} />
                     <Route path="/edit" element={<PrivateRoute element={EditPage} />} />
                     <Route path="/edit/:id?" element={<PrivateRoute element={EditPage} />} />
+                    <Route path="/analytics" element={<GraphPage />} />
                 </Routes>
             </Router>
         </AuthProvider>

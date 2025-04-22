@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import DateRangeSelector from '../components/daterangeselector';
 import './homepage.css';
 import * as XLSX from 'xlsx';
+import { Link } from 'react-router-dom';
 
 const HomePage = () => {
     const dateRangeSelectorRef = useRef();
@@ -33,19 +34,34 @@ const HomePage = () => {
 const [currentView, setCurrentView] = useState('default'); // 'default', 'filter', 'search'
 const [savedSearchQuery, setSavedSearchQuery] = useState('');
 const [savedFilterParams, setSavedFilterParams] = useState({});
-    const [filterFormData, setFilterFormData] = useState({
-        source: '',
-        status: '',
-        location: '',
-        arrivalMode: '',
-        language_barrier: false,
-        dateField: 'created_at',
-        dateRange: {
-            startDate: '',
-            endDate: ''
-        },
-        garage:[],
-    });
+const initialFilterState = {
+    user: '', // Will be set based on isAdmin/cUser later
+    source: '',
+    status: '',
+    location: '',
+    arrivalMode: '',
+    language_barrier: false,
+    dateField: 'created_at',
+    dateRange: { startDate: '', endDate: '' },
+    garage: [],
+    luxuryNormal: '', // Ensure this is included if it's part of your form
+};
+const [filterFormData, setFilterFormData] = useState(() => {
+    // Initialize state from localStorage or use default
+    const savedFilters = localStorage.getItem('homePageFilters');
+    if (savedFilters) {
+        try {
+            // Merge saved filters with defaults to ensure all keys exist
+            return { ...initialFilterState, ...JSON.parse(savedFilters) };
+        } catch (e) {
+            console.error("Failed to parse saved filters, using defaults.", e);
+            localStorage.removeItem('homePageFilters'); // Clear corrupted data
+            return initialFilterState;
+        }
+    }
+    return initialFilterState;
+});
+
 
     // Add pagination state
     const [dataFromFilter, setDataFromFilter] = useState(false);
@@ -90,13 +106,14 @@ const [savedFilterParams, setSavedFilterParams] = useState({});
     const [finalAmountPerLead, setFinalAmountPerLead] = useState(0);
     const [totalCommissionDue, setTotalCommissionDue] = useState(0);
     const [totalCommissionReceived, setTotalCommissionReceived] = useState(0);
+    const [totalCommissionExceptOwn, setTotalCommissionExceptOwn] = useState(0);
     const [showStatsContainer, setShowStatsContainer] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
 
     // const fetchLeads = async () => {
     //     try {
     //         setIsLoading(true);
-    //         const response = await axios.get(`https://obc.work.gd/?page=1`, {
+    //         const response = await axios.get(`https://admin.onlybigcars.com/?page=1`, {
     //             headers: { 'Authorization': `Token ${token}` }
     //         });
     
@@ -128,20 +145,20 @@ const [savedFilterParams, setSavedFilterParams] = useState({});
     //         if (currentView === 'filter') {
     //             console.log('Fetching filtered leads with params:', savedFilterParams);
     //             response = await axios.post(
-    //                 'https://obc.work.gd/api/leads/filter/',
+    //                 'https://admin.onlybigcars.com/api/leads/filter/',
     //                 { ...savedFilterParams, page: nextPage },
     //                 { headers: { 'Authorization': `Token ${token}` } }
     //             );
     //         } else if (currentView === 'search') {
     //             console.log('Fetching search results with query:', savedSearchQuery);
     //             response = await axios.get(
-    //                 `https://obc.work.gd/api/leads/search/?query=${savedSearchQuery}&page=${nextPage}`,
+    //                 `https://admin.onlybigcars.com/api/leads/search/?query=${savedSearchQuery}&page=${nextPage}`,
     //                 { headers: { 'Authorization': `Token ${token}` } }
     //             );
     //         } else {
     //             console.log('Fetching default leads');
     //             response = await axios.get(
-    //                 `https://obc.work.gd/?page=${nextPage}`,
+    //                 `https://admin.onlybigcars.com/?page=${nextPage}`,
     //                 { headers: { 'Authorization': `Token ${token}` } }
     //             );
     //         }
@@ -172,7 +189,7 @@ const [savedFilterParams, setSavedFilterParams] = useState({});
     const fetchLeads = async () => {
         try {
             setIsLoading(true);
-            const response = await axios.get(`https://obc.work.gd/?page=1`, {
+            const response = await axios.get(`https://admin.onlybigcars.com/?page=1`, {
                 headers: { 'Authorization': `Token ${token}` }
             });
             setLeads(response.data.leads);
@@ -217,18 +234,18 @@ const [savedFilterParams, setSavedFilterParams] = useState({});
     
             if (currentView === 'filter') {
                 response = await axios.post(
-                    'https://obc.work.gd/api/leads/filter/',
+                    'https://admin.onlybigcars.com/api/leads/filter/',
                     { ...savedFilterParams, page: nextPage },
                     { headers: { 'Authorization': `Token ${token}` } }
                 );
             } else if (currentView === 'search') {
                 response = await axios.get(
-                    `https://obc.work.gd/api/leads/search/?query=${savedSearchQuery}&page=${nextPage}`,
+                    `https://admin.onlybigcars.com/api/leads/search/?query=${savedSearchQuery}&page=${nextPage}`,
                     { headers: { 'Authorization': `Token ${token}` } }
                 );
             } else {
                 response = await axios.get(
-                    `https://obc.work.gd/?page=${nextPage}`,
+                    `https://admin.onlybigcars.com/?page=${nextPage}`,
                     { headers: { 'Authorization': `Token ${token}` } }
                 );
             }
@@ -279,7 +296,7 @@ const [savedFilterParams, setSavedFilterParams] = useState({});
         setSearchMessage('');
         try {
             const response = await axios.get(
-                `https://obc.work.gd/api/leads/search/?query=${searchQuery}&page=1`,
+                `https://admin.onlybigcars.com/api/leads/search/?query=${searchQuery}&page=1`,
                 { headers: { 'Authorization': `Token ${token}` } }
             );
           
@@ -323,17 +340,102 @@ const handleGarageChange = (garageName) => {
 };
     
 
-    const handleDateRangeChange = (range) => {
-        setDateRange([range.startDate, range.endDate]);
-        setFilterFormData((prevData) => ({
-            ...prevData,
-            dateRange: {
-                startDate: range.startDate,
-                endDate: range.endDate
-            }
-        }));
+// Add this function after handleGarageChange
+const getCityVariations = (cityName) => {
+    const cityMap = {
+      'bangalore': ['bangalore', 'bengaluru'],
+      'bengaluru': ['bangalore', 'bengaluru'],
+      'bombay': ['mumbai', 'bombay'],
+      'mumbai': ['mumbai', 'bombay'],
+      'delhi': ['delhi', 'new delhi'],
+      'calcutta': ['kolkata', 'calcutta'],
+      'kolkata': ['kolkata', 'calcutta'],
+      'madras': ['chennai', 'madras'],
+      'chennai': ['chennai', 'madras'],
+      'gurugram': ['gurugram', 'gurgaon']
     };
+    
+    return cityMap[cityName.toLowerCase()] || [cityName.toLowerCase()];
+  };
 
+// Add this function after handleGarageChange
+const toggleAllGarages = () => {
+    // Get the currently filtered garages based on search
+    const filteredGarageNames = garages
+        .filter(garage =>
+            garage.name.toLowerCase().includes(garageSearchQuery.toLowerCase()) ||
+            (garage.mechanic && garage.mechanic.toLowerCase().includes(garageSearchQuery.toLowerCase())) ||
+            (garage.locality && garage.locality.toLowerCase().includes(garageSearchQuery.toLowerCase()))
+        )
+        .map(garage => garage.name);
+
+         // Modify your garage filter to use the new function
+const filteredGarages = garages.filter(garage => {
+    const query = garageSearchQuery.toLowerCase();
+    
+    // Check if query might be a city name with variations
+    const cityVariations = getCityVariations(query);
+    
+    // Check name match
+    if (garage.name.toLowerCase().includes(query)) return true;
+    
+    // Check mechanic match
+    if (garage.mechanic && garage.mechanic.toLowerCase().includes(query)) return true;
+    
+    // Check locality match with city variations
+    if (garage.locality) {
+      // First try direct match
+      if (garage.locality.toLowerCase().includes(query)) return true;
+      
+      // Then try all city variations
+      for (const cityVariation of cityVariations) {
+        if (garage.locality.toLowerCase().includes(cityVariation)) return true;
+      }
+    }
+    
+    return false;
+  });
+    
+    
+    // Check if all filtered garages are already selected
+    const allSelected = filteredGarageNames.every(name => 
+        filterFormData.garage.includes(name)
+    );
+    
+    // If all are selected, unselect all. Otherwise, select all
+    if (allSelected) {
+        // Remove all filtered garages from selection
+        setFilterFormData(prev => ({
+            ...prev,
+            garage: prev.garage.filter(name => !filteredGarageNames.includes(name))
+        }));
+    } else {
+        // Add all filtered garages to selection (avoiding duplicates)
+        setFilterFormData(prev => {
+            const currentGarages = [...prev.garage];
+            filteredGarageNames.forEach(name => {
+                if (!currentGarages.includes(name)) {
+                    currentGarages.push(name);
+                }
+            });
+            return {
+                ...prev,
+                garage: currentGarages
+            };
+        });
+    }
+};
+
+const handleDateRangeChange = (range) => {
+    // setDateRange([range.startDate, range.endDate]); // No longer needed
+    setFilterFormData((prevData) => ({
+        ...prevData,
+        dateRange: {
+            startDate: range.startDate,
+            endDate: range.endDate
+        }
+    }));
+};
     const handleFilterChange = (e) => {
         const { name, value, type, checked } = e.target;
         setFilterFormData(prev => ({
@@ -353,7 +455,7 @@ const handleGarageChange = (garageName) => {
         setIsLoading(true); // Add loading state here
         try {
             const response = await axios.post(
-                'https://obc.work.gd/api/leads/filter/',
+                'https://admin.onlybigcars.com/api/leads/filter/',
                 { ...filterFormData, page: 1 },
                 { headers: { 'Authorization': `Token ${token}` } }
             );
@@ -384,7 +486,8 @@ const handleGarageChange = (garageName) => {
             const commissionStats = response.data.commission_stats || {};
             setTotalCommissionDue(commissionStats.total_commission_due || 0);
             setTotalCommissionReceived(commissionStats.total_commission_received || 0);
-            
+            setTotalCommissionExceptOwn(commissionStats.total_commission_except_own || 0);
+
             // IMPORTANT: Set these flags explicitly and unconditionally for filter view
             setDataFromFilter(true);
             setShowStatsContainer(true);
@@ -502,31 +605,40 @@ formatColumns('Date:', lead.arrival_time ?
 
       // 18 feb end
 
-    const handleReset = (e) => {
-        e.target.form.reset();
-        setFilterFormData({
-            ...(isAdmin ? { user: '' } : { user: cUser || '' }),
-            // user: '',
-            source: '',
-            status: '',
-            location: '',
-            dateRange: {
-                startDate: '',
-                endDate: ''
-            },
-            garage: [],
-        });
+      const handleReset = (e) => {
+        if (e && e.target && e.target.form) {
+            e.target.form.reset(); // Reset form visually if event is passed
+        }
+        // Reset state to initial values, considering admin/user status
+        const defaultFilters = {
+            ...initialFilterState,
+            user: isAdmin ? '' : (cUser || '') // Set user based on current context
+        };
+        setFilterFormData(defaultFilters);
+    
+        // Reset dependent UI states
         setDataFromFilter(false);
         setShowStatsContainer(false);
-        // setDateRange([null, null]); // Reset the date range
-        dateRangeSelectorRef.current.reset();
+        if (dateRangeSelectorRef.current && typeof dateRangeSelectorRef.current.reset === 'function') {
+            dateRangeSelectorRef.current.reset(); // Reset the DateRangeSelector component
+        }
+        setSavedFilterParams({}); // Clear saved parameters for fetching more
+        setCurrentView('default'); // Reset view type
+        setSearchMessage(''); // Clear any messages
+    
+        // Clear the saved filters from localStorage
+        localStorage.removeItem('homePageFilters');
+        console.log("Filters reset and localStorage cleared.");
+    
+        // Optional: Refetch default leads after reset
+        fetchLeads();
     };
     // http://34.131.86.189
 
     useEffect(() => {
         console.log('Here we are - ')
         // Fetch welcome message and users
-        axios.get('https://obc.work.gd/', {
+        axios.get('https://admin.onlybigcars.com/', {
             headers: {
                 Authorization: `Token ${token}`
             }
@@ -580,6 +692,61 @@ formatColumns('Date:', lead.arrival_time ?
     }, [handleScroll]);
 
 
+
+
+// Effect to restore DateRangeSelector state after filterFormData is potentially restored
+useEffect(() => {
+    // Check if dates exist in the (potentially restored) filterFormData
+    const { startDate, endDate } = filterFormData.dateRange || {};
+    
+    if (startDate && endDate && dateRangeSelectorRef.current && 
+        typeof dateRangeSelectorRef.current.setDates === 'function') {
+        
+        // Validate dates before setting them
+        try {
+            // Parse dates and check if they're valid
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            
+            if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+                console.log("Restoring valid dates in DateRangeSelector:", startDate, endDate);
+                dateRangeSelectorRef.current.setDates(startDate, endDate);
+            } else {
+                console.error("Invalid dates found in saved filters, will not restore:", { startDate, endDate });
+                // Clear invalid dates
+                setFilterFormData(prev => ({
+                    ...prev,
+                    dateRange: { startDate: '', endDate: '' }
+                }));
+            }
+        } catch (e) {
+            console.error("Error parsing saved dates:", e);
+            // Clear invalid dates
+            setFilterFormData(prev => ({
+                ...prev,
+                dateRange: { startDate: '', endDate: '' }
+            }));
+        }
+    }
+    
+    // Check if we should apply restored filters automatically
+    const isRestored = localStorage.getItem('homePageFilters');
+    if (isRestored) {
+        // Existing logic...
+        const parsed = JSON.parse(isRestored);
+        const wasFiltered = Object.keys(parsed).some(key =>
+            key !== 'user' && key !== 'dateField' && key !== 'language_barrier' && 
+            parsed[key] && (!Array.isArray(parsed[key]) || parsed[key].length > 0) && 
+            (!(typeof parsed[key] === 'object' && key === 'dateRange') || 
+                (parsed[key].startDate && parsed[key].endDate))
+        );
+        
+        if (wasFiltered) {
+            console.log("Filters were restored from localStorage. UI updated.");
+        }
+    }
+}, []); // Run only once on mount
+
     
    // Modify the checkForNewCalls function within your useEffect
 useEffect(() => {
@@ -594,7 +761,7 @@ useEffect(() => {
         // Get recent calls (implement this API endpoint in your backend)
         console.log("📞 Calling API: /api/recent-calls/");
         const response = await axios.get(
-          'https://obc.work.gd/api/recent-calls/',
+          'https://admin.onlybigcars.com/api/recent-calls/',
           {
             headers: {
               'Authorization': `Token ${token}`
@@ -638,163 +805,219 @@ useEffect(() => {
     };
   }, [token]);
 
-    const [isExporting, setIsExporting] = useState(false);
-        const exportToExcel = async () => {
-            try {
-                setIsExporting(true);
-                setAlertMessage('Preparing Excel export...');
-                setShowSuccessAlert(true);
-        
-                let response;
-                let url;
-                let method = 'GET'; // Default to GET
-                let data = null;    // Default to no data (for GET requests)
-        
-                // if (currentView === 'filter') {
-                //     // url = 'https://obc.work.gd/api/leads/export/filtered/';
-                //     url = 'https://obc.work.gd/api/leads/filter/';
-                //     method = 'POST';
-                //     // Ensure we're sending a properly formatted object with all required filter parameters
-                    // data = {
-                    //     ...savedFilterParams,
-                    //     // Ensure dateRange is properly formatted if it exists
-                    //     dateRange: savedFilterParams.dateRange ? {
-                    //         startDate: savedFilterParams.dateRange.startDate || null,
-                    //         endDate: savedFilterParams.dateRange.endDate || null
-                    //     } : null
-                    // };
-                // } 
-                // else if (currentView === 'search') {
-                    
-                //     url = `https://obc.work.gd/api/leads/search/?query=${encodeURIComponent(savedSearchQuery)}`;
-                //     // method remains GET, no data needed
-                // } 
-                // else {
-                //     url = 'https://obc.work.gd/api/leads/export/';
-                //     // method remains GET, no data needed
-                // }
+  
     
-                if (currentView === 'filter') {
+    // Add after state declarations:
+  
+  // Effect to save filters to localStorage whenever they change
+  useEffect(() => {
+      // Debounce or throttle this if performance becomes an issue with rapid changes
+      localStorage.setItem('homePageFilters', JSON.stringify(filterFormData));
+  }, [filterFormData]);
+
+  // Add this useEffect after your existing interval effect 21 April
+useEffect(() => {
+    console.log("🔄 Setting up lead refresh interval");
+    
+    // Create a refresh interval with longer duration (e.g., 30 seconds)
+    // to avoid overwhelming the server
+    const refreshIntervalId = setInterval(() => {
+      console.log("🔄 Auto-refreshing leads data...");
+      
+      // Only refresh if we're not already loading data and user isn't in the middle of pagination
+      if (!isLoading && currentView === 'default') {
+        // Use the existing fetchLeads function to refresh data
+        fetchLeads();
+      }
+    }, 30000); // 30 seconds - adjust as needed
+    
+    // Cleanup on unmount
+    return () => {
+      console.log("🛑 Clearing lead refresh interval");
+      clearInterval(refreshIntervalId);
+    };
+  }, [isLoading, currentView]); // Add dependencies to prevent unnecessary interval resets
+  
+ 
+// Add this function to export data to Excel 06-03
+    const [isExporting, setIsExporting] = useState(false);
+    
+    
+    const exportToExcel = async () => {
+        try {
+            setIsExporting(true);
+            setAlertMessage('Preparing Excel export...');
+            setShowSuccessAlert(true);
+    
+            let response;
+            let url;
+            let method = 'GET'; // Default to GET
+            let data = null;    // Default to no data (for GET requests)
+    
+            
+            if (currentView === 'filter') {
+                
+                   url= 'https://admin.onlybigcars.com/api/leads/export/filter/';
+                   method = 'POST';
+                   data = {
+                    ...savedFilterParams,
+                    // Ensure dateRange is properly formatted if it exists
+                    dateRange: savedFilterParams.dateRange ? {
+                        startDate: savedFilterParams.dateRange.startDate || null,
+                        endDate: savedFilterParams.dateRange.endDate || null
+                    } : null
+                };
+                   
                     
-                       url= 'https://obc.work.gd/api/leads/export/filter/';
-                       method = 'POST';
-                       data = {
-                        ...savedFilterParams,
-                        // Ensure dateRange is properly formatted if it exists
-                        dateRange: savedFilterParams.dateRange ? {
-                            startDate: savedFilterParams.dateRange.startDate || null,
-                            endDate: savedFilterParams.dateRange.endDate || null
-                        } : null
-                    };
-                       
-                        
-                } else if (currentView === 'search') {
+            } else if (currentView === 'search') {
+                
+                   url= `https://admin.onlybigcars.com/api/leads/export/search/?query=${encodeURIComponent(savedSearchQuery)}`;
                     
-                       url= `https://obc.work.gd/api/leads/export/search/?query=${encodeURIComponent(savedSearchQuery)}`;
-                        
-                } else {
+            } else {
+                
+                // url = 'https://admin.onlybigcars.com/api/leads/export/';
+                url= 'https://admin.onlybigcars.com/api/leads/export/filter/';
+                method = 'POST';
+                
                     
-                    // url = 'https://obc.work.gd/api/leads/export/';
-                    url= 'https://obc.work.gd/api/leads/export/filter/';
-                    method = 'POST';
-                    
-                        
-                }
-        
-        
-                response = await axios({
-                    method: method,
-                    url: url,
-                    data: data, // This will be null for GET, and savedFilterParams for POST
-                    headers: { 'Authorization': `Token ${token}` }
-                });
-        
-                // Check if we got a valid response with leads
-                if (!response.data || !response.data.leads) {
-                    throw new Error('Invalid response format from server');
-                }
-        
-                // Format data for Excel
-                const excelData = response.data.leads.map(lead => ({
-                    'Lead ID': lead.id,
-                    'Type': lead.type,
-                    'Location': lead.city,
-                    'Customer Name': lead.name,
-                    'Vehicle': lead.vehicle,
-                    'Phone Number': lead.number,
-                    'Source': lead.source,
-                    'Order ID': lead.orderId,
-                    'Registration Number': lead.regNumber,
-                    'Status': lead.status,
-                    'CCE': lead.cceName,
-                    'CA': lead.caName,
-                    'Arrival Date/Time': lead.arrival_time ? new Date(lead.arrival_time).toLocaleString('en-IN') : 'Not Set',
-                    'Created At': lead.created_at ? new Date(lead.created_at).toLocaleString('en-IN') : 'NA',
-                    'Updated At': lead.updated_at ? new Date(lead.updated_at).toLocaleString('en-IN') : 'NA'
-                }));
-        
-                // Create worksheet
-                const worksheet = XLSX.utils.json_to_sheet(excelData);
-                const workbook = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(workbook, worksheet, "Leads");
-        
-                // Add metadata sheet if exporting filtered data
-                if (currentView === 'filter') {
-                    // Get calculated values from current state rather than relying on dataFromFilter
-                    // Make sure these state variables are properly defined in your component
-                    const filterInfo = [
-                        ['Filter Criteria:', ''],
-                        ['User:', savedFilterParams.user || 'All'],
-                        ['Source:', savedFilterParams.source || 'All'],
-                        ['Status:', savedFilterParams.status || 'All'],
-                        ['Location:', savedFilterParams.location || 'All'],
-                        ['Date Range:', savedFilterParams.dateRange?.startDate && savedFilterParams.dateRange?.endDate ?
-                            `${savedFilterParams.dateRange.startDate} to ${savedFilterParams.dateRange.endDate}` : 'All'],
-                        [''],
-                        ['Export Statistics:', ''],
-                        ['Total Leads:', response.data.total_count],
-                        ['Export Date:', new Date().toLocaleString('en-IN')],
-                    ];
-        
-                    // Only add financial data if those state variables are available
-                    if (typeof totalFinalAmount !== 'undefined' && totalFinalAmount > 0) {
-                        filterInfo.push(
-                            ['GMV:', `₹${Math.round(Number(totalFinalAmount)).toLocaleString('en-IN')}`],
-                            ['ATS:', `₹${Math.round(Number(finalAmountPerLead)).toLocaleString('en-IN')}`]
-                        );
-        
-                        if (typeof totalCommissionDue !== 'undefined' && totalCommissionDue > 0) {
-                            filterInfo.push(['Commission Due:', `₹${Math.round(Number(totalCommissionDue)).toLocaleString('en-IN')}`]);
-                        }
-        
-                        if (typeof totalCommissionReceived !== 'undefined' && totalCommissionReceived > 0) {
-                            filterInfo.push(['Commission Received:', `₹${Math.round(Number(totalCommissionReceived)).toLocaleString('en-IN')}`]);
-                        }
-                    }
-        
-                    const metadataSheet = XLSX.utils.aoa_to_sheet(filterInfo);
-                    XLSX.utils.book_append_sheet(workbook, metadataSheet, "Export Info");
-                }
-        
-                // Generate file name and create/download the file
-                const date = new Date().toISOString().slice(0, 10);
-                const fileName = `leads_export_${date}.xlsx`;
-                XLSX.writeFile(workbook, fileName);
-        
-                // setAlertMessage(`Excel export completed successfully (${response.data.total_count} leads)`);
-                setAlertMessage(`Excel export completed successfully `);
-                setShowSuccessAlert(true);
-                setTimeout(() => setShowSuccessAlert(false), 3000);
-        
-            } catch (error) {
-                console.error('Error exporting to Excel:', error);
-                setAlertMessage('Error exporting to Excel: ' + (error.response?.data?.message || error.message));
-                setShowSuccessAlert(true);
-                setTimeout(() => setShowSuccessAlert(false), 5000);
-            } finally {
-                setIsExporting(false);
             }
-        };
+    
+    
+            response = await axios({
+                method: method,
+                url: url,
+                data: data, // This will be null for GET, and savedFilterParams for POST
+                headers: { 'Authorization': `Token ${token}` }
+            });
+    
+            // Check if we got a valid response with leads
+            if (!response.data || !response.data.leads) {
+                throw new Error('Invalid response format from server');
+            }
+            // Add before the mapping to check what's coming from API
+            console.log("Sample lead data:", response.data.leads[0]);
+            // Format data for Excel
+            // Modify within the exportToExcel function, around line 1208 (after logging the sample lead data)
+// Format data for Excel
+const excelData = response.data.leads.map(lead => ({
+    'Lead ID': lead.id,
+    'Type': lead.type,
+    'Location': lead.city,
+    'Customer Name': lead.name,
+    'Vehicle': lead.vehicle,
+    'Phone Number': lead.number,
+    'Source': lead.source,
+    'Order ID': lead.orderId,
+    'Registration Number': lead.regNumber,
+    'Workshop Name': lead.workshop_details?.name || 'NA',
+    
+    // Status related fields - always include these
+    'Status': lead.status || lead.lead_status || 'NA',
+    'Arrival Mode': lead.arrival_mode || 'NA',
+    'Disposition': lead.disposition || 'NA',
+    'Arrival Date/Time': lead.arrival_time ? new Date(lead.arrival_time).toLocaleString('en-IN') : 'Not Set',
+    
+    // Conditional fields - include always but they'll be empty if not applicable
+    'Battery Feature': lead.battery_feature || 'NA',
+    'Fuel Status': lead.fuel_status || 'NA',
+    'Fuel Type': lead.car?.fuel || 'NA',
+    
+    'Speedometer Reading': lead.speedometer_rd || 'NA',
+    'Additional Work': lead.additional_work || 'NA',
+    'Inventory': Array.isArray(lead.inventory) 
+        ? lead.inventory.join(', ') 
+        : (typeof lead.inventory === 'string' ? lead.inventory : 'NA'),
+    
+    // Payment/Commission fields
+    'Estimated Price': typeof lead.estimated_price !== 'undefined' ? `₹${Number(lead.estimated_price).toLocaleString('en-IN')}` : 'NA',
+    'Discount': typeof lead.overview?.discount !== 'undefined' ? `₹${Number(lead.overview?.discount).toLocaleString('en-IN')}` : 'NA',
+    // 'Final Amount': typeof lead.overview?.finalAmount !== 'undefined' 
+    //     ? `₹${Number(lead.overview.finalAmount).toLocaleString('en-IN')}` 
+    //     : (typeof lead.final_amount !== 'undefined' ? `₹${Number(lead.final_amount).toLocaleString('en-IN')}` : 'NA'),
+    'Commission Due': typeof lead.commission_due !== 'undefined' ? `₹${Number(lead.commission_due).toLocaleString('en-IN')}` : 'NA',
+    'Commission Received': typeof lead.commission_received !== 'undefined' ? `₹${Number(lead.commission_received).toLocaleString('en-IN')}` : 'NA',
+    'Commission Percent': typeof lead.commission_percent !== 'undefined' ? `${lead.commission_percent}%` : 'NA',
+    
+    
+    // Other important fields
+    'CCE': lead.cceName || 'NA',
+    'Technician': lead.caName || 'NA',
+    'CCE Comments': lead.cceComments || 'NA',
+    'Technician Comments': lead.caComments || 'NA',
+    'Created At': lead.created_at ? new Date(lead.created_at).toLocaleString('en-IN') : 'NA',
+    'Updated At': lead.updated_at ? new Date(lead.updated_at).toLocaleString('en-IN') : 'NA',
+    'Work Summary': Array.isArray(lead.products) 
+    ? lead.products.map(product => 
+        `[PRODUCT: ${product.name}] ${product.workdone}, ${product.total})`
+      ).join('; ') 
+    : (typeof lead.products === 'string' ? lead.products : 'N/A'),
+    'Total Amount': lead.overview?.finalAmount !== undefined && lead.overview?.finalAmount !== null 
+        ? `₹${Number(lead.overview.finalAmount).toLocaleString('en-IN')}`
+        : 'NA',
+}));    
+    
+            // Create worksheet
+            const worksheet = XLSX.utils.json_to_sheet(excelData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Leads");
+    
+            // Add metadata sheet if exporting filtered data
+            if (currentView === 'filter') {
+                // Get calculated values from current state rather than relying on dataFromFilter
+                // Make sure these state variables are properly defined in your component
+                const filterInfo = [
+                    ['Filter Criteria:', ''],
+                    ['User:', savedFilterParams.user || 'All'],
+                    ['Source:', savedFilterParams.source || 'All'],
+                    ['Status:', savedFilterParams.status || 'All'],
+                    ['Location:', savedFilterParams.location || 'All'],
+                    ['Date Range:', savedFilterParams.dateRange?.startDate && savedFilterParams.dateRange?.endDate ?
+                        `${savedFilterParams.dateRange.startDate} to ${savedFilterParams.dateRange.endDate}` : 'All'],
+                    [''],
+                    ['Export Statistics:', ''],
+                    ['Total Leads:', response.data.total_count],
+                    ['Export Date:', new Date().toLocaleString('en-IN')],
+                ];
+    
+                // Only add financial data if those state variables are available
+                if (typeof totalFinalAmount !== 'undefined' && totalFinalAmount > 0) {
+                    filterInfo.push(
+                        ['GMV:', `₹${Math.round(Number(totalFinalAmount)).toLocaleString('en-IN')}`],
+                        ['ATS:', `₹${Math.round(Number(finalAmountPerLead)).toLocaleString('en-IN')}`]
+                    );
+    
+                    if (typeof totalCommissionDue !== 'undefined' && totalCommissionDue > 0) {
+                        filterInfo.push(['Commission Due:', `₹${Math.round(Number(totalCommissionDue)).toLocaleString('en-IN')}`]);
+                    }
+    
+                    if (typeof totalCommissionReceived !== 'undefined' && totalCommissionReceived > 0) {
+                        filterInfo.push(['Commission Received:', `₹${Math.round(Number(totalCommissionReceived)).toLocaleString('en-IN')}`]);
+                    }
+                }
+    
+                const metadataSheet = XLSX.utils.aoa_to_sheet(filterInfo);
+                XLSX.utils.book_append_sheet(workbook, metadataSheet, "Export Info");
+            }
+    
+            // Generate file name and create/download the file
+            const date = new Date().toISOString().slice(0, 10);
+            const fileName = `leads_export_${date}.xlsx`;
+            XLSX.writeFile(workbook, fileName);
+    
+            // setAlertMessage(`Excel export completed successfully (${response.data.total_count} leads)`);
+            setAlertMessage(`Excel export completed successfully `);
+            setShowSuccessAlert(true);
+            setTimeout(() => setShowSuccessAlert(false), 3000);
+    
+        } catch (error) {
+            console.error('Error exporting to Excel:', error);
+            setAlertMessage('Error exporting to Excel: ' + (error.response?.data?.message || error.message));
+            setShowSuccessAlert(true);
+            setTimeout(() => setShowSuccessAlert(false), 5000);
+        } finally {
+            setIsExporting(false);
+        }
+    };
 
     return (
         <Layout>
@@ -884,6 +1107,8 @@ useEffect(() => {
                 dateField: value
             }));
         }}
+        className="w-full" // Add this class to ensure it takes full width
+
     />
 </div>
 
@@ -1072,12 +1297,49 @@ useEffect(() => {
                     autoFocus
                 />
             </div>
+{/* Add Select All button here */}
+<div className="px-3 py-2 border-b border-gray-200">
+    <button
+        onClick={(e) => {
+            e.stopPropagation();
+            toggleAllGarages();
+        }}
+        className="w-full py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium"
+    >
+        {garages.filter(garage =>
+            garage.name.toLowerCase().includes(garageSearchQuery.toLowerCase()) ||
+            (garage.mechanic && garage.mechanic.toLowerCase().includes(garageSearchQuery.toLowerCase())) ||
+            (garage.locality && garage.locality.toLowerCase().includes(garageSearchQuery.toLowerCase()))
+        ).every(garage => filterFormData.garage.includes(garage.name))
+            ? "Unselect All"
+            : "Select All"
+        }
+    </button>
+</div>
+                   
 
-            {garages
-                .filter(garage =>
-                    garage.name.toLowerCase().includes(garageSearchQuery.toLowerCase()) ||
-                    (garage.mechanic && garage.mechanic.toLowerCase().includes(garageSearchQuery.toLowerCase()))
-                ).map(garage => (
+{garages
+    .filter(garage => {
+        const query = garageSearchQuery.toLowerCase();
+        const cityVariations = getCityVariations(query);
+        
+        // Name match
+        if (garage.name.toLowerCase().includes(query)) return true;
+        
+        // Mechanic match
+        if (garage.mechanic && garage.mechanic.toLowerCase().includes(query)) return true;
+        
+        // Locality match with city variations
+        if (garage.locality) {
+            if (garage.locality.toLowerCase().includes(query)) return true;
+            for (const cityVariation of cityVariations) {
+                if (garage.locality.toLowerCase().includes(cityVariation)) return true;
+            }
+        }
+        
+        return false;
+    })
+    .map(garage => (
                 <div
                     key={garage.id}
                     className="flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer"
@@ -1102,14 +1364,19 @@ useEffect(() => {
                     </label>
                 </div>
             ))}
+
+
+            
+            
             {garages.filter(garage =>
-                garage.name.toLowerCase().includes(garageSearchQuery.toLowerCase()) ||
-                (garage.mechanic && garage.mechanic.toLowerCase().includes(garageSearchQuery.toLowerCase()))
-            ).length === 0 && (
-                <div className="px-3 py-2 text-gray-500 text-center">
-                    No garages match your search
-                </div>
-            )}
+    garage.name.toLowerCase().includes(garageSearchQuery.toLowerCase()) ||
+    (garage.mechanic && garage.mechanic.toLowerCase().includes(garageSearchQuery.toLowerCase())) ||
+    (garage.locality && garage.locality.toLowerCase().includes(garageSearchQuery.toLowerCase()))
+).length === 0 && (
+    <div className="px-3 py-2 text-gray-500 text-center">
+        No garages match your search
+    </div>
+)}
         </div>
     )}
 </div>
@@ -1242,12 +1509,14 @@ useEffect(() => {
 <div className="col-span-5 mb-1">
     <div className="bg-white rounded-md shadow-sm border border-gray-200">
     <div className={`grid ${(totalCommissionDue > 0 || totalCommissionReceived > 0) ? 'grid-cols-5' : 'grid-cols-3'} divide-x`}>
-            <div className="p-1 text-center">
-                <div className="text-[9px] text-gray-600 leading-none">Total</div>
-                <div className="text-sm font-semibold text-red-600 leading-tight">
-                    {totalLeads}
-                </div>
-            </div>
+    {(totalCommissionDue <= 0 && totalCommissionReceived <= 0) && (
+    <div className="p-1 text-center">
+        <div className="text-[9px] text-gray-600 leading-none">Total</div>
+        <div className="text-sm font-semibold text-red-600 leading-tight">
+            {totalLeads}
+        </div>
+    </div>
+)}
             <div className="p-1 text-center">
                 <div className="text-[9px] text-gray-600 leading-none">GMV</div>
                 <div className="text-sm font-semibold text-red-600 leading-tight">
@@ -1276,6 +1545,14 @@ useEffect(() => {
                     </div>
                 </div>
             )}
+             {totalCommissionExceptOwn > 0 && (
+        <div className="p-1 text-center">
+            <div className="text-[9px] text-gray-600 leading-none">WXCR</div>
+            <div className="text-sm font-semibold text-green-600 leading-tight">
+                +₹{Math.round(Number(totalCommissionExceptOwn)).toLocaleString('en-IN')}
+            </div>
+        </div>
+    )}
         </div>
     </div>
 </div>
@@ -1298,9 +1575,19 @@ useEffect(() => {
                         Apply
                     </button>
                 </div>
-                <button onClick={() => navigate('/edit', { state: { seqNum: seqNum } })}  className="px-4 py-2 border-2 border-red-500 text-red-500 rounded-md hover:bg-red-500 hover:text-white transition-colors duration-300">
-                    Add Lead
-                </button>
+
+                <div className="flex gap-2">
+                    <Link to="/analytics" className="px-4 py-2 border-2 border-green-500 text-green-500 rounded-md hover:bg-green-500 hover:text-white transition-colors duration-300 flex items-center">
+                        <svg className="w-5 h-5 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M8 13V17M16 11V17M12 7V17M7.8 21H16.2C17.8802 21 18.7202 21 19.362 20.673C19.9265 20.3854 20.3854 19.9265 20.673 19.362C21 18.7202 21 17.8802 21 16.2V7.8C21 6.11984 21 5.27976 20.673 4.63803C20.3854 4.07354 19.9265 3.6146 19.362 3.32698C18.7202 3 17.8802 3 16.2 3H7.8C6.11984 3 5.27976 3 4.63803 3.32698C4.07354 3.6146 3.6146 4.07354 3.32698 4.63803C3 5.27976 3 6.11984 3 7.8V16.2C3 17.8802 3 18.7202 3.32698 19.362C3.6146 19.9265 4.07354 20.3854 4.63803 20.673C5.27976 21 6.11984 21 7.8 21Z" 
+                                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        
+                    </Link>
+                    <button onClick={() => navigate('/edit', { state: { seqNum: seqNum } })} className="px-4 py-2 border-2 border-red-500 text-red-500 rounded-md hover:bg-red-500 hover:text-white transition-colors duration-300">
+                        Add Lead
+                    </button>
+                </div>
             </div>
 
             <div className='flex justify-center'>

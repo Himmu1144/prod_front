@@ -12,7 +12,7 @@ const AuthProvider = ({ children }) => {
       if (token) {
         try {
           // Call your backend to validate token
-          await axios.get('https://obc.work.gd/api/validate-token/', {
+          await axios.get('https://admin.onlybigcars.com/api/validate-token/', {
             headers: { 'Authorization': `Token ${token}` }
           });
           // Token is valid, continue

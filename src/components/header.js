@@ -7,21 +7,42 @@ import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import './header.css';
 
+// Import car images
+import loknath from '../assets/images/loknath.jpg'; // Adjust path as needed
+import anjali from '../assets/images/anjali.jpg'; // Adjust path as needed
+
 const Header = () => {
-    const { token } = useContext(AuthContext);
+    const { token, user } = useContext(AuthContext);    
     const [status, setStatus] = useState('Active');
     const [statusTime, setStatusTime] = useState(null);
     const [statusHistory, setStatusHistory] = useState({});
     const [showProfileMenu, setShowProfileMenu] = useState(false);
+    const [username, setUsername] = useState('');
 
-    // Fetch initial status when component mounts
+    // Fetch initial status and user info when component mounts
     useEffect(() => {
         fetchUserStatus();
+        fetchUserInfo();
     }, []);
+
+    const fetchUserInfo = async () => {
+        try {
+            const response = await axios.get('https://admin.onlybigcars.com/api/leads/search/', {
+                headers: { 'Authorization': `Token ${token}` }
+            });
+            setUsername(response.data.current_username.toLowerCase());
+        } catch (error) {
+            console.error('Error fetching user info:', error);
+            // If the endpoint doesn't exist, try to get username from AuthContext
+            if (user && user.username) {
+                setUsername(user.username.toLowerCase());
+            }
+        }
+    };
 
     const fetchUserStatus = async () => {
         try {
-            const response = await axios.get('https://obc.work.gd/api/user-status/', {
+            const response = await axios.get('https://admin.onlybigcars.com/api/user-status/', {
                 headers: { 'Authorization': `Token ${token}` }
             });
             setStatus(response.data.status);
@@ -35,7 +56,7 @@ const Header = () => {
     const handleStatusChange = async (newStatus) => {
         try {
             const response = await axios.post(
-                'https://obc.work.gd/api/update-status/',
+                'https://admin.onlybigcars.com/api/update-status/',
                 { status: newStatus },
                 { headers: { 'Authorization': `Token ${token}` }}
             );
@@ -47,6 +68,25 @@ const Header = () => {
             console.error('Error updating status:', error);
         }
     };
+
+    // Determine which icon to show based on username
+const renderProfileIcon = () => {
+    const lowerUsername = username.toLowerCase();
+    const imageStyle = {
+        width: '100%',
+        height: '100%',
+        objectFit: 'cover',
+        borderRadius: '50%'
+    };
+    
+    if (lowerUsername === 'loknath') {
+        return <img src={loknath} alt="loknath" style={imageStyle} />;
+    } else if (lowerUsername === 'anjali') {
+        return <img src={anjali} alt="anjali" style={imageStyle} />;
+    } else {
+        return <FaUser />;
+    }
+};
 
     return (
         <>
@@ -119,7 +159,7 @@ const Header = () => {
                             style={{width: '40px', height: '40px', padding: '6px'}}
                             onClick={() => setShowProfileMenu(true)}
                         >
-                            <FaUser />
+                            {renderProfileIcon()}
                         </Button>
                     </Navbar.Collapse>
                 </Container>

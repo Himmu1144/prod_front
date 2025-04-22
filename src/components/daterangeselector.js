@@ -3,25 +3,61 @@ import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import { Calendar } from 'lucide-react';
 
-const DateRangeSelector = forwardRef(({ onDateRangeChange, dateField = 'created_at', onDateFieldChange }, ref) => {
-  const [dateRange, setDateRange] = useState([null, null]);
-  const [startDate, endDate] = dateRange;
+const formatToLocalDateString = (date) => {
+  if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
+    return '';
+  }
+  const year = date.getFullYear();
+  const month = (date.getMonth() + 1).toString().padStart(2, '0'); // getMonth is 0-indexed
+  const day = date.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const DateRangeSelector = forwardRef(({ onDateRangeChange, dateField = 'created_at', onDateFieldChange, showDateFieldOptions = true }, ref) => {
+  const [startDate, setStartDate] = useState(null);
+  const [endDate, setEndDate] = useState(null);
+
+  const reset = () => {
+    setStartDate(null);
+    setEndDate(null);
+    onDateRangeChange({ startDate: '', endDate: '' });
+  };
+
+  const setDates = (start, end) => {
+    // Attempt to convert inputs to Date objects if they aren't already
+    const newStart = start instanceof Date ? start : (start ? new Date(start) : null);
+    const newEnd = end instanceof Date ? end : (end ? new Date(end) : null);
+
+    // Optional: Check if conversion resulted in valid dates
+    if (newStart && isNaN(newStart.getTime())) {
+       console.warn("Invalid start date provided to setDates:", start);
+       setStartDate(null); 
+    } else {
+       setStartDate(newStart);
+    }
+
+    if (newEnd && isNaN(newEnd.getTime())) {
+       console.warn("Invalid end date provided to setDates:", end);
+       setEndDate(null);
+    } else {
+       setEndDate(newEnd);
+    }
+  };
 
   useImperativeHandle(ref, () => ({
-    reset: () => {
-      setDateRange([null, null]);
-      onDateRangeChange({ startDate: null, endDate: null });
-    }
+    reset,
+    setDates
   }));
 
   const handleDateChange = (update) => {
-    setDateRange(update);
-    if (update[0] && update[1]) {
-      onDateRangeChange({
-        startDate: update[0].toISOString().split('T')[0],
-        endDate: update[1].toISOString().split('T')[0]
-      });
-    }
+    const [newStart, newEnd] = update;
+    setStartDate(newStart);
+    setEndDate(newEnd);
+    // Pass the correctly formatted LOCAL date strings
+    onDateRangeChange({
+      startDate: formatToLocalDateString(newStart), 
+      endDate: formatToLocalDateString(newEnd)    
+    });
   };
 
   const formatDate = (date) => {
@@ -46,6 +82,7 @@ const DateRangeSelector = forwardRef(({ onDateRangeChange, dateField = 'created_
   };
 
   const CustomCalendarFooter = () => (
+    showDateFieldOptions ? (
     <div className="p-2 border-t border-gray-200 mt-2 flex">
       <div className="flex items-center justify-center space-x-4">
         <label className="inline-flex items-center cursor-pointer">
@@ -72,10 +109,11 @@ const DateRangeSelector = forwardRef(({ onDateRangeChange, dateField = 'created_
         </label>
       </div>
     </div>
+    ) : null
   );
 
   return (
-    <div className="relative">
+    <div className="relative w-full">
       <style>
         {`
           .react-datepicker-popper {
@@ -93,6 +131,9 @@ const DateRangeSelector = forwardRef(({ onDateRangeChange, dateField = 'created_
           }
           .react-datepicker {
             background-color: white !important;
+          }
+          .react-datepicker__month-container{
+          float:none !important;
           }
         `}
       </style>
@@ -130,6 +171,7 @@ const DateRangeSelector = forwardRef(({ onDateRangeChange, dateField = 'created_
             </div>
           </div>
         )}
+
         calendarContainer={({ children }) => (
           <div className="date-range-calendar-container bg-white shadow-lg rounded-md border border-gray-200">
             {children}

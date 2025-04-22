@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Configure axios defaults globally
-axios.defaults.baseURL = 'https://obc.work.gd';
+axios.defaults.baseURL = 'https://admin.onlybigcars.com';
 axios.defaults.validateStatus = (status) => {
     return status >= 200 && status < 300;
 };

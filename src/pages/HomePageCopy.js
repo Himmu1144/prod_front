@@ -30,7 +30,7 @@ const HomePage = () => {
 
     useEffect(() => {
         // Fetch welcome message
-        axios.get('https://obc.work.gd/', {
+        axios.get('https://admin.onlybigcars.com/', {
             headers: {
                 Authorization: `Token ${token}`
             }

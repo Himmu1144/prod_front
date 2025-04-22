@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { FaUpload } from 'react-icons/fa';
 import { X } from 'lucide-react';
 
 // Normalize image URLs for display
@@ -40,42 +41,155 @@ const ImageUploader = ({ images, setImages, maxImages = 5 }) => {
     );
   }, [images]);
 
-  const handleImageChange = (e) => {
-    const files = Array.from(e.target.files);
-    if (previewImages.length + files.length > maxImages) {
-      alert(`You can upload a maximum of ${maxImages} images.`);
-      return;
-    }
+  // const handleImageChange = (e) => {
+  //   const files = Array.from(e.target.files);
+  //   if (previewImages.length + files.length > maxImages) {
+  //     alert(`You can upload a maximum of ${maxImages} images.`);
+  //     return;
+  //   }
+    
+  //   // Create a copy of the current images including previously uploaded ones
+  //   const newImagesArray = [...previewImages];
+  //   let filesProcessed = 0;
+    
+  //   console.log(`Processing ${files.length} new files. Current image count: ${previewImages.length}`);
+    
+  //   // Process each file
+  //   files.forEach((file) => {
+  //     console.log(`Processing file: ${file.name}, size: ${file.size} bytes`);
+      
+  //     const reader = new FileReader();
+      
+  //     reader.onloadend = () => {
+  //       console.log(`File loaded: ${file.name}`);
+        
+  //       // Add this image to our array copy
+  //       newImagesArray.push({ url: reader.result, file });
+        
+  //       // Increment count of processed files
+  //       filesProcessed++;
+        
+  //       // Only update state when all files have been processed
+  //       if (filesProcessed === files.length) {
+  //         setPreviewImages(newImagesArray);
+  //         setImages(newImagesArray);
+  //         console.log(`All files processed. New total image count: ${newImagesArray.length}`);
+  //       }
+  //     };
+      
+  //     reader.onerror = (error) => {
+  //       console.error(`Error reading file ${file.name}:`, error);
+  //       filesProcessed++;
+  //     };
+      
+  //     reader.readAsDataURL(file);
+  //   });
+  // };
 
-    // Process each file
-    files.forEach(file => {
-      console.log(`Processing file: ${file.name}, size: ${file.size} bytes`);
+//   // Update the handleImageChange function
+// const handleImageChange = (e) => {
+//   const files = Array.from(e.target.files);
+  
+//   // Check total images limit
+//   if (previewImages.length + files.length > maxImages) {
+//     alert(`You can upload a maximum of ${maxImages} images.`);
+//     return;
+//   }
+  
+//   // Create a copy of the current images including previously uploaded ones
+//   const newImagesArray = [...previewImages];
+//   let filesProcessed = 0;
+  
+//   console.log(`Processing ${files.length} new files. Current image count: ${previewImages.length}`);
+  
+//   // Process each file
+//   files.forEach((file) => {
+//     console.log(`Processing file: ${file.name}, size: ${file.size} bytes`);
+    
+//     const reader = new FileReader();
+    
+//     reader.onloadend = () => {
+//       console.log(`File loaded: ${file.name}`);
       
-      const reader = new FileReader();
+//       // Add this image to our array copy
+//       newImagesArray.push({ url: reader.result, file });
       
-      reader.onloadend = () => {
-        console.log(`File loaded: ${file.name}, data size: ${reader.result.length}`);
+//       // Increment count of processed files
+//       filesProcessed++;
+      
+//       // Only update state when all files have been processed
+//       if (filesProcessed === files.length) {
+//         // Update local state
+//         setPreviewImages(newImagesArray);
         
-        // Create new array with the new image
-        const newImages = [
-          ...previewImages,
-          { url: reader.result, file } // reader.result contains the data URL
-        ];
+//         // Pass to parent - make sure parent gets the complete updated array
+//         setImages(newImagesArray);
         
-        // Update state with the new images
-        setPreviewImages(newImages);
-        setImages(newImages);
-      };
+//         console.log(`All files processed. New total image count: ${newImagesArray.length}`);
+//       }
+//     };
+    
+//     reader.onerror = (error) => {
+//       console.error(`Error reading file ${file.name}:`, error);
+//       filesProcessed++;
+//     };
+    
+//     reader.readAsDataURL(file);
+//   });
+// };
+
+const handleImageChange = (e) => {
+  const files = Array.from(e.target.files);
+  
+  // Check total images limit
+  if (previewImages.length + files.length > maxImages) {
+    alert(`You can upload a maximum of ${maxImages} images.`);
+    return;
+  }
+  
+  // Create a copy of the current images
+  const newImagesArray = [...previewImages];
+  let filesProcessed = 0;
+  
+  console.log(`Processing ${files.length} new files. Current image count: ${previewImages.length}`);
+  
+  // Process each file
+  files.forEach((file) => {
+    console.log(`Processing file: ${file.name}, size: ${file.size} bytes`);
+    
+    const reader = new FileReader();
+    
+    reader.onloadend = () => {
+      console.log(`File loaded: ${file.name}`);
       
-      reader.onerror = (error) => {
-        console.error(`Error reading file ${file.name}:`, error);
-        alert(`Failed to load image: ${file.name}`);
-      };
+      // Add this image to our array copy WITH the file reference
+      newImagesArray.push({
+        url: reader.result,
+        file: file // Store the actual File object
+      });
       
-      // Read the file as a data URL
-      reader.readAsDataURL(file);
-    });
-  };
+      // Increment count of processed files
+      filesProcessed++;
+      
+      // Only update state when all files have been processed
+      if (filesProcessed === files.length) {
+        // Update local state first
+        setPreviewImages(newImagesArray);
+        
+        // Then update parent state - WITHOUT using setTimeout which can cause issues
+        setImages(newImagesArray);
+        console.log(`All files processed. New total image count: ${newImagesArray.length}`);
+      }
+    };
+    
+    reader.onerror = (error) => {
+      console.error(`Error reading file ${file.name}:`, error);
+      filesProcessed++;
+    };
+    
+    reader.readAsDataURL(file);
+  });
+};
 
   const removeImage = (index) => {
     const newImages = [...previewImages];
@@ -109,20 +223,62 @@ const ImageUploader = ({ images, setImages, maxImages = 5 }) => {
         ))}
       </div>
       
-      {previewImages.length < maxImages && (
-        <div className="mt-2">
-          <label className="cursor-pointer block p-2 border-2 border-dashed border-gray-300 rounded-md text-center hover:border-red-500 transition-colors">
-            <span className="text-gray-600">Click to upload images</span>
-            <input
-              type="file"
-              multiple
-              accept="image/*"
-              onChange={handleImageChange}
-              className="hidden"
-            />
-          </label>
-        </div>
-      )}
+  
+{/* 
+{previewImages.length < maxImages && (
+  <div className="mt-2">
+    <label className="cursor-pointer block p-2 border-2 border-dashed border-gray-300 rounded-md text-center hover:border-red-500 transition-colors">
+      <span className="text-gray-600">
+        Click to upload images 
+      </span>
+      <input
+        type="file"
+        multiple
+        accept="image/*"
+        onChange={handleImageChange}
+        className="hidden"
+      />
+    </label>
+  </div>
+)} */}
+
+{/* // Add this before the image upload label */}
+{previewImages.length > 0 && (
+  <div className="flex justify-between items-center mb-2 text-sm">
+    <span className="text-gray-600">
+      Selected images: {previewImages.length}/{maxImages}
+    </span>
+    {/* {previewImages.length < maxImages && (
+      <span className="text-blue-600 cursor-pointer hover:underline" 
+            onClick={() => document.getElementById('image-uploader-input').click()}>
+        Add more
+      </span>
+    )} */}
+  </div>
+)}
+{previewImages.length < maxImages && (
+  <div className="mt-2">
+    <label className="cursor-pointer block p-2 border-2 border-dashed border-gray-300 rounded-md text-center hover:border-red-500 transition-colors">
+      <div className="flex flex-col items-center">
+        <FaUpload className="text-gray-500 mb-1" />
+        <span className="text-gray-600 font-medium">
+          Click to upload images
+        </span>
+        <span className="text-gray-500 text-xs mt-1">
+          (Hold Ctrl/Cmd to select multiple files)
+        </span>
+      </div>
+      <input
+        type="file"
+        id="image-uploader-input"
+        multiple
+        accept="image/*"
+        onChange={handleImageChange}
+        className="hidden"
+      />
+    </label>
+  </div>
+)}
     </div>
   );
 };

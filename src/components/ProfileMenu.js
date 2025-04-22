@@ -1,18 +1,59 @@
-import React, { useContext } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import { Offcanvas } from 'react-bootstrap';
 import { FaUser, FaCog, FaSignOutAlt } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 
+// Import car images - same as in header.js
+import loknath from '../assets/images/loknath.jpg'; // Adjust path as needed
+import anjali from '../assets/images/anjali.jpg'; // Adjust path as needed
+
 const ProfileMenu = ({ show, handleClose }) => {
     const navigate = useNavigate();
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
-    const { logout } = useContext(AuthContext);
+    const [username, setUsername] = useState('');
+    const { logout, token, user } = useContext(AuthContext);
+    
+    // Fetch the current username from API when component mounts
+    useEffect(() => {
+        fetchUserInfo();
+    }, []);
 
+    const fetchUserInfo = async () => {
+        try {
+            const response = await axios.get('https://admin.onlybigcars.com/api/leads/search/', {
+                headers: { 'Authorization': `Token ${token}` }
+            });
+            setUsername(response.data.current_username);
+        } catch (error) {
+            console.error('Error fetching user info:', error);
+            // Fallback to localStorage if API fails
+            const localUser = JSON.parse(localStorage.getItem('user') || '{}');
+            setUsername(localUser.username || 'User');
+        }
+    };
+
+    const renderProfileIcon = () => {
+        const lowerUsername = username.toLowerCase();
+        const imageStyle = {
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            borderRadius: '50%'
+        };
+        
+        if (lowerUsername === 'loknath') {
+            return <img src={loknath} alt="loknath" style={imageStyle} />;
+        } else if (lowerUsername === 'anjali') {
+            return <img src={anjali} alt="anjali" style={imageStyle} />;
+        } else {
+            return <FaUser size={40} className="text-gray-500" />;
+        }
+    };
+    
     const handleLogout = async () => {
         try {
-            await axios.post('https://obc.work.gd/api/token/logout/', {}, {
+            await axios.post('https://admin.onlybigcars.com/api/token/logout/', {}, {
                 headers: {
                     Authorization: `Token ${localStorage.getItem('token')}`
                 }
@@ -31,9 +72,9 @@ const ProfileMenu = ({ show, handleClose }) => {
             <Offcanvas.Body>
                 <div className="flex flex-col items-center mb-6">
                     <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-3">
-                        <FaUser size={40} className="text-gray-500" />
+                        {renderProfileIcon()}
                     </div>
-                    <h5 className="text-lg font-semibold">{user.username || 'User'}</h5>
+                    <h5 className="text-lg font-semibold">{username || 'User'}</h5>
                 </div>
 
                 <div className="space-y-4">

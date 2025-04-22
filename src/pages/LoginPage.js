@@ -19,7 +19,7 @@ const LoginPage = () => {
     e.preventDefault();
     setError(''); // Clear any existing errors
     try {
-      const response = await axios.post('https://obc.work.gd/api/token/login/', formData);
+      const response = await axios.post('https://admin.onlybigcars.com/api/token/login/', formData);
       
       if (response.data.token) {
         // Store token and user info
@@ -30,7 +30,7 @@ const LoginPage = () => {
 
         // Set initial active status
         await axios.post(
-          'https://obc.work.gd/api/update-status/',
+          'https://admin.onlybigcars.com/api/update-status/',
           { status: 'active' },
           { headers: { 'Authorization': `Token ${response.data.token}` }}
       );
