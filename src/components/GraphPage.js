@@ -201,7 +201,8 @@ const GraphPage = () => {
   useEffect(() => {
     const fetchSecondChartData = async () => {
       if (!dateRange.startDate || !dateRange.endDate) return;
-      const filterJobCardOnly = selectedMetric === 'cars';
+      // const filterJobCardOnly = selectedMetric === 'cars';
+      const filterJobCardOnly = true; // Default to true for all metrics
       setSecondChartIsLoading(true);
       setSecondChartError(null);
 

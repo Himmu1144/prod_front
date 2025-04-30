@@ -27,7 +27,7 @@ const Header = () => {
 
     const fetchUserInfo = async () => {
         try {
-            const response = await axios.get('https://admin.onlybigcars.com/api/leads/search/', {
+            const response = await axios.get('http://localhost:8000/api/leads/search/', {
                 headers: { 'Authorization': `Token ${token}` }
             });
             setUsername(response.data.current_username.toLowerCase());
@@ -42,7 +42,7 @@ const Header = () => {
 
     const fetchUserStatus = async () => {
         try {
-            const response = await axios.get('https://admin.onlybigcars.com/api/user-status/', {
+            const response = await axios.get('http://localhost:8000/api/user-status/', {
                 headers: { 'Authorization': `Token ${token}` }
             });
             setStatus(response.data.status);
@@ -53,22 +53,50 @@ const Header = () => {
         }
     };
 
+    // const handleStatusChange = async (newStatus) => {
+    //     try {
+    //         const response = await axios.post(
+    //             'http://localhost:8000/api/update-status/',
+    //             { status: newStatus },
+    //             { headers: { 'Authorization': `Token ${token}` }}
+    //         );
+            
+    //         setStatus(newStatus);
+    //         setStatusTime(new Date(response.data.timestamp));
+    //         fetchUserStatus(); // Refresh status history
+    //     } catch (error) {
+    //         console.error('Error updating status:', error);
+    //     }
+    // };
+
     const handleStatusChange = async (newStatus) => {
         try {
             const response = await axios.post(
-                'https://admin.onlybigcars.com/api/update-status/',
+                'http://localhost:8000/api/update-status/',
                 { status: newStatus },
                 { headers: { 'Authorization': `Token ${token}` }}
             );
             
-            setStatus(newStatus);
-            setStatusTime(new Date(response.data.timestamp));
-            fetchUserStatus(); // Refresh status history
+            // Check if response message is 'invalid_count'
+            if (response.data.count === 'invalid_count') {
+                alert(response.data.message);
+            } else {
+                // Refresh the page instead of showing alert
+                window.location.reload();
+            }
         } catch (error) {
             console.error('Error updating status:', error);
+            
+            // Handle errors
+            if (error.response && error.response.data) {
+                if (error.response.data.message) {
+                    alert(error.response.data.message);
+                } else {
+                    alert('Failed to update status');
+                }
+            }
         }
     };
-
     // Determine which icon to show based on username
 const renderProfileIcon = () => {
     const lowerUsername = username.toLowerCase();

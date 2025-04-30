@@ -7,6 +7,7 @@ import { useLocation } from 'react-router-dom';
 import { Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import DateRangeSelector from '../components/daterangeselector';
+import StatusTimer from '../components/StatusTimer';
 import './homepage.css';
 import * as XLSX from 'xlsx';
 import { Link } from 'react-router-dom';
@@ -34,6 +35,15 @@ const HomePage = () => {
 const [currentView, setCurrentView] = useState('default'); // 'default', 'filter', 'search'
 const [savedSearchQuery, setSavedSearchQuery] = useState('');
 const [savedFilterParams, setSavedFilterParams] = useState({});
+const [userStatus, setUserStatus] = useState('Active');
+const [statusTime, setStatusTime] = useState(null);
+
+const handleStatusChange = (newStatus, timestamp) => {
+    setUserStatus(newStatus);
+    setStatusTime(timestamp);
+    // You may want to call fetchUserStatus() here too if needed
+  };
+
 const initialFilterState = {
     user: '', // Will be set based on isAdmin/cUser later
     source: '',
@@ -838,6 +848,30 @@ useEffect(() => {
     };
   }, [isLoading, currentView]); // Add dependencies to prevent unnecessary interval resets
   
+  
+  // Fetch user status when component mounts
+  useEffect(() => {
+    const fetchUserStatus = async () => {
+      try {
+        const response = await axios.get('http://localhost:8000/api/user-status/', {
+          headers: { 'Authorization': `Token ${token}` }
+        });
+        setUserStatus(response.data.status);
+        setStatusTime(response.data.timestamp);
+      } catch (error) {
+        console.error('Error fetching status:', error);
+      }
+    };
+    
+    if (token) {
+      fetchUserStatus();
+      // Refresh status every minute
+      const interval = setInterval(fetchUserStatus, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [token]);
+  
+  
  
 // Add this function to export data to Excel 06-03
     const [isExporting, setIsExporting] = useState(false);
@@ -1033,6 +1067,18 @@ const excelData = response.data.leads.map(lead => ({
                     <p>{alertMessage}</p>
                 </Alert>
             )}
+
+            
+<div className="App">
+      {/* Your existing app content */}
+      
+      {/* Updated StatusTimer with callback */}
+      <StatusTimer 
+        status={userStatus} 
+        startTime={statusTime} 
+        onStatusChange={handleStatusChange}
+      />
+    </div>
             {/* <h1 className="text-2xl font-bold mb-6">{welcomeData || 'Welcome to the Home Page!'}</h1> */}
 
             {/* New Form Section */}
