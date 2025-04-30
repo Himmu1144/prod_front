@@ -27,7 +27,7 @@ const Header = () => {
 
     const fetchUserInfo = async () => {
         try {
-            const response = await axios.get('http://localhost:8000/api/leads/search/', {
+            const response = await axios.get('https://admin.onlybigcars.com/api/leads/search/', {
                 headers: { 'Authorization': `Token ${token}` }
             });
             setUsername(response.data.current_username.toLowerCase());
@@ -42,7 +42,7 @@ const Header = () => {
 
     const fetchUserStatus = async () => {
         try {
-            const response = await axios.get('http://localhost:8000/api/user-status/', {
+            const response = await axios.get('https://admin.onlybigcars.com/api/user-status/', {
                 headers: { 'Authorization': `Token ${token}` }
             });
             setStatus(response.data.status);
@@ -56,7 +56,7 @@ const Header = () => {
     // const handleStatusChange = async (newStatus) => {
     //     try {
     //         const response = await axios.post(
-    //             'http://localhost:8000/api/update-status/',
+    //             'https://admin.onlybigcars.com/api/update-status/',
     //             { status: newStatus },
     //             { headers: { 'Authorization': `Token ${token}` }}
     //         );
@@ -72,7 +72,7 @@ const Header = () => {
     const handleStatusChange = async (newStatus) => {
         try {
             const response = await axios.post(
-                'http://localhost:8000/api/update-status/',
+                'https://admin.onlybigcars.com/api/update-status/',
                 { status: newStatus },
                 { headers: { 'Authorization': `Token ${token}` }}
             );

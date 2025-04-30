@@ -853,7 +853,7 @@ useEffect(() => {
   useEffect(() => {
     const fetchUserStatus = async () => {
       try {
-        const response = await axios.get('http://localhost:8000/api/user-status/', {
+        const response = await axios.get('https://admin.onlybigcars.com/api/user-status/', {
           headers: { 'Authorization': `Token ${token}` }
         });
         setUserStatus(response.data.status);

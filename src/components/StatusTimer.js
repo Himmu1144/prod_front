@@ -110,7 +110,7 @@ const StatusTimer = ({ status, startTime, onStatusChange }) => {
     // const handleStatusChange = async (newStatus) => {
     //     try {
     //         const response = await axios.post(
-    //             'http://localhost:8000/api/update-status/',
+    //             'https://admin.onlybigcars.com/api/update-status/',
     //             { status: newStatus },
     //             { headers: { 'Authorization': `Token ${token}` }}
     //         );
@@ -141,7 +141,7 @@ const StatusTimer = ({ status, startTime, onStatusChange }) => {
     const handleStatusChange = async (newStatus) => {
         try {
             const response = await axios.post(
-                'http://localhost:8000/api/update-status/',
+                'https://admin.onlybigcars.com/api/update-status/',
                 { status: newStatus },
                 { headers: { 'Authorization': `Token ${token}` }}
             );
