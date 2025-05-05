@@ -64,6 +64,8 @@ const GraphPage = () => {
   const [statusChartData, setStatusChartData] = useState(null);
   const [statusChartIsLoading, setStatusChartIsLoading] = useState(false);
   const [statusChartError, setStatusChartError] = useState(null);
+  const [dateField, setDateField] = useState('created_at'); // Add this state
+
 
   // Handle date range change
   const handleDateRangeChange = (range) => {
@@ -86,7 +88,8 @@ const GraphPage = () => {
           'https://admin.onlybigcars.com/api/analytics/lead-status-graph/',
           {
             startDate: dateRange.startDate,
-            endDate: dateRange.endDate
+            endDate: dateRange.endDate,
+            dateField: dateField,
           },
           { headers: { 'Authorization': `Token ${token}` } }
         );
@@ -101,7 +104,7 @@ const GraphPage = () => {
     };
 
     fetchStatusChartData();
-  }, [dateRange.startDate, dateRange.endDate, token]);
+  }, [dateRange.startDate, dateRange.endDate, token, dateField]);
 
   // Fetch the graph data based on date range
   useEffect(() => {
@@ -118,7 +121,8 @@ const GraphPage = () => {
             startDate: dateRange.startDate,
             endDate: dateRange.endDate,
             groupBy: groupBy,
-            filterJobCardOnly: filterJobCardOnly
+            filterJobCardOnly: filterJobCardOnly,
+            dateField: dateField, 
           },
           { headers: { 'Authorization': `Token ${token}` } }
         );
@@ -164,6 +168,7 @@ const GraphPage = () => {
             endDate: initialDateRange.endDate,
             groupBy: groupBy,
             filterJobCardOnly: filterJobCardOnly, // Use the defined variable here
+            dateField: dateField, // Pass the dateField to the API
           },
           { headers: { 'Authorization': `Token ${token}` } }
         );
@@ -195,14 +200,14 @@ const GraphPage = () => {
 
     fetchInitialGraphData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]); // Removed groupBy from dependencies to avoid re-fetch on initial load if groupBy changes
+  }, [token, dateField]); // Removed groupBy from dependencies to avoid re-fetch on initial load if groupBy changes
 
   // Fetch second chart data
   useEffect(() => {
     const fetchSecondChartData = async () => {
       if (!dateRange.startDate || !dateRange.endDate) return;
       // const filterJobCardOnly = selectedMetric === 'cars';
-      const filterJobCardOnly = true; // Default to true for all metrics
+      const filterJobCardOnly =  true;
       setSecondChartIsLoading(true);
       setSecondChartError(null);
 
@@ -214,11 +219,13 @@ const GraphPage = () => {
             endDate: dateRange.endDate,
             groupBy: secondChartType,
             filterJobCardOnly: filterJobCardOnly,
+            dateField: dateField,
           },
           { headers: { 'Authorization': `Token ${token}` } }
         );
 
         setSecondChartData(response.data);
+        console.log('Second Chart Data:', response.data); // Debugging log  
       } catch (error) {
         console.error('Error fetching workshop/type data:', error);
         setSecondChartError('Failed to fetch data. Please try again.');
@@ -228,7 +235,7 @@ const GraphPage = () => {
     };
 
     fetchSecondChartData();
-  }, [dateRange.startDate, dateRange.endDate, secondChartType, token, selectedMetric]); // Added selectedMetric dependency
+  }, [dateRange.startDate, dateRange.endDate, secondChartType, token, selectedMetric, dateField]); // Added selectedMetric dependency
 
   // Fetch source chart data
   useEffect(() => {
@@ -247,7 +254,8 @@ const GraphPage = () => {
             startDate: dateRange.startDate,
             endDate: dateRange.endDate,
             metric: selectedSourceMetric,
-            filterJobCardOnly: filterJobCardOnly
+            filterJobCardOnly: filterJobCardOnly,
+            dateField: dateField,
           },
           { headers: { 'Authorization': `Token ${token}` } }
         );
@@ -262,7 +270,7 @@ const GraphPage = () => {
     };
 
     fetchSourceChartData();
-  }, [dateRange.startDate, dateRange.endDate, selectedSourceMetric, token]);
+  }, [dateRange.startDate, dateRange.endDate, selectedSourceMetric, token, dateField]);
 
   useEffect(() => {
     const fetchCceChartData = async () => {
@@ -281,7 +289,8 @@ const GraphPage = () => {
             startDate: dateRange.startDate,
             endDate: dateRange.endDate,
             metric: selectedCceMetric,
-            filterJobCardOnly: filterJobCardOnly
+            filterJobCardOnly: filterJobCardOnly,
+            dateField: dateField,
           },
           { headers: { 'Authorization': `Token ${token}` } }
         );
@@ -296,7 +305,7 @@ const GraphPage = () => {
     };
 
     fetchCceChartData();
-  }, [dateRange.startDate, dateRange.endDate, selectedCceMetric, token]);
+  }, [dateRange.startDate, dateRange.endDate, selectedCceMetric, token, dateField]);
 
   // Fetch city chart data
   useEffect(() => {
@@ -316,7 +325,8 @@ const GraphPage = () => {
             startDate: dateRange.startDate,
             endDate: dateRange.endDate,
             metric: selectedCityMetric,
-            filterJobCardOnly: filterJobCardOnly
+            filterJobCardOnly: filterJobCardOnly,
+            dateField: dateField, 
           },
           { headers: { 'Authorization': `Token ${token}` } }
         );
@@ -331,7 +341,7 @@ const GraphPage = () => {
     };
 
     fetchCityChartData();
-  }, [dateRange.startDate, dateRange.endDate, selectedCityMetric, token]);
+  }, [dateRange.startDate, dateRange.endDate, selectedCityMetric, token ,dateField]);
 
   // Prepare chart options and datasets
   const chartOptions = {
@@ -340,21 +350,60 @@ const GraphPage = () => {
     plugins: {
       legend: {
         position: 'top',
-        onClick: (/* e is unused */ _, legendItem, legend) => { // Removed unused 'e' parameter
+        labels: {
+          generateLabels: function (chart) {
+            const data = chart.data;
+            if (data.labels && data.datasets) {
+              const { labels: { pointStyle } } = chart.legend.options;
+              // Calculate total for each dataset (sum across all labels)
+              const datasetTotals = data.datasets.map(ds =>
+                ds.data.reduce((sum, val) => sum + (val || 0), 0)
+              );
+              // One legend item per dataset, showing only total (no percentage)
+              return data.datasets.map((ds, dsIdx) => {
+                const value = datasetTotals[dsIdx];
+                let text = `${ds.label}: `;
+                if (
+                  ds.label.toLowerCase().includes('gmv') ||
+                  ds.label.toLowerCase().includes('ats') ||
+                  ds.label.toLowerCase().includes('commission') ||
+                  ds.label.toLowerCase().includes('payment') ||
+                  ds.label.toLowerCase().includes('workshop')
+                ) {
+                  text += `₹${value.toLocaleString('en-IN')}`;
+                } else {
+                  text += `${value}`;
+                }
+                return {
+                  text,
+                  fillStyle: ds.backgroundColor instanceof Array ? ds.backgroundColor[0] : ds.backgroundColor,
+                  strokeStyle: ds.borderColor instanceof Array ? ds.borderColor[0] : ds.borderColor,
+                  lineWidth: ds.borderWidth || 1,
+                  pointStyle: pointStyle,
+                  hidden: ds.hidden,
+                  datasetIndex: dsIdx,
+                  index: 0,
+                };
+              });
+            }
+            return [];
+          }
+        },
+        onClick: (/* e is unused */ _, legendItem, legend) => {
           if (chartType === 'bar') {
             const index = legendItem.datasetIndex;
             const ci = legend.chart;
-
+  
             // If we're clicking the already selected dataset, show all datasets
             if (selectedDataset === index) {
               setSelectedDataset(null);
-              ci.data.datasets.forEach((/* dataset is unused */ __, i) => { // Removed unused 'dataset' parameter
+              ci.data.datasets.forEach((__, i) => {
                 ci.setDatasetVisibility(i, true);
               });
             } else {
               // Otherwise, hide all datasets except the clicked one
               setSelectedDataset(index);
-              ci.data.datasets.forEach((/* dataset is unused */ __, i) => { // Removed unused 'dataset' parameter
+              ci.data.datasets.forEach((__, i) => {
                 ci.setDatasetVisibility(i, i === index);
               });
             }
@@ -373,18 +422,20 @@ const GraphPage = () => {
         callbacks: {
           label: function (context) {
             let label = context.dataset.label || '';
-            if (label) {
-              label += ': ';
-            }
+            if (label) label += ': ';
             if (context.parsed.y !== null) {
-              // Format based on metric type
-              if (label.includes('GMV') || label.includes('ATS') ||
-                label.includes('Commission') || label.includes('Payment') ||
-                label.includes('Own Workshops')) {
+              if (
+                label.toLowerCase().includes('gmv') ||
+                label.toLowerCase().includes('ats') ||
+                label.toLowerCase().includes('commission') ||
+                label.toLowerCase().includes('payment') ||
+                label.toLowerCase().includes('workshop')
+              ) {
                 label += '₹' + context.parsed.y.toLocaleString('en-IN');
               } else {
                 label += context.parsed.y;
               }
+              // Percentage removed from tooltip
             }
             return label;
           }
@@ -1261,11 +1312,13 @@ const JobCardFilterNotice = ({ isActive }) => {
       <div className="sticky top-12 z-30 bg-white border-b border-gray-200 py-3 px-6 shadow-sm">
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex-grow">
-            <DateRangeSelector
-              ref={dateRangeSelectorRef}
-              onDateRangeChange={handleDateRangeChange}
-              showDateFieldOptions={false}
-            />
+          <DateRangeSelector
+    ref={dateRangeSelectorRef}
+    onDateRangeChange={handleDateRangeChange}
+    showDateFieldOptions={true}
+    dateField={dateField}
+    onDateFieldChange={setDateField}
+  />
           </div>
 
           <div className="flex items-center space-x-2">
@@ -1295,7 +1348,7 @@ const JobCardFilterNotice = ({ isActive }) => {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm p-6 mb-6 mt-4">
+      <div className="bg-white rounded-lg shadow-sm p-6 mt-4">
       <h2 className="text-2xl font-semibold mb-4 text-center py-3 bg-red-50 rounded-md text-red-600">Overall Analysis</h2>
         {/* Remove the controls that are now in the sticky header */}
 
@@ -1304,7 +1357,7 @@ const JobCardFilterNotice = ({ isActive }) => {
           {renderChart()}
         </div>
 
-        <div className="flex justify-between items-center mb-4 py-3 bg-red-50 rounded-md px-4">
+        <div className="flex justify-between items-center mt-4 py-3 bg-red-50 rounded-md px-4">
   <h2 className="text-2xl font-semibold text-red-600">Workshop & Leadtype performance</h2>
   <div className="flex items-center gap-4">
     <div className="flex items-center space-x-2">
@@ -1346,7 +1399,7 @@ const JobCardFilterNotice = ({ isActive }) => {
           {renderSecondChart()}
         </div>
 
-        <div className="flex justify-between items-center mb-4 py-3 bg-red-50 rounded-md px-4">
+        <div className="flex justify-between items-center mt-4 py-3 bg-red-50 rounded-md px-4">
   <h2 className="text-2xl font-semibold text-red-600">Source wise performance</h2>
   <div className="flex items-center space-x-2">
     <label className="text-gray-700">Metric:</label>
@@ -1372,7 +1425,7 @@ const JobCardFilterNotice = ({ isActive }) => {
 
 
 
-<div className="flex justify-between items-center mb-4 py-3 bg-red-50 rounded-md px-4">
+<div className="flex justify-between items-center mt-4 py-3 bg-red-50 rounded-md px-4">
   <h2 className="text-2xl font-semibold text-red-600">CCE Performance</h2>
   <div className="flex items-center space-x-2">
     <label className="text-gray-700">Metric:</label>
@@ -1396,7 +1449,7 @@ const JobCardFilterNotice = ({ isActive }) => {
         </div>
 
 
-<div className="flex justify-between items-center mb-4 py-3 bg-red-50 rounded-md px-4">
+<div className="flex justify-between items-center mt-4 py-3 bg-red-50 rounded-md px-4">
   <h2 className="text-2xl font-semibold text-red-600">City wise performance</h2>
   <div className="flex items-center space-x-2">
     <label className="text-gray-700">Metric:</label>
@@ -1420,7 +1473,7 @@ const JobCardFilterNotice = ({ isActive }) => {
         </div>
 
 
-<div className="flex justify-between items-center mb-4 py-3 bg-red-50 rounded-md px-4">
+<div className="flex justify-between items-center mt-4 py-3 bg-red-50 rounded-md px-4">
   <h2 className="text-2xl font-semibold text-red-600">Lead's status wise performance</h2>
   {/* No controls for this section, but keeping the same layout */}
 </div>
