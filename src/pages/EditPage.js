@@ -4626,6 +4626,9 @@ const handleGenerateEstimate = async () => {
   <option value="Workshop Tie-ups">Workshop Tie-ups</option>
   <option value="Not Answering">Not Answering</option>
   <option value="Test Leads">Test Leads</option>
+  <option value="Price Issue">Price Issue</option>
+  <option value="Workshop Not Available">Workshop Not Available</option>
+  <option value="Workshop Not Responding">Workshop Not Responding</option>
   <option value="Others">Others</option>
 </select>
                 <input
