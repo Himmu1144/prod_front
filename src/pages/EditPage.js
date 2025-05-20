@@ -60,6 +60,7 @@ const initialFormState = {
     disposition: '',
     dateTime: '',
     batteryFeature: '',
+    gstin: '',
     fuelStatus: '',
     speedometerRd: '',
     inventory: [],
@@ -485,6 +486,7 @@ const handleRemoveExistingImage = (index) => {
       disposition: '',
       dateTime: '',
       batteryFeature: '', // Add this new field
+      gstin: '', // Add this new field
       fuelStatus: '', // Add this new field
       speedometerRd: '', // Add this new field
       inventory: [],
@@ -639,6 +641,7 @@ useEffect(() => {
                 arrivalMode: previousLead.arrival_mode || prevState.arrivalStatus.arrivalMode,
                 disposition: previousLead.disposition || prevState.arrivalStatus.disposition,
                 batteryFeature: previousLead.battery_feature || prevState.arrivalStatus.batteryFeature,
+                gstin: previousLead.gstin || prevState.arrivalStatus.gstin,
                 fuelStatus: previousLead.fuel_status || prevState.arrivalStatus.fuelStatus,
                 speedometerRd: previousLead.speedometer_rd || prevState.arrivalStatus.speedometerRd,
                 inventory: previousLead.inventory || prevState.arrivalStatus.inventory,
@@ -647,12 +650,15 @@ useEffect(() => {
               },
               workshop: previousLead.workshop_details || prevState.workshop,
               overview: {
-                ...prevState.overview,
-                tableData: previousLead.products || prevState.overview.tableData,
-                total:previousLead.estimated_price || prevState.overview.total,
-                discount: previousLead.overview.discount || prevState.overview.discount,
-                finalAmount: previousLead.overview.finalAmount || prevState.overview.finalAmount,
-              }
+  ...prevState.overview,
+  tableData: (previousLead.products || prevState.overview.tableData).map(row => ({
+    ...row,
+    gst: row.gst !== undefined ? row.gst : 0 // If gst is missing, set to 0
+  })),
+  total: previousLead.estimated_price || prevState.overview.total,
+  discount: previousLead.overview.discount || prevState.overview.discount,
+  finalAmount: previousLead.overview.finalAmount || prevState.overview.finalAmount,
+}
             };
             
               // Update the discount UI state as well
@@ -796,15 +802,20 @@ useEffect(() => {
         }
 
 
-          setFormState({
-            ...formState, //14-2
-            overview: {
-              tableData: leadData.products || [],
-              caComments: technicianComments, //14-2
-              total: leadData.estimated_price || 0,
-              discount: leadData.overview.discount || 0, // Add this new field
-              finalAmount: leadData.overview.finalAmount || leadData.overview.total || 0, // Add this new field
-            },
+         setFormState({
+  ...formState, //14-2
+  overview: {
+    tableData: (leadData.products || []).map(row => ({
+      ...row,
+      gst: row.gst !== undefined ? row.gst : 0 // Ensure GST is present
+    })),
+    caComments: technicianComments, //14-2
+    total: leadData.estimated_price || 0,
+    discount: leadData.overview.discount || 0,
+    finalAmount: leadData.overview.finalAmount || leadData.overview.total || 0,
+  },
+
+
             customerInfo: {
               mobileNumber: leadData.number || '',
               customerName: leadData.name || '',
@@ -836,6 +847,7 @@ useEffect(() => {
               commissionReceived: leadData.commission_received || 0, // Add this new field
               commissionPercent: leadData.commission_percent || 0, // Add this new field
               batteryFeature: leadData.battery_feature || '', // Add this new field
+              gstin: leadData.gstin || '', // Add this new field
               pendingAmount: leadData.pending_amount || 0, // Add this new field
               additionalWork: leadData.additional_work || '',
               fuelStatus: leadData.fuel_status || '', // Add this new field 
@@ -965,32 +977,98 @@ useEffect(() => {
   //     });
   //   }
   // }, [isLoaded]);
+const handleGSTHeaderClick = () => {
+  const newTableData = formState.overview.tableData.map(row => {
+    const quantity = row.quantity || 1;
+    let baseTotal;
+    if (row.pricePerItem !== undefined) {
+      baseTotal = row.pricePerItem * quantity;
+    } else {
+      const prevGST = parseFloat(row.gst ?? 18);
+      baseTotal = prevGST > 0 ? (parseFloat(row.total) / (1 + prevGST / 100)) : parseFloat(row.total);
+    }
+    return {
+      ...row,
+      gst: 0,
+      total: Math.round(baseTotal) // Ensure integer
+    };
+  });
+  setFormState(prev => ({
+    ...prev,
+    overview: {
+      ...prev.overview,
+      tableData: newTableData,
+      total: calculateTotalAmount(newTableData),
+      finalAmount: calculateTotalAmount(newTableData) - (parseFloat(discount) || 0)
+    }
+  }));
+};
 
+// handleGSTChange
+const handleGSTChange = (index, value) => {
+  const newGST = parseFloat(value) || 0;
+  const newTableData = [...formState.overview.tableData];
+  const row = newTableData[index];
+
+  // Only update if GST value actually changed
+  if (row.gst === newGST) return;
+
+  // Calculate base price (without GST)
+  const quantity = row.quantity || 1;
+  let baseTotal;
+  if (row.pricePerItem !== undefined) {
+    baseTotal = row.pricePerItem * quantity;
+  } else {
+    // Remove previous GST if present
+    const prevGST = parseFloat(row.gst ?? 18);
+    baseTotal = prevGST > 0 ? (parseFloat(row.total) / (1 + prevGST / 100)) : parseFloat(row.total);
+  }
+
+  // Calculate new total with new GST
+  const totalWithGST = Math.round(baseTotal + (newGST > 0 ? (baseTotal * newGST / 100) : 0));
+
+  newTableData[index] = {
+    ...row,
+    gst: newGST,
+    total: totalWithGST
+  };
+
+  setFormState(prev => ({
+    ...prev,
+    overview: {
+      ...prev.overview,
+      tableData: newTableData,
+      total: calculateTotalAmount(newTableData),
+      finalAmount: calculateTotalAmount(newTableData) - (parseFloat(discount) || 0)
+    }
+  }));
+};
   
 
   // Update the calculateTotalAmount function
-  const calculateTotalAmount = (tableData) => {
-    return tableData.reduce((sum, row) => {
-      const quantity = parseInt(row.quantity) || 1;
-      const price = parseFloat(row.pricePerItem || row.total / quantity) || 0;
-      const rowTotal = price * quantity;
-      return sum + rowTotal;
-    }, 0);
-  };
+const calculateTotalAmount = (tableData) => {
+  const sum = tableData.reduce((sum, row) => {
+    const quantity = parseInt(row.quantity) || 1;
+    const price = parseFloat(row.pricePerItem || row.total / quantity) || 0;
+    const baseTotal = price * quantity;
+    const gst = parseFloat(row.gst ?? 18);
+    const totalWithGST = baseTotal + (gst > 0 ? (baseTotal * gst / 100) : 0);
+    return sum + totalWithGST;
+  }, 0);
+  return Math.round(sum); // round here
+};
 
   // Modify handleTotalChange to preserve price per item
 const handleTotalChange = (index, value) => {
   const newTableData = [...formState.overview.tableData];
-  const newTotal = value === '' ? 0 : parseFloat(value) || 0;
+  const newBaseTotal = value === '' ? 0 : Math.round(parseFloat(value) || 0); // round here
   const quantity = newTableData[index].quantity || 1;
-  
-  // Calculate and store price per item
-  newTableData[index].pricePerItem = newTotal / quantity;
-  newTableData[index].total = newTotal;
-  
-  // Calculate new total amount
+  newTableData[index].gst = 0;
+  newTableData[index].pricePerItem = newBaseTotal / quantity;
+  newTableData[index].total = newBaseTotal;
+
   const newTotalAmount = calculateTotalAmount(newTableData);
-  
+
   setFormState(prev => ({
     ...prev,
     overview: {
@@ -1072,39 +1150,42 @@ const handleTotalChange = (index, value) => {
   
     };
     
-    // Check if a price is available for this service
+
+
   const serviceKey = `${service.id}-${service.title}`;
   let servicePrice = 0;
-  
   if (servicePrices[serviceKey] && servicePrices[serviceKey] !== "Determine") {
-    // Extract numerical value from the price string (removing the ₹ symbol)
     const priceString = servicePrices[serviceKey].replace('₹', '');
     servicePrice = parseFloat(priceString) || 0;
   }
-  
-    const newTableRow = {
+  const gst = 18;
+  const totalWithGST = servicePrice + (gst > 0 ? (servicePrice * gst / 100) : 0);
+
+  const newTableRow = {
     type: selectedService,
     name: service.title,
     workdone: cleanWorkdone(),
-    determined: false, 
-    total: servicePrice  // Use the extracted price rather than always 0
-    };
-
-    const newTableData = [...formState.overview.tableData, newTableRow]; //14-2
-
-    setFormState(prev => ({
-      ...prev,
-      overview: {
-        ...prev.overview,
-        tableData: newTableData,
-        total: calculateTotalAmount(newTableData),  // Recalculate total
-        finalAmount: calculateTotalAmount(newTableData) // Sync final amount with total
-      }
-    }));
-
-    updateTechnicianComments(newTableData);
+    determined: false,
+    quantity: 1,
+    pricePerItem: servicePrice,
+    gst: gst,
+    total: totalWithGST // <-- total includes GST
   };
-  
+
+  const newTableData = [...formState.overview.tableData, newTableRow];
+
+  setFormState(prev => ({
+    ...prev,
+    overview: {
+      ...prev.overview,
+      tableData: newTableData,
+      total: calculateTotalAmount(newTableData),
+      finalAmount: calculateTotalAmount(newTableData)
+    }
+  }));
+
+  updateTechnicianComments(newTableData);
+};
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -2871,14 +2952,16 @@ const handleQuantityChange = (index, value) => {
 // Add this function after other state definitions
 const handleAddEmptyRow = () => {
   const emptyRow = {
-    type: 'Service',
-    name: 'Sub Service',
-    comments: '',
-    workdone: 'Work to be done',
-    determined: false,
-    quantity: 1,
-    total: 0
-  };
+  type: 'Service',
+  name: 'Sub Service',
+  comments: '',
+  workdone: 'Work to be done',
+  determined: false,
+  quantity: 1,
+  total: 0,
+  gst: 18 // <-- new field
+};
+
 
   setFormState(prev => {
     const newTableData = [...prev.overview.tableData, emptyRow];
@@ -3134,21 +3217,40 @@ const handleGenerateCard = async () => {
   }
 };
 
+const [isGeneratingBill, setIsGeneratingBill] = useState(false);
+
+// const handleGenerateBill = async () => {
+//   setShowBill(true);
+//   try {
+//     // Wait longer for component to fully render
+//     await new Promise(resolve => setTimeout(resolve, 1000));
+    
+//     if (billRef.current) {
+//       await billRef.current.generatePDF();
+    
+//     } else {
+//       throw new Error('Job card reference not available');
+//     }
+//   } catch (error) {
+//     console.error('Error generating job card:', error);
+//   } 
+// };
+
 const handleGenerateBill = async () => {
+  setIsGeneratingBill(true);
   setShowBill(true);
   try {
-    // Wait longer for component to fully render
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
     if (billRef.current) {
       await billRef.current.generatePDF();
-    
     } else {
-      throw new Error('Job card reference not available');
+      throw new Error('Bill reference not available');
     }
   } catch (error) {
-    console.error('Error generating job card:', error);
-  } 
+    console.error('Error generating bill:', error);
+  } finally {
+    setIsGeneratingBill(false);
+  }
 };
 
 // First, create a new function to handle commission calculations
@@ -4291,7 +4393,8 @@ const handleGenerateEstimate = async () => {
   <th className="p-3 text-left">Category</th>
   <th className="p-3 text-left">Sub Category</th>
   <th className="p-3 text-left">Workdone</th>
-  <th className="p-3 text-left">Qty</th> {/* New column */}
+  <th className="p-3 text-left">Qty</th>
+  <th className="p-3 text-left cursor-pointer" onClick={handleGSTHeaderClick}>GST</th> {/* Add this */}
   <th className="p-3 text-left">Total</th>
   <th className="p-3 text-left">Action</th>
 </tr>
@@ -4421,6 +4524,16 @@ const handleGenerateEstimate = async () => {
     value={row.quantity || 1}
     onChange={(e) => handleQuantityChange(index, e.target.value)}
     min="1"
+    className="w-16 text-center p-1 border rounded"
+  />
+</td>
+<td className="p-3">
+  <input
+    type="number"
+    value={row.gst ?? 18}
+    min="0"
+    max="100"
+    onChange={e => handleGSTChange(index, e.target.value)}
     className="w-16 text-center p-1 border rounded"
   />
 </td>
@@ -4625,11 +4738,7 @@ const handleGenerateEstimate = async () => {
   <option value="Invalid Lead">Invalid Lead</option>
   <option value="Marketing Leads">Marketing Leads</option>
   <option value="Workshop Tie-ups">Workshop Tie-ups</option>
-  <option value="Not Answering">Not Answering</option>
   <option value="Test Leads">Test Leads</option>
-  <option value="Price Issue">Price Issue</option>
-  <option value="Workshop Not Available">Workshop Not Available</option>
-  <option value="Workshop Not Responding">Workshop Not Responding</option>
   <option value="Others">Others</option>
 </select>
                 <input
@@ -4721,6 +4830,7 @@ const handleGenerateEstimate = async () => {
           className="p-2 border border-gray-300 rounded-md w-full"
           
         />
+        
       </>
     )}
 
@@ -4748,6 +4858,7 @@ const handleGenerateEstimate = async () => {
     
   </> 
 )}
+
 
 
 {(formState.arrivalStatus.leadStatus === 'Payment Due') && (
@@ -4891,6 +5002,7 @@ const handleGenerateEstimate = async () => {
         </div>
       </div>
     )}
+
     
     {/* Display newly selected images with X button */}
     {selectedImages.length > 0 && (
@@ -4924,6 +5036,7 @@ const handleGenerateEstimate = async () => {
 )}
 
 
+
 {/* 
 {formState.arrivalStatus.leadStatus === 'Completed' && (
   <div className="mt-4 p-3 flex gap-4">
@@ -4955,7 +5068,22 @@ const handleGenerateEstimate = async () => {
   </div>
 )} */}
               </div>
-
+{formState.arrivalStatus.leadStatus === 'Job Card' && (
+  <>
+{/* GSTIN input on a single line, not stretched */}
+    <div className="flex mt-2">
+      <input
+        type="text"
+        value={formState.arrivalStatus.gstin}
+        onChange={(e) => handleInputChange('arrivalStatus', 'gstin', e.target.value)}
+        placeholder="GSTIN"
+        className="p-2 border border-gray-300 rounded-md"
+        style={{ width: 280, minWidth: 180, maxWidth: 320 }}
+        required
+      />
+    </div>
+  </>
+)}
 
             </div>
 
@@ -5134,6 +5262,27 @@ const handleGenerateEstimate = async () => {
                   >
                     Cancel
                   </Button>
+
+                {cards && (['Job Card', 'Estimate', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
+        <Button
+  variant="outline-dark"
+  type="button"
+  disabled={isSubmitting || isGeneratingBill}
+  onClick={handleGenerateBill}
+  className="position-relative"
+>
+  {isGeneratingBill ? (
+    <>
+      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+      <span className="animate-pulse">Generating PDF...</span>
+    </>
+  ) : (
+    'Generate Bill'
+  )}
+</Button>      
+    )}
+
+
                   
                   {/* Add Generate Card button when lead status is Job Card */}
                   {cards && (['Job Card', 'Estimate', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
@@ -5277,6 +5426,7 @@ Generate Bill
         customerMobile: formState.customerInfo.mobileNumber,
         whatsappNum: formState.customerInfo.whatsappNumber,
         batteryFeature: formState.arrivalStatus.batteryFeature,
+        gstin: formState.arrivalStatus.gstin,
         additionalWork: formState.arrivalStatus.additionalWork,
         inventory: formState.arrivalStatus.inventory,
        
@@ -5322,7 +5472,7 @@ Generate Bill
 )}
 
 
-{showBill && (
+{/* {showBill && (
   <div style={{ width: '100%', minHeight: '100vh', position: 'absolute', left: '-9999px' }}>
     <Bill 
       ref={billRef}
@@ -5368,7 +5518,63 @@ Generate Bill
       }}
     />
   </div>
+)} */}
+
+{showBill && (
+  <div style={{ width: '100%', minHeight: '100vh', position: 'absolute', left: '-9999px' }}>
+    <Bill 
+      ref={billRef}
+      data={{
+        customerName: formState.customerInfo.customerName,
+        customerMobile: formState.customerInfo.mobileNumber,
+        carBrand: formState.cars[0]?.carBrand || '',
+        carModel: formState.cars[0]?.carModel || '',
+        carYearFuel: `${formState.cars[0]?.year || ''} ${formState.cars[0]?.fuel || ''}`,
+        regNumber: formState.cars[0]?.regNo || '',
+        handoverDate: new Date(formState.arrivalStatus.dateTime).toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
+        }),
+        orderId: formState.arrivalStatus.jobCardNumber || '',
+        speedometerRd: formState.arrivalStatus.speedometerRd,
+        carColor: formState.cars[0]?.color || '',
+        vinNo: formState.cars[0]?.vin || '',
+        customerAdd: formState.location.address || '',
+        workshop: formState.workshop.name,
+        batteryFeature: formState.arrivalStatus.batteryFeature || '',
+        gstin: formState.arrivalStatus.gstin || '',
+        fuelStatus: formState.arrivalStatus.fuelStatus || '',
+        // --- NEW: Invoice Summary with GST ---
+        invoiceSum: [
+          {
+            netAmt: formState.overview.total,
+            gst: formState.overview.total * 0.18, // 18% GST, adjust as needed
+            dis: formState.overview.discount || 0,
+            totalPay: formState.overview.finalAmount
+          }
+        ],
+        workDetail: formState.overview.tableData.map(item => ({
+          descriptions: item.type,
+          workDn: item.workdone,
+          quant: item.quantity || 1,
+          unitPr: parseFloat(item.pricePerItem) || 0,
+          gst: parseFloat(item.gst) || 0,
+          dis: 0, // If you have per-row discount, use it here
+          netAmt: parseFloat(item.total) || 0
+        })),
+        totalUnitPriceBill: formState.overview.total,
+        totalDiscountedPriceBill: formState.overview.discount || 0,
+        finalPriceBill: formState.overview.finalAmount,
+        totalPayablePriceBill: formState.overview.finalAmount,
+        workshopAddress: formState.workshop.locality || '', // or .address if you store it as address
+        customerGSTIN: '', // leave blank for now
+        // --- NEW: Work Detail with GST per row ---
+      }}
+    />
+  </div>
 )}
+
 
 {showEstimate && (
   <div style={{ width: '100%', minHeight: '100vh', position: 'absolute', left: '-9999px' }}>
@@ -5379,6 +5585,7 @@ Generate Bill
         customerMobile: formState.customerInfo.mobileNumber,
         orderId: formState.arrivalStatus.orderId || '',
         batteryFeature: formState.arrivalStatus.batteryFeature,
+        gstin: formState.arrivalStatus.gstin,
         additionalWork: formState.arrivalStatus.additionalWork,
         carBrand: formState.cars[0]?.carBrand || '',
         carModel: formState.cars[0]?.carModel || '',
