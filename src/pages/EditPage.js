@@ -1159,7 +1159,7 @@ const handleTotalChange = (index, value) => {
     servicePrice = parseFloat(priceString) || 0;
   }
   const gst = 18;
-  const totalWithGST = servicePrice + (gst > 0 ? (servicePrice * gst / 100) : 0);
+  const totalWithGST = Math.round(servicePrice + (gst > 0 ? (servicePrice * gst / 100) : 0));
 
   const newTableRow = {
     type: selectedService,
@@ -4738,6 +4738,10 @@ const handleGenerateEstimate = async () => {
   <option value="Invalid Lead">Invalid Lead</option>
   <option value="Marketing Leads">Marketing Leads</option>
   <option value="Workshop Tie-ups">Workshop Tie-ups</option>
+  <option value="Price Issue">Price Issue</option>
+  <option value="Not Answering">Not Answering</option>
+  <option value="Workshop Not Responding">Workshop Not Responding</option>
+  <option value="Workshop Not Available">Workshop Not Available</option>
   <option value="Test Leads">Test Leads</option>
   <option value="Others">Others</option>
 </select>
@@ -5418,10 +5422,10 @@ Generate Bill
       ref={jobCardRef}
       data={{
         customerName: formState.customerInfo.customerName,
-        carBrand: formState.cars[0]?.carBrand || '',
-        carModel: formState.cars[0]?.carModel || '',
-        regNumber: formState.cars[0]?.regNo || '',
-        carYearFuel: `${formState.cars[0]?.year || ''} ${formState.cars[0]?.fuel || ''}`,
+        carBrand: formState.cars[selectedCarIndex]?.carBrand || '',
+        carModel: formState.cars[selectedCarIndex]?.carModel || '',
+        regNumber: formState.cars[selectedCarIndex]?.regNo || '',
+        carYearFuel: `${formState.cars[selectedCarIndex]?.year || ''} ${formState.cars[selectedCarIndex]?.fuel || ''}`,
         orderId: formState.arrivalStatus.orderId || '',
         customerMobile: formState.customerInfo.mobileNumber,
         whatsappNum: formState.customerInfo.whatsappNumber,
@@ -5527,10 +5531,10 @@ Generate Bill
       data={{
         customerName: formState.customerInfo.customerName,
         customerMobile: formState.customerInfo.mobileNumber,
-        carBrand: formState.cars[0]?.carBrand || '',
-        carModel: formState.cars[0]?.carModel || '',
-        carYearFuel: `${formState.cars[0]?.year || ''} ${formState.cars[0]?.fuel || ''}`,
-        regNumber: formState.cars[0]?.regNo || '',
+        carBrand: formState.cars[selectedCarIndex]?.carBrand || '',
+        carModel: formState.cars[selectedCarIndex]?.carModel || '',
+        regNumber: formState.cars[selectedCarIndex]?.regNo || '',
+        carYearFuel: `${formState.cars[selectedCarIndex]?.year || ''} ${formState.cars[selectedCarIndex]?.fuel || ''}`,
         handoverDate: new Date(formState.arrivalStatus.dateTime).toLocaleDateString('en-IN', {
           day: '2-digit',
           month: 'short',
@@ -5587,10 +5591,10 @@ Generate Bill
         batteryFeature: formState.arrivalStatus.batteryFeature,
         gstin: formState.arrivalStatus.gstin,
         additionalWork: formState.arrivalStatus.additionalWork,
-        carBrand: formState.cars[0]?.carBrand || '',
-        carModel: formState.cars[0]?.carModel || '',
-        regNumber: formState.cars[0]?.regNo || '',
-        carYearFuel: `${formState.cars[0]?.year || ''} ${formState.cars[0]?.fuel || ''}`,
+        carBrand: formState.cars[selectedCarIndex]?.carBrand || '',
+        carModel: formState.cars[selectedCarIndex]?.carModel || '',
+        regNumber: formState.cars[selectedCarIndex]?.regNo || '',
+        carYearFuel: `${formState.cars[selectedCarIndex]?.year || ''} ${formState.cars[selectedCarIndex]?.fuel || ''}`,
         fuelStatus: formState.arrivalStatus.fuelStatus,
         handoverDate: new Date(formState.arrivalStatus.dateTime).toLocaleDateString('en-IN', {
           day: '2-digit',

@@ -464,10 +464,17 @@ const handleDateRangeChange = (range) => {
         setTotalPages(1);
         setIsLoading(true); // Add loading state here
         try {
+             const filterPayload = {
+            ...filterFormData,
+            dateRange: {
+                ...filterFormData.dateRange,
+                dateField: filterFormData.dateField // <-- Add this line
+            }
+        };
             const response = await axios.post(
-                'https://admin.onlybigcars.com/api/leads/filter/',
-                { ...filterFormData, page: 1 },
-                { headers: { 'Authorization': `Token ${token}` } }
+                'http://localhost:8000/api/leads/filter/',
+               { ...filterPayload, page: 1 },
+                { headers: { 'Authorization': `Token ${token}` }}
             );
     
             // Debug logs
@@ -898,10 +905,10 @@ useEffect(() => {
                     // Ensure dateRange is properly formatted if it exists
                     dateRange: savedFilterParams.dateRange ? {
                         startDate: savedFilterParams.dateRange.startDate || null,
-                        endDate: savedFilterParams.dateRange.endDate || null
-                    } : null
+                        endDate: savedFilterParams.dateRange.endDate || null,
+                        dateField: savedFilterParams.dateField || savedFilterParams.dateRange.dateField || 'created_at',
+                    } : null,
                 };
-                   
                     
             } else if (currentView === 'search') {
                 
@@ -1665,11 +1672,19 @@ const excelData = response.data.leads.map(lead => ({
                                 </thead>
                                 <tbody>
                                     {leads.map((lead, index) => (
+                                        // <tr 
+                                        //     key={`${lead.id}-${index}`} 
+                                        //     className={`
+                                        //         border-b hover:bg-gray-50 group 
+                                        //         ${(lead.status === "Assigned" || !lead.is_read) ? "bg-gray-100 border-l-2 border-l-red-500" : ""}
+                                        //         transition-all duration-200 ease-in-out
+                                        //     `}
+                                        // >
                                         <tr 
                                             key={`${lead.id}-${index}`} 
                                             className={`
                                                 border-b hover:bg-gray-50 group 
-                                                ${(lead.status === "Assigned" || !lead.is_read) ? "bg-gray-100 border-l-2 border-l-red-500" : ""}
+                                                ${lead.status === "Assigned" ? "bg-gray-100 border-l-2 border-l-red-500" : ""}
                                                 transition-all duration-200 ease-in-out
                                             `}
                                         >
