@@ -90,6 +90,7 @@ const GraphPage = () => {
             startDate: dateRange.startDate,
             endDate: dateRange.endDate,
             dateField: dateField,
+            excludeTestLeads: true 
           },
           { headers: { 'Authorization': `Token ${token}` } }
         );
@@ -123,6 +124,7 @@ const GraphPage = () => {
             groupBy: groupBy,
             filterJobCardOnly: filterJobCardOnly,
             dateField: dateField, 
+            excludeTestLeads: true 
           },
           { headers: { 'Authorization': `Token ${token}` } }
         );
@@ -146,62 +148,70 @@ const GraphPage = () => {
   useEffect(() => {
     const fetchInitialGraphData = async () => {
       try {
-        setIsLoading(true);
-
-        // Default to "All" date range (will be replaced by server response)
-        const today = new Date().toISOString().split('T')[0];
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const filterJobCardOnly = true;
-        const initialDateRange = {
-          startDate: thirtyDaysAgo.toISOString().split('T')[0],
-          endDate: today
-        };
-
-        // Set initial date range (will be updated when data arrives)
-        setDateRange(initialDateRange);
-
-        const response = await axios.post(
-          'https://admin.onlybigcars.com/api/analytics/graph/',
-          {
-            startDate: initialDateRange.startDate,
-            endDate: initialDateRange.endDate,
-            groupBy: groupBy,
-            filterJobCardOnly: filterJobCardOnly, // Use the defined variable here
-            dateField: dateField, // Pass the dateField to the API
-          },
-          { headers: { 'Authorization': `Token ${token}` } }
-        );
-
-        // Use earliest_lead_date from response if available
-        if (response.data.earliest_lead_date) {
-          setDateRange({
-            startDate: response.data.earliest_lead_date,
-            endDate: today
-          });
-
-          if (dateRangeSelectorRef.current) {
-            dateRangeSelectorRef.current.setInitialDateRange({
-              startDate: response.data.earliest_lead_date,
-              endDate: today
-            });
-          }
-        }
-
-        setChartData(response.data);
-
-      } catch (error) {
-        console.error('Error fetching initial graph data:', error);
-        setError('Failed to fetch graph data');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchInitialGraphData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, dateField]); // Removed groupBy from dependencies to avoid re-fetch on initial load if groupBy changes
-
+              setIsLoading(true);
+      
+              // First make a request to get the earliest_lead_date
+              const response = await axios.post(
+                'https://admin.onlybigcars.com/api/analytics/graph/',
+                {
+                  // Use a minimal date range initially - the API will return earliest_lead_date
+                  startDate: new Date().toISOString().split('T')[0], // today
+                  endDate: new Date().toISOString().split('T')[0],   // today
+                  groupBy: groupBy,
+                  filterJobCardOnly: true,
+                  dateField: dateField,
+                  excludeTestLeads: true
+                },
+                { headers: { 'Authorization': `Token ${token}` } }
+              );
+      
+              // Get today's date
+              const today = new Date().toISOString().split('T')[0];
+              
+              // Use earliest_lead_date from response if available, otherwise use 30 days ago as fallback
+              const earliestDate = response.data.earliest_lead_date || 
+                                  new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0];
+              
+              const fullRangeDateRange = {
+                startDate: earliestDate,
+                endDate: today
+              };
+      
+              // Set the date range to show all historical data
+              setDateRange(fullRangeDateRange);
+              
+              // Update the date range selector reference with the full range
+              if (dateRangeSelectorRef.current) {
+                dateRangeSelectorRef.current.setDates(fullRangeDateRange.startDate, fullRangeDateRange.endDate);
+              }
+      
+              // Now fetch the data with the full date range
+              const fullDataResponse = await axios.post(
+                'https://admin.onlybigcars.com/api/analytics/graph/',
+                {
+                  startDate: fullRangeDateRange.startDate,
+                  endDate: fullRangeDateRange.endDate,
+                  groupBy: groupBy,
+                  filterJobCardOnly: true,
+                  dateField: dateField,
+                  excludeTestLeads: true
+                },
+                { headers: { 'Authorization': `Token ${token}` } }
+              );
+      
+              setChartData(fullDataResponse.data);
+      
+            } catch (error) {
+              console.error('Error fetching initial graph data:', error);
+              setError('Failed to fetch graph data');
+            } finally {
+              setIsLoading(false);
+            }
+          };
+      
+          fetchInitialGraphData();
+        }, [token, dateField]);
+      
   // Fetch second chart data
   useEffect(() => {
     const fetchSecondChartData = async () => {
@@ -220,6 +230,7 @@ const GraphPage = () => {
             groupBy: secondChartType,
             filterJobCardOnly: filterJobCardOnly,
             dateField: dateField,
+            excludeTestLeads: true 
           },
           { headers: { 'Authorization': `Token ${token}` } }
         );
@@ -256,6 +267,7 @@ const GraphPage = () => {
             metric: selectedSourceMetric,
             filterJobCardOnly: filterJobCardOnly,
             dateField: dateField,
+            excludeTestLeads: true 
           },
           { headers: { 'Authorization': `Token ${token}` } }
         );
@@ -291,6 +303,7 @@ const GraphPage = () => {
             metric: selectedCceMetric,
             filterJobCardOnly: filterJobCardOnly,
             dateField: dateField,
+            excludeTestLeads: true 
           },
           { headers: { 'Authorization': `Token ${token}` } }
         );
@@ -327,6 +340,7 @@ const GraphPage = () => {
             metric: selectedCityMetric,
             filterJobCardOnly: filterJobCardOnly,
             dateField: dateField, 
+            excludeTestLeads: true 
           },
           { headers: { 'Authorization': `Token ${token}` } }
         );
@@ -1137,7 +1151,7 @@ const GraphPage = () => {
     const originalTotal = originalValues.reduce((a, b) => a + b, 0);
 
     // Statuses to aggregate visually and group in legend
-    const statusesToAggregate = ['Job Card', 'Payment Due', 'Commission Due', 'Completed'];
+    const statusesToAggregate = ['Job Card', 'Payment Due', 'Commision Due', 'Completed'];
     const convertedColor = 'rgba(50, 205, 50, 0.8)'; // Green for converted segment/items
 
     // --- Data for Chart Visualisation (Aggregated) ---

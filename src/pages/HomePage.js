@@ -31,19 +31,19 @@ const HomePage = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchMessage, setSearchMessage] = useState('');
     const [alertMessage, setAlertMessage] = useState('');
+    const [userStatus, setUserStatus] = useState('Active');
+    const [statusTime, setStatusTime] = useState(null);
+
+    const handleStatusChange = (newStatus, timestamp) => {
+        setUserStatus(newStatus);
+        setStatusTime(timestamp);
+        // You may want to call fetchUserStatus() here too if needed
+      };
+
     // Add these state variables at the top of your component
 const [currentView, setCurrentView] = useState('default'); // 'default', 'filter', 'search'
 const [savedSearchQuery, setSavedSearchQuery] = useState('');
 const [savedFilterParams, setSavedFilterParams] = useState({});
-const [userStatus, setUserStatus] = useState('Active');
-const [statusTime, setStatusTime] = useState(null);
-
-const handleStatusChange = (newStatus, timestamp) => {
-    setUserStatus(newStatus);
-    setStatusTime(timestamp);
-    // You may want to call fetchUserStatus() here too if needed
-  };
-
 const initialFilterState = {
     user: '', // Will be set based on isAdmin/cUser later
     source: '',
@@ -195,6 +195,25 @@ const [filterFormData, setFilterFormData] = useState(() => {
     //     }
     // };
     
+    // ...existing code...
+
+const handleClick2Call = async (receiverNo) => {
+  try {
+    const response = await axios.post(
+      'https://admin.onlybigcars.com/api/click2call/',
+      { receiver_no: receiverNo },
+      { headers: { Authorization: `Token ${token}` } }
+    );
+    setAlertMessage(response.data.message || 'Call initiated!');
+    setShowSuccessAlert(true);
+    setTimeout(() => setShowSuccessAlert(false), 3000);
+  } catch (error) {
+    setAlertMessage('Failed to initiate call: ' + (error.response?.data?.error || error.message));
+    setShowSuccessAlert(true);
+    setTimeout(() => setShowSuccessAlert(false), 3000);
+  }
+};
+// ...existing code...
 
     const fetchLeads = async () => {
         try {
@@ -472,7 +491,7 @@ const handleDateRangeChange = (range) => {
             }
         };
             const response = await axios.post(
-                'http://localhost:8000/api/leads/filter/',
+                'https://admin.onlybigcars.com/api/leads/filter/',
                { ...filterPayload, page: 1 },
                 { headers: { 'Authorization': `Token ${token}` }}
             );
@@ -855,7 +874,7 @@ useEffect(() => {
     };
   }, [isLoading, currentView]); // Add dependencies to prevent unnecessary interval resets
   
-  
+
   // Fetch user status when component mounts
   useEffect(() => {
     const fetchUserStatus = async () => {
@@ -879,7 +898,8 @@ useEffect(() => {
   }, [token]);
   
   
- 
+     
+    
 // Add this function to export data to Excel 06-03
     const [isExporting, setIsExporting] = useState(false);
     
@@ -909,6 +929,7 @@ useEffect(() => {
                         dateField: savedFilterParams.dateField || savedFilterParams.dateRange.dateField || 'created_at',
                     } : null,
                 };
+                   
                     
             } else if (currentView === 'search') {
                 
@@ -1062,6 +1083,7 @@ const excelData = response.data.leads.map(lead => ({
 
     return (
         <Layout>
+
            
             {showSuccessAlert && alertMessage && (
                 <Alert
@@ -1075,7 +1097,6 @@ const excelData = response.data.leads.map(lead => ({
                 </Alert>
             )}
 
-            
 <div className="App">
       {/* Your existing app content */}
       
@@ -1243,58 +1264,85 @@ const excelData = response.data.leads.map(lead => ({
                         {/* Second Row */}
                         {isAdmin ? (
                         <select
-                            name="status"
-                            value={filterFormData.status}
-                            onChange={handleFilterChange}
-                            className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                        >
-                            <option value="">Status</option>
-  <option value="test">test</option>
-  <option value="Assigned">Assigned</option>
-  <option value="Follow Up">Follow Up</option>
-  <option value="Dead">Dead</option>
-  <option value="Duplicate">Duplicate</option>
-  <option value="Communicate To Ops">Communicate To Ops</option>
-  <option value="Referred To Ops">Referred To Ops</option>
-  <option value="Walkin">Walkin</option>
-  <option value="Pickup">Pickup</option>
-  <option value="Doorstep">Doorstep</option>
-  <option value="At Workshop">At Workshop</option>
-  <option value="Job Card">Job Card</option>
-  <option value="Converted">Converted</option>
-  <option value="Payment Due">Payment Due</option>
-  <option value="Commision Due">Commision Due</option>
-  <option value="Completed">Completed</option>
-  <option value="Analytics">Analytics</option>
-                        </select>
-                        ) : ( 
-<select
-                            name="status"
-                            value={filterFormData.status}
-                            onChange={handleFilterChange}
-                            className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                        >
-                            <option value="">Status</option>
-  <option value="test">test</option>
-  <option value="Assigned">Assigned</option>
-  <option value="Follow Up">Follow Up</option>
-  <option value="Dead">Dead</option>
-  <option value="Duplicate">Duplicate</option>
-  <option value="Communicate To Ops">Communicate To Ops</option>
-  <option value="Referred To Ops">Referred To Ops</option>
-  <option value="Walkin">Walkin</option>
-  <option value="Pickup">Pickup</option>
-  <option value="Doorstep">Doorstep</option>
-  <option value="At Workshop">At Workshop</option>
-  <option value="Job Card">Job Card</option>
-  <option value="Converted">Converted</option>
-  <option value="Payment Due">Payment Due</option>
-  <option value="Commision Due">Commision Due</option>
-  <option value="Completed">Completed</option>
-
-                        </select> )}
-
-
+    name="status"
+    value={filterFormData.status}
+    onChange={handleFilterChange}
+    className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent"
+  >
+    <option value="">Status</option>
+    {filterFormData.luxuryNormal === "Sell/Buy" ? (
+      <>
+        <option value="Purchase">Purchase</option>
+        <option value="S/B At Workshop">S/B At Workshop</option>
+        <option value="RFS">RFS</option>
+        <option value="Sold">Sold</option>
+        <option value="S/B Commision Due">S/B Commision Due</option>
+        <option value="Purchase Due">Purchase Due</option>
+        <option value="S/B Completed">S/B Completed</option>
+      </>
+    ) : (
+      <>
+        <option value="test">test</option>
+        <option value="Assigned">Assigned</option>
+        <option value="Follow Up">Follow Up</option>
+        <option value="Dead">Dead</option>
+        <option value="Duplicate">Duplicate</option>
+        <option value="Communicate To Ops">Communicate To Ops</option>
+        <option value="Referred To Ops">Referred To Ops</option>
+        <option value="Walkin">Walkin</option>
+        <option value="Pickup">Pickup</option>
+        <option value="Doorstep">Doorstep</option>
+        <option value="At Workshop">At Workshop</option>
+        <option value="Job Card">Job Card</option>
+        <option value="Converted">Converted</option>
+        <option value="Payment Due">Payment Due</option>
+        <option value="Commision Due">Commision Due</option>
+        <option value="Completed">Completed</option>
+        <option value="Analytics">Analytics</option>
+      </>
+    )}
+  </select>
+) : (
+  <select
+    name="status"
+    value={filterFormData.status}
+    onChange={handleFilterChange}
+    className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent"
+  >
+    <option value="">Status</option>
+    {filterFormData.luxuryNormal === "Sell/Buy" ? (
+      <>
+        <option value="Purchase">Purchase</option>
+        <option value="S/B At Workshop">S/B At Workshop</option>
+        <option value="RFS">RFS</option>
+        <option value="Sold">Sold</option>
+        <option value="S/B Commision Due">S/B Commision Due</option>
+        <option value="Purchase Due">Purchase Due</option>
+        <option value="S/B Completed">S/B Completed</option>
+      </>
+    ) : (
+      <>
+        <option value="test">test</option>
+        <option value="Assigned">Assigned</option>
+        <option value="Follow Up">Follow Up</option>
+        <option value="Dead">Dead</option>
+        <option value="Duplicate">Duplicate</option>
+        <option value="Communicate To Ops">Communicate To Ops</option>
+        <option value="Referred To Ops">Referred To Ops</option>
+        <option value="Walkin">Walkin</option>
+        <option value="Pickup">Pickup</option>
+        <option value="Doorstep">Doorstep</option>
+        <option value="At Workshop">At Workshop</option>
+        <option value="Job Card">Job Card</option>
+        <option value="Converted">Converted</option>
+        <option value="Payment Due">Payment Due</option>
+        <option value="Commision Due">Commision Due</option>
+        <option value="Completed">Completed</option>
+        <option value="Analytics">Analytics</option>
+      </>
+    )}
+  </select>
+)}
                         <select
                             name="location"
                             value={filterFormData.location}
@@ -1314,6 +1362,8 @@ const excelData = response.data.leads.map(lead => ({
                             <option value="Luxury">Luxury</option>
                             <option value="Normal">Normal</option>
                             <option value="Insurance">Insurance</option>
+                            <option value="Sell/Buy">Sell/Buy</option> {/* <-- Add this */}
+                            <option value="Spares">Spares</option>  
                         </select>
                         {/* <input
                             type="date"
@@ -1574,13 +1624,15 @@ const excelData = response.data.leads.map(lead => ({
             <div className="p-1 text-center">
                 <div className="text-[9px] text-gray-600 leading-none">GMV</div>
                 <div className="text-sm font-semibold text-red-600 leading-tight">
-                    ₹{Math.round(Number(totalFinalAmount)).toLocaleString('en-IN')}
+                    {/* ₹{Math.round(Number(totalFinalAmount)).toLocaleString('en-IN')} */}
+                    ₹{Math.round(Number(totalEstimatedPrice)).toLocaleString('en-IN')}
                 </div>
             </div>
             <div className="p-1 text-center">
                 <div className="text-[9px] text-gray-600 leading-none">ATS</div>
                 <div className="text-sm font-semibold text-red-600 leading-tight">
-                    ₹{Math.round(Number(finalAmountPerLead)).toLocaleString('en-IN')}
+                    {/* ₹{Math.round(Number(finalAmountPerLead)).toLocaleString('en-IN')} */}
+                    ₹{Math.round(Number(estPricePerLead)).toLocaleString('en-IN')}
                 </div>
             </div>
             {totalCommissionDue > 0 && (
@@ -1681,13 +1733,13 @@ const excelData = response.data.leads.map(lead => ({
                                         //     `}
                                         // >
                                         <tr 
-                                            key={`${lead.id}-${index}`} 
-                                            className={`
-                                                border-b hover:bg-gray-50 group 
-                                                ${lead.status === "Assigned" ? "bg-gray-100 border-l-2 border-l-red-500" : ""}
-                                                transition-all duration-200 ease-in-out
-                                            `}
-                                        >
+    key={`${lead.id}-${index}`} 
+    className={`
+        border-b hover:bg-gray-50 group 
+        ${lead.status === "Assigned" ? "bg-gray-100 border-l-2 border-l-red-500" : ""}
+        transition-all duration-200 ease-in-out
+    `}
+>
                                             {/* 14-2 */}
                                             <td className="p-2">
                                                 <div className="relative">
@@ -1724,13 +1776,37 @@ const excelData = response.data.leads.map(lead => ({
                                                     {lead.regNumber}
                                                 </div>
                                             </td>
-                                            <td className="p-2">
+                                            {/* <td className="p-2">
                                                 <div className="h-12 overflow-hidden group-hover:h-auto transition-all duration-200">
                                                 <span className={lead.status === "Assigned" ? "font-bold text-grey-600" : ""}>
                                                         {lead.status}
                                                     </span>
                                                 </div>
-                                            </td>
+                                            </td> */}
+                                           <td className="p-2 text-center">
+    <div className="flex flex-col items-center gap-2">
+        <span className={`text-sm ${lead.status === "Assigned" ? "font-bold text-grey-600" : "text-gray-600"}`}>
+            {lead.status}
+        </span>
+        
+        {/* Clean, professional Click2Call button */}
+        <button
+            className="group/btn inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-medium rounded-lg shadow-sm hover:shadow-md active:scale-95 transition-all duration-150 min-w-[60px]"
+            onClick={() => handleClick2Call(lead.number)}
+            title="Click2Call"
+        >
+            {/* Phone icon */}
+            <svg 
+                className="w-3.5 h-3.5" 
+                fill="currentColor" 
+                viewBox="0 0 20 20"
+            >
+                <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+            </svg>
+            <span>Call</span>
+        </button>
+    </div>
+</td>
                                             <td className="p-2">
                                                 <div className="h-12 overflow-hidden group-hover:h-auto transition-all duration-200">
                                                     {lead.cceName}<br />

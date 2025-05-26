@@ -113,6 +113,7 @@ const EditPage = () => {
   const [existingImageUrls, setExistingImageUrls] = useState([]);
   const [imageTooltipText, setImageTooltipText] = useState('');
   const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [showDesignerPopup, setShowDesignerPopup] = useState(false);
 
   
   
@@ -453,6 +454,13 @@ const handleRemoveExistingImage = (index) => {
       </>
     );
   };
+
+
+  
+  const shouldHideProducts=()=>{
+    return formState.basicInfo.carType=== 'Sell/Buy'|| formState.basicInfo.carType=== 'Spares';
+  }
+
   
   const [formState, setFormState] = useState({
     overview: {
@@ -519,6 +527,17 @@ const handleRemoveExistingImage = (index) => {
       total: 0, // Sync with basicInfo,
 
     },
+    sellBuyInfo: {
+    dealerName: '',
+    dealerNumber: '',
+    dealerAddress: '',
+    dealerEmail: '',
+    repairingCost: '',
+    sellingCost: '',
+    purchaseCost: '',
+    dealerCommission: '',
+    profit: ''
+  },
   });
 
   const fetchPreviousLeads = async (phoneNumber) => {
@@ -815,6 +834,18 @@ useEffect(() => {
     finalAmount: leadData.overview.finalAmount || leadData.overview.total || 0,
   },
 
+  sellBuyInfo: {
+            dealerName: leadData.sellBuyInfo?.dealerName || '',
+            dealerNumber: leadData.sellBuyInfo?.dealerNumber || '',
+            dealerAddress: leadData.sellBuyInfo?.dealerAddress || '',
+            dealerEmail: leadData.sellBuyInfo?.dealerEmail || '',
+            sellingCost: leadData.sellBuyInfo?.sellingCost || '',
+            repairingCost: leadData.sellBuyInfo?.repairingCost || '',
+            purchaseCost: leadData.sellBuyInfo?.purchaseCost || '',
+            dealerCommission: leadData.sellBuyInfo?.dealerCommission || '',
+            profit: leadData.sellBuyInfo?.profit || '',
+          },
+
 
             customerInfo: {
               mobileNumber: leadData.number || '',
@@ -876,6 +907,8 @@ useEffect(() => {
             updated_at: leadData.updated_at,
           });
 
+           
+
           setDiscount(leadData.overview.discount || 0); // Add this new field
           // Set the current car index
           setSelectedCarIndex(currentCarIndex);
@@ -884,6 +917,8 @@ useEffect(() => {
         if (leadData.orderId && leadData.orderId !== 'NA') {
           setCards(true);
         }
+
+
 
           // Also update selectedGarage if workshop data exists
           if (leadData.workshop_details) {
@@ -957,6 +992,33 @@ useEffect(() => {
       fetchLead();
     }
   }, [id, token]);
+
+
+
+useEffect(() => {
+  if (formState.basicInfo.carType === "Sell/Buy") {
+    const repairingCost = parseFloat(formState.sellBuyInfo.repairingCost) || 0;
+    const sellingCost = parseFloat(formState.sellBuyInfo.sellingCost) || 0;
+    const purchaseCost = parseFloat(formState.sellBuyInfo.purchaseCost) || 0;
+    const dealerCommission = parseFloat(formState.sellBuyInfo.dealerCommission) || 0;
+    const profit = sellingCost - repairingCost - purchaseCost - dealerCommission;
+
+    setFormState(prev => ({
+      ...prev,
+      sellBuyInfo: {
+        ...prev.sellBuyInfo,
+        profit: profit
+      }
+    }));
+  }
+  // eslint-disable-next-line
+}, [
+  formState.sellBuyInfo.repairingCost,
+  formState.sellBuyInfo.sellingCost,
+  formState.sellBuyInfo.purchaseCost,
+  formState.sellBuyInfo.dealerCommission,
+  formState.basicInfo.carType
+]);
 
   
 
@@ -3169,6 +3231,24 @@ const shouldDisableOption = (optionValue, previousStatus) => {
 };
 
 
+const sellBuyStatusFlow = [
+  "Purchase",
+  "S/B At Workshop",
+  "RFS",
+  "Sold",
+  "S/B Commision Due",
+  "Purchase Due",
+  "S/B Completed"
+];
+
+function getNextSellBuyStatus(previousStatus) {
+  if (!previousStatus) return sellBuyStatusFlow[0]; // No previous, start with "Purchase"
+  const idx = sellBuyStatusFlow.indexOf(previousStatus);
+  if (idx === -1 || idx === sellBuyStatusFlow.length - 1) return null; // Not found or already at last
+  return sellBuyStatusFlow[idx + 1];
+}
+
+
 const fetchCustomerData = async (mobileNumber) => {
   try {
     const response = await fetch(`https://admin.onlybigcars.com/api/customers/${mobileNumber}`, {
@@ -3880,6 +3960,8 @@ const handleGenerateEstimate = async () => {
                       <option value="Luxury">Luxury</option>
                       <option value="Normal">Normal</option>
                       <option value="Insurance">Insurance</option>
+                      <option value="Sell/Buy">Sell/Buy</option>
+                      <option value="Spares">Spares</option>
                       
                     </select>
                     {validationErrors.carType && (
@@ -4094,7 +4176,7 @@ const handleGenerateEstimate = async () => {
 
 <button 
   type='button'
-  className={`px-3 py-2 rounded-md mb-6 bg-red-600 hover:bg-red-700 text-white`}
+  className={`px-3 py-2 rounded-md mb-3 bg-red-600 hover:bg-red-700 text-white`}
   style={{ fontSize: '14px', fontWeight: '500' }}
   onClick={() => {
     setEditingCar(null);
@@ -4249,9 +4331,98 @@ const handleGenerateEstimate = async () => {
     </p>
   </div>
 )}
+
+
+
+{formState.basicInfo.carType === "Sell/Buy" && (
+  <div className="w-full p-2 rounded-lg">
+    <div className="text-gray-700 mb-4" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>
+      Sell/Buy
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <input
+        type="text"
+        value={formState.sellBuyInfo.dealerName}
+        onChange={e => handleInputChange('sellBuyInfo', 'dealerName', e.target.value)}
+        className="p-2 border border-gray-300 rounded-md"
+        placeholder="Dealer Name"
+      />
+      <input
+  type="tel"
+  value={formState.sellBuyInfo.dealerNumber}
+  onChange={e => {
+    // Allow only digits and max 10 characters
+    const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+    handleInputChange('sellBuyInfo', 'dealerNumber', val);
+  }}
+  className="p-2 border border-gray-300 rounded-md"
+  placeholder="Dealer Number"
+  maxLength={10}
+  pattern="[0-9]{10}"
+  // required
+/>
+      {/* <input
+        type="text"
+        value={formState.sellBuyInfo.dealerAddress}
+        onChange={e => handleInputChange('sellBuyInfo', 'dealerAddress', e.target.value)}
+        className="p-2 border border-gray-300 rounded-md"
+        placeholder="Dealer Address"
+      /> */}
+      <input
+        type="email"
+        value={formState.sellBuyInfo.dealerEmail}
+        onChange={e => handleInputChange('sellBuyInfo', 'dealerEmail', e.target.value)}
+        className="p-2 border border-gray-300 rounded-md"
+        placeholder="Dealer Email"
+      />
+      <input
+        type="number"
+        min="0"
+        value={formState.sellBuyInfo.repairingCost}
+        onChange={e => handleInputChange('sellBuyInfo', 'repairingCost', e.target.value)}
+        className="p-2 border border-gray-300 rounded-md"
+        placeholder="Repairing Cost"
+      />
+      <input
+        type="number"
+        min="0"
+        value={formState.sellBuyInfo.sellingCost}
+        onChange={e => handleInputChange('sellBuyInfo', 'sellingCost', e.target.value)}
+        className="p-2 border border-gray-300 rounded-md"
+        placeholder="Selling Cost"
+      />
+      <input
+        type="number"
+        min="0"
+        value={formState.sellBuyInfo.purchaseCost}
+        onChange={e => handleInputChange('sellBuyInfo', 'purchaseCost', e.target.value)}
+        className="p-2 border border-gray-300 rounded-md"
+        placeholder="Purchase Cost"
+      />
+      <input
+        type="number"
+        min="0"
+        value={formState.sellBuyInfo.dealerCommission}
+        onChange={e => handleInputChange('sellBuyInfo', 'dealerCommission', e.target.value)}
+        className="p-2 border border-gray-300 rounded-md"
+        placeholder="Dealer Commission"
+      />
+     <input
+  type="number"
+  // min="0"
+  value={formState.sellBuyInfo.profit}
+  readOnly
+  className={`p-2 border border-gray-300 rounded-md bg-gray-100 
+    ${formState.sellBuyInfo.profit < 0 ? 'text-red-600' : 'text-green-600'}`}
+  placeholder="Profit"
+/>
+    </div>
+  </div>
+)}
+
        
             <div className="w-full p-2 rounded-lg">
-                      <div className="text-gray-700 mb-4 mt-3" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>Our Feature Services</div>
+                      <div className="text-gray-700 mb-4 mt-1" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>Our Feature Services</div>
             <input
             type="text"
             placeholder="Search services..."
@@ -4259,25 +4430,32 @@ const handleGenerateEstimate = async () => {
             onChange={handleSearchChange}
             className="w-full p-2 mb-4 border rounded"
           />
-                      <div style={{ display: 'flex', flexWrap: 'wrap' }}> 
-                        {services.map((service, index) => (
-                          <Button 
-                            variant='outline-danger' 
-                            key={index} 
-                            outline 
-                            color="danger" 
-                            style={{ 
-                              margin: '5px',
-                              backgroundColor: selectedService === service ? '#dc3545' : 'transparent',
-                              color: selectedService === service ? 'white' : '#dc3545'
-                            }}
-                            onClick={() => handleServiceClick(service)}
-                          > 
-                            {service} 
-                          </Button>
-                        ))} 
-                      </div>
-            
+                       {!shouldHideProducts()&&(
+                                  <>
+                                            <div className="text-gray-700 mb-4 mt-3" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>Our Feature Services</div>
+                                  
+                                            <div style={{ display: 'flex', flexWrap: 'wrap' }}> 
+                                              {services.map((service, index) => (
+                                                <Button 
+                                                  variant='outline-danger' 
+                                                  key={index} 
+                                                  outline 
+                                                  color="danger" 
+                                                  style={{ 
+                                                    margin: '5px',
+                                                    backgroundColor: selectedService === service ? '#dc3545' : 'transparent',
+                                                    color: selectedService === service ? 'white' : '#dc3545'
+                                                  }}
+                                                  onClick={() => handleServiceClick(service)}
+                                                > 
+                                                  {service} 
+                                                </Button>
+                                              ))} 
+                                            </div>
+                                  </>
+                                  )}
+                        {!shouldHideProducts()&&(
+            <>
                       <div className="text-gray-700 mb-2 mt-3" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>Our Products</div>
           
           {/* Add Search Bar */}
@@ -4368,6 +4546,17 @@ const handleGenerateEstimate = async () => {
 ))}
             </div>
           </div>
+
+           </>
+            )}
+
+             {/* Show a message when products section is hidden */}
+  {shouldHideProducts() && (
+    <div className="text-center py-8 text-gray-500">
+      <p className="text-lg">Products section is not available for {formState.basicInfo.carType} leads</p>
+      <p className="text-sm">Please use the "Add New Row" button in the Work Summary section to add items manually</p>
+    </div>
+  )}
                     </div>
 
             {/* Overview section */}
@@ -4664,6 +4853,20 @@ const handleGenerateEstimate = async () => {
   className="p-2 border border-gray-300 rounded-md"
 >
   <option value="">Lead Status</option>
+  {formState.basicInfo.carType === "Sell/Buy" ? (
+    // Show all Sell/Buy statuses, but only enable the next allowed one
+    sellBuyStatusFlow.map((status, idx) => {
+      const previousStatus = location.state?.previousStatus || null;
+      const nextStatus = getNextSellBuyStatus(previousStatus);
+      const shouldDisable = status !== nextStatus;
+      return (
+        <option key={status} value={status} disabled={shouldDisable}>
+          {status}
+        </option>
+      );
+    })
+  ) :  (
+    <>
   <option value="test" disabled={shouldDisableOption("test", location.state?.previousStatus)}>test</option>
   <option value="Assigned" disabled={shouldDisableOption("Assigned", location.state?.previousStatus)}>Assigned</option>
   <option value="Follow Up" disabled={shouldDisableOption("Follow Up", location.state?.previousStatus)}>Follow Up</option>
@@ -4680,7 +4883,7 @@ const handleGenerateEstimate = async () => {
   <option value="Payment Due" disabled={shouldDisableOption("Payment Due", location.state?.previousStatus)}>Payment Due</option>
   <option value="Commision Due" disabled={shouldDisableOption("Commision Due", location.state?.previousStatus)}>Commision Due</option>
   <option value="Completed" disabled={shouldDisableOption("Completed", location.state?.previousStatus)}>Completed</option>
-
+</>  )}
 </select> 
 
 
@@ -5267,7 +5470,7 @@ const handleGenerateEstimate = async () => {
                     Cancel
                   </Button>
 
-                {cards && (['Job Card', 'Estimate', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
+                {/* {cards && (['Job Card', 'Estimate', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
         <Button
   variant="outline-dark"
   type="button"
@@ -5284,7 +5487,21 @@ const handleGenerateEstimate = async () => {
     'Generate Bill'
   )}
 </Button>      
-    )}
+    )} */}
+
+    {cards && (['Job Card', 'Estimate', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
+  <>
+    <Button
+      variant="outline-dark"
+      type="button"
+      onClick={() => setShowDesignerPopup(true)}
+      disabled={isSubmitting}
+    >
+      Generate Bill
+    </Button>
+   
+  </>
+)}
 
 
                   
@@ -5641,6 +5858,62 @@ Generate Bill
         date: formState.arrivalStatus.dateTime, // Add the full arrival date time
       }}
     />
+  </div>
+)}
+
+{showDesignerPopup && (
+<div
+  className="fixed inset-0 z-50 flex items-center justify-center"
+  style={{ background: "rgba(0,0,0,0.57)" }} // 7% black
+>
+    <div className="bg-white rounded-lg shadow-lg p-8 w-80 flex flex-col items-center relative">
+      <button
+        className="absolute top-2 right-2 text-gray-400 hover:text-red-500 text-xl"
+        onClick={() => setShowDesignerPopup(false)}
+        aria-label="Close"
+      >
+        ×
+      </button>
+      <h2 className="text-lg font-bold mb-6 text-gray-800">Choose Type</h2>
+      {/* <Button
+        variant="danger"
+        className="w-full mb-4 py-2 text-lg"
+        onClick={() => {
+          // Handle Customer button click
+          setShowDesignerPopup(false);
+          // ...your logic here...
+        }}
+      >
+        Customer
+      </Button> */}
+       <Button
+  variant="danger"
+  type="button"
+  disabled={isSubmitting || isGeneratingBill}
+  onClick={handleGenerateBill}
+  className="w-full mb-4 py-2 text-lg"
+>
+  {isGeneratingBill ? (
+    <>
+      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+      <span className="animate-pulse">Generating PDF...</span>
+    </>
+  ) : (
+    'Customer'
+  )}
+</Button>  
+      <Button
+        variant="dark"
+        className="w-full py-2 text-lg"
+        onClick={() => {
+          // Handle Workshop button click
+          setShowDesignerPopup(false);
+          // ...your logic here...
+        }}
+      >
+        Workshop
+      </Button>
+    </div>
   </div>
 )}
 
