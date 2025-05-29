@@ -1338,7 +1338,7 @@ const excelData = response.data.leads.map(lead => ({
         <option value="Payment Due">Payment Due</option>
         <option value="Commision Due">Commision Due</option>
         <option value="Completed">Completed</option>
-        <option value="Analytics">Analytics</option>
+        {/* <option value="Analytics">Analytics</option> */}
       </>
     )}
   </select>

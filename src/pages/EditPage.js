@@ -18,6 +18,7 @@ import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import JobCard from './JobCard';
 import Bill from './bill.js';
+import WxBill from './wxbill';
 import { toast } from 'react-toastify';
 import Estimate from './estimate.js';
 import { FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
@@ -134,6 +135,7 @@ const EditPage = () => {
   const addressInputRef = useRef(null);
   const jobCardRef = useRef(null);
   const billRef = useRef(null);
+  const wxBillRef = useRef();
   const estimateRef = useRef(null);
 
   const handleImageChange = (e) => {
@@ -3276,6 +3278,7 @@ const fetchCustomerData = async (mobileNumber) => {
 };
 
 const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+const [isGeneratingWxBill, setIsGeneratingWxBill] = useState(false); // Add this
 const handleGenerateCard = async () => {
   console.log('pdf function is called');
   setIsGeneratingPDF(true); // Start animation
@@ -3298,6 +3301,8 @@ const handleGenerateCard = async () => {
 };
 
 const [isGeneratingBill, setIsGeneratingBill] = useState(false);
+
+
 
 // const handleGenerateBill = async () => {
 //   setShowBill(true);
@@ -3330,6 +3335,24 @@ const handleGenerateBill = async () => {
     console.error('Error generating bill:', error);
   } finally {
     setIsGeneratingBill(false);
+  }
+};
+
+const handleGenerateWxBill = async () => {
+  setShowBill(true); // Show the hidden WxBill component
+  setIsGeneratingWxBill(true);
+  try {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    if (wxBillRef.current) {
+      await wxBillRef.current.generatePDF();
+    } else {
+      throw new Error('Workshop bill reference not available');
+    }
+  } catch (error) {
+    console.error('Error generating workshop bill:', error);
+  } finally {
+    setIsGeneratingWxBill(false);
+    setShowDesignerPopup(false);
   }
 };
 
@@ -4945,6 +4968,7 @@ const handleGenerateEstimate = async () => {
   <option value="Not Answering">Not Answering</option>
   <option value="Workshop Not Responding">Workshop Not Responding</option>
   <option value="Workshop Not Available">Workshop Not Available</option>
+  <option value="Language Barrier">Language Barrier</option>
   <option value="Test Leads">Test Leads</option>
   <option value="Others">Others</option>
 </select>
@@ -5796,6 +5820,62 @@ Generate Bill
   </div>
 )}
 
+{showBill && (
+  <div style={{ width: '100%', minHeight: '100vh', position: 'absolute', left: '-9999px' }}>
+    <WxBill
+      ref={wxBillRef}
+      data={{
+        // Pass the same data structure as Bill, or adjust as needed for wxbill.js
+        customerName: formState.customerInfo.customerName,
+        customerMobile: formState.customerInfo.mobileNumber,
+        carBrand: formState.cars[selectedCarIndex]?.carBrand || '',
+        carModel: formState.cars[selectedCarIndex]?.carModel || '',
+        regNumber: formState.cars[selectedCarIndex]?.regNo || '',
+        carYearFuel: `${formState.cars[selectedCarIndex]?.year || ''} ${formState.cars[selectedCarIndex]?.fuel || ''}`,
+        handoverDate: new Date(formState.arrivalStatus.dateTime).toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
+        }),
+        orderId: formState.arrivalStatus.jobCardNumber || '',
+        speedometerRd: formState.arrivalStatus.speedometerRd,
+        carColor: formState.cars[0]?.color || '',
+        vinNo: formState.cars[0]?.vin || '',
+        customerAdd: formState.location.address || '',
+        workshop: formState.workshop.name,
+        batteryFeature: formState.arrivalStatus.batteryFeature || '',
+        gstin: formState.arrivalStatus.gstin || '',
+        fuelStatus: formState.arrivalStatus.fuelStatus || '',
+        invoiceSum: [
+          {
+            netAmt: formState.overview.total,
+            gst: formState.overview.total * 0.18,
+            dis: formState.overview.discount || 0,
+            totalPay: formState.overview.finalAmount
+          }
+        ],
+        workDetail: formState.overview.tableData.map(item => ({
+          descriptions: item.type,
+          workDn: item.workdone,
+          quant: item.quantity || 1,
+          unitPr: parseFloat(item.pricePerItem) || 0,
+          gst: parseFloat(item.gst) || 0,
+          dis: 0,
+          netAmt: parseFloat(item.total) || 0
+        })),
+        totalUnitPriceBill: formState.overview.total,
+        totalDiscountedPriceBill: formState.overview.discount || 0,
+        finalPriceBill: formState.overview.finalAmount,
+        totalPayablePriceBill: formState.overview.finalAmount,
+        workshopAddress: formState.workshop.locality || '',
+        customerGSTIN: '',
+        commissionReceived: formState.arrivalStatus.commissionReceived || 0,
+        commissionDue: formState.arrivalStatus.commissionDue || 0,
+      }}
+    />
+  </div>
+)}
+
 
 {showEstimate && (
   <div style={{ width: '100%', minHeight: '100vh', position: 'absolute', left: '-9999px' }}>
@@ -5903,16 +5983,21 @@ Generate Bill
   )}
 </Button>  
       <Button
-        variant="dark"
-        className="w-full py-2 text-lg"
-        onClick={() => {
-          // Handle Workshop button click
-          setShowDesignerPopup(false);
-          // ...your logic here...
-        }}
-      >
-        Workshop
-      </Button>
+  variant="dark"
+  className="w-full py-2 text-lg"
+  type="button"
+  disabled={isSubmitting || isGeneratingWxBill}
+  onClick={handleGenerateWxBill}
+>
+  {isGeneratingWxBill ? (
+    <>
+      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+      <span className="animate-pulse">Generating PDF...</span>
+    </>
+  ) : (
+    'Workshop'
+  )}
+</Button>
     </div>
   </div>
 )}
