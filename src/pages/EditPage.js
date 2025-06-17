@@ -19,9 +19,12 @@ import { jsPDF } from 'jspdf';
 import JobCard from './JobCard';
 import Bill from './bill.js';
 import WxBill from './wxbill';
-import { toast } from 'react-toastify';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import Estimate from './estimate.js';
 import { FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
+
+// import { toast } from 'react-toastify';
 
 
 
@@ -89,6 +92,17 @@ const initialFormState = {
   },
   created_at: null,
   updated_at: null,
+  gstDetail: {
+    customer_name: '',
+    customer_address: '',
+    customer_gstin: '',
+    customer_state: '',
+    wx_name: '',
+    wx_address: '',
+    wx_gstin: '',
+    wx_state: ''
+  },
+
 };
 
 const EditPage = () => {
@@ -115,6 +129,27 @@ const EditPage = () => {
   const [imageTooltipText, setImageTooltipText] = useState('');
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [showDesignerPopup, setShowDesignerPopup] = useState(false);
+  const [gstMode, setGstMode] = useState(null);
+  const [isSendingJobCard, setIsSendingJobCard] = useState(false);
+  
+
+// Add this with other state declarations around line 90-100
+const [statusCounterData, setStatusCounterData] = useState({
+  follow_up_count: 0,
+  dead_count: 0,
+  duplicate_count: 0,
+  communicate_to_ops_count: 0,
+  referred_to_ops_count: 0,
+  walkin_count: 0,
+  pickup_count: 0,
+  doorstep_count: 0,
+  at_workshop_count: 0,
+  job_card_count: 0,
+  payment_due_count: 0,
+  commission_due_count: 0,
+  completed_count: 0
+});
+
 
   
   
@@ -540,6 +575,16 @@ const handleRemoveExistingImage = (index) => {
     dealerCommission: '',
     profit: ''
   },
+  gstDetail: {
+    customer_name: '',
+    customer_address: '',
+    customer_gstin: '',
+    customer_state: '',
+    wx_name: '',
+    wx_address: '',
+    wx_gstin: '',
+    wx_state: ''
+  },
   });
 
   const fetchPreviousLeads = async (phoneNumber) => {
@@ -779,10 +824,21 @@ useEffect(() => {
             }
           );
 
+           console.log("Full response from update_lead:", response.data); // ADD THIS DEBUG LOG
+
+    // CAPTURE STATUS COUNTER DATA HERE
+    if (response.data.status_counter) {
+      setStatusCounterData(response.data.status_counter);
+      console.log('Status Counter Data received after update:', response.data.status_counter);
+    } else {
+      console.log('No status_counter in response data');
+    }
         
           
           // Restructure the incoming data to match formState structure
           const leadData = response.data[0];
+
+        
 
            // If the lead has images, store them in state
         if (leadData.images && Array.isArray(leadData.images)) {
@@ -909,6 +965,8 @@ useEffect(() => {
             updated_at: leadData.updated_at,
           });
 
+
+          
            
 
           setDiscount(leadData.overview.discount || 0); // Add this new field
@@ -919,6 +977,9 @@ useEffect(() => {
         if (leadData.orderId && leadData.orderId !== 'NA') {
           setCards(true);
         }
+
+        // After setting the initial formState from leadData
+// Add this code to handle GST details autofill
 
 
 
@@ -945,6 +1006,9 @@ useEffect(() => {
           if (response.data.users) {
             setUsers(response.data.users);
           }
+
+
+      
 
          
 // need prod check
@@ -974,6 +1038,59 @@ useEffect(() => {
   //   dummyCarAddedRef.current = true;
   // }
 
+  
+  // After setting the initial formState from leadData
+// Replace this section (around line 936-968)
+
+// Initialize GST details with values from leadData if available, otherwise use values from other fields
+setFormState(prev => {
+  // Create the gstDetail object with smart fallbacks
+  const gstDetail = {
+    // For customer details, check each field and use fallbacks in this order:
+    // 1. Use existing GST detail if it exists and is not empty
+    // 2. Use corresponding customer/location data
+    // 3. Fall back to empty string
+    customer_name: 
+      (leadData.gstDetail?.customer_name) || 
+      prev.customerInfo.customerName || 
+      leadData.name || '',
+      
+    customer_address: 
+      (leadData.gstDetail?.customer_address) || 
+      prev.location.address || 
+      leadData.address || '',
+      
+    customer_gstin: 
+      (leadData.gstDetail?.customer_gstin) || 
+      prev.arrivalStatus.gstin || '',
+      
+    customer_state: 
+      (leadData.gstDetail?.customer_state) || 
+      prev.location.state || 
+      leadData.state || '',
+    
+    // For workshop details, similar approach
+    wx_name: 
+      (leadData.gstDetail?.wx_name) || 
+      prev.workshop.name || '',
+      
+    wx_address: 
+      (leadData.gstDetail?.wx_address) || 
+      prev.workshop.locality || '',
+      
+    wx_gstin: 
+      (leadData.gstDetail?.wx_gstin) || '',
+      
+    wx_state: 
+      (leadData.gstDetail?.wx_state) || ''
+  };
+
+  return {
+    ...prev,
+    gstDetail: gstDetail
+  };
+});
+
 
             // Update source if available
         if (leadData.source) {
@@ -995,7 +1112,25 @@ useEffect(() => {
     }
   }, [id, token]);
 
+// Add this with your other useState declarations
+const [stateSearchCustomer, setStateSearchCustomer] = useState('');
+const [stateSearchWorkshop, setStateSearchWorkshop] = useState('');
+const [showCustomerStateDropdown, setShowCustomerStateDropdown] = useState(false);
+const [showWorkshopStateDropdown, setShowWorkshopStateDropdown] = useState(false);
 
+// List of Indian states and union territories
+const indianStates = [
+  // States
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", 
+  "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", 
+  "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", 
+  "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", 
+  "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
+  
+  // Union Territories
+  "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", 
+  "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"
+];
 
 useEffect(() => {
   if (formState.basicInfo.carType === "Sell/Buy") {
@@ -1022,8 +1157,30 @@ useEffect(() => {
   formState.basicInfo.carType
 ]);
 
+  // ... existing code around line 1119
+useEffect(() => {
+  function handleClickOutside(event) {
+    // Close customer state dropdown if clicking outside
+    if (showCustomerStateDropdown && 
+        !event.target.closest('.customer-state-dropdown')) {
+      setShowCustomerStateDropdown(false);
+    }
+    
+    // Close workshop state dropdown if clicking outside
+    if (showWorkshopStateDropdown && 
+        !event.target.closest('.workshop-state-dropdown')) {
+      setShowWorkshopStateDropdown(false);
+    }
+  }
   
-
+  // Add event listener
+  document.addEventListener('mousedown', handleClickOutside);
+  
+  // Clean up
+  return () => {
+    document.removeEventListener('mousedown', handleClickOutside);
+  };
+}, [showCustomerStateDropdown, showWorkshopStateDropdown]);
   // useEffect(() => {
   //   if (isLoaded && addressInputRef.current) {
   //     const autocomplete = new window.google.maps.places.Autocomplete(addressInputRef.current);
@@ -1067,7 +1224,35 @@ const handleGSTHeaderClick = () => {
     }
   }));
 };
-
+const handleClick2Call = async (receiverNo) => {
+  try {
+    const response = await axios.post(
+      'https://admin.onlybigcars.com/api/click2call/',
+      { receiver_no: receiverNo },
+      { headers: { Authorization: `Token ${token}` } }
+    );
+    
+    // Use toast for success notification
+    toast.success(response.data.message || 'Call initiated!', {
+      position: "top-right",
+      autoClose: 3000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+    });
+  } catch (error) {
+    // Use toast for error notification instead of setError
+    toast.error('Failed to initiate call: ' + (error.response?.data?.error || error.message), {
+      position: "top-right",
+      autoClose: 4000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+    });
+  }
+};
 // handleGSTChange
 const handleGSTChange = (index, value) => {
   const newGST = parseFloat(value) || 0;
@@ -1469,6 +1654,8 @@ const validateForm = () => {
   
   return errors;
 };
+
+
 
   const formatLeadId = (mobileNumber, seqNum) => {
     if (!mobileNumber || !seqNum) return null;
@@ -3302,6 +3489,74 @@ const handleGenerateCard = async () => {
 
 const [isGeneratingBill, setIsGeneratingBill] = useState(false);
 
+// const handleSendJobCard = async () => {
+//   if (!formState.customerInfo.whatsappNumber && !formState.customerInfo.mobileNumber) {
+//     toast.error('No WhatsApp number found for customer', {
+//       position: "top-right",
+//       autoClose: 3000,
+//     });
+//     return;
+//   }
+
+//   setIsSendingJobCard(true);
+//   setShowJobCard(true);
+  
+//   try {
+//     // Wait for component to render
+//     await new Promise(resolve => setTimeout(resolve, 4000));
+    
+//     if (jobCardRef.current) {
+//       // Generate PDF blob
+//       const pdfBlob = await jobCardRef.current.generatePDFBlob();
+      
+//       if (!pdfBlob) {
+//         throw new Error('Failed to generate PDF blob');
+//       }
+
+//       // Prepare form data to send to backend
+//       const formData = new FormData();
+//       formData.append('pdf', pdfBlob, `JobCard-${formState.customerInfo.customerName || 'Customer'}.pdf`);
+//       formData.append('whatsapp_number', formState.customerInfo.whatsappNumber || formState.customerInfo.mobileNumber);
+//       formData.append('customer_name', formState.customerInfo.customerName || 'Customer');
+//       formData.append('lead_id', id || '');
+
+//       // Send to backend
+//       const response = await axios.post(
+//         'https://admin.onlybigcars.com/api/send-jobcard/',
+//         formData,
+//         {
+//           headers: {
+//             'Authorization': `Token ${token}`,
+//             'Content-Type': 'multipart/form-data',
+//           }
+//         }
+//       );
+
+//       if (response.data.success) {
+//         toast.success('JobCard sent successfully to customer!', {
+//           position: "top-right",
+//           autoClose: 3000,
+//         });
+//       } else {
+//         toast.error(response.data.message || 'Failed to send JobCard', {
+//           position: "top-right",
+//           autoClose: 3000,
+//         });
+//       }
+//     } else {
+//       throw new Error('JobCard reference not available');
+//     }
+//   } catch (error) {
+//     console.error('Error sending JobCard:', error);
+//     toast.error('Failed to send JobCard: ' + (error.response?.data?.message || error.message), {
+//       position: "top-right",
+//       autoClose: 4000,
+//     });
+//   } finally {
+//     setIsSendingJobCard(false);
+//     setShowJobCard(false);
+//   }
+// };
 
 
 // const handleGenerateBill = async () => {
@@ -3320,6 +3575,95 @@ const [isGeneratingBill, setIsGeneratingBill] = useState(false);
 //     console.error('Error generating job card:', error);
 //   } 
 // };
+
+// ...existing code...
+
+const handleSendJobCard = async () => {
+  if (!formState.customerInfo.whatsappNumber && !formState.customerInfo.mobileNumber) {
+    toast.error('No WhatsApp number found for customer', {
+      position: "top-right",
+      autoClose: 3000,
+    });
+    return;
+  }
+
+  setIsSendingJobCard(true);
+  setShowJobCard(true);
+  
+  try {
+    // Wait for component to render
+    await new Promise(resolve => setTimeout(resolve, 4000));
+    
+    if (jobCardRef.current) {
+      // Generate PDF blob
+      const pdfBlob = await jobCardRef.current.generatePDFBlob();
+      
+      if (!pdfBlob) {
+        throw new Error('Failed to generate PDF blob');
+      }
+
+      // Prepare form data to send to backend
+      const formData = new FormData();
+      formData.append('pdf', pdfBlob, `JobCard-${formState.customerInfo.customerName || 'Customer'}.pdf`);
+      formData.append('whatsapp_number', formState.customerInfo.whatsappNumber || formState.customerInfo.mobileNumber);
+      formData.append('customer_name', formState.customerInfo.customerName || 'Customer');
+      formData.append('lead_id', id || '');
+      
+      // Add car details for dynamic filename
+      formData.append('car_brand', formState.cars[0]?.carBrand || '');
+      formData.append('car_model', formState.cars[0]?.carModel || '');
+      formData.append('order_id', formState.arrivalStatus.orderId || '');
+
+      console.log('Sending JobCard request with:', {
+        whatsapp_number: formState.customerInfo.whatsappNumber || formState.customerInfo.mobileNumber,
+        customer_name: formState.customerInfo.customerName || 'Customer',
+        lead_id: id || '',
+        car_brand: formState.cars[0]?.carBrand || '',
+        car_model: formState.cars[0]?.carModel || '',
+        order_id: formState.arrivalStatus.orderId || '',
+        pdf_size: pdfBlob.size
+      });
+
+      // Send to backend
+      const response = await axios.post(
+        'https://admin.onlybigcars.com/api/send-jobcard/',
+        formData,
+        {
+          headers: {
+            'Authorization': `Token ${token}`,
+            // Don't set Content-Type manually when using FormData
+          }
+        }
+      );
+
+      if (response.data.success) {
+        toast.success(`JobCard sent successfully! File: ${response.data.filename}`, {
+          position: "top-right",
+          autoClose: 4000,
+        });
+      } else {
+        toast.error(response.data.message || 'Failed to send JobCard', {
+          position: "top-right",
+          autoClose: 3000,
+        });
+      }
+    } else {
+      throw new Error('JobCard reference not available');
+    }
+  } catch (error) {
+    console.error('Error sending JobCard:', error);
+    console.error('Error details:', error.response?.data);
+    toast.error('Failed to send JobCard: ' + (error.response?.data?.message || error.message), {
+      position: "top-right",
+      autoClose: 4000,
+    });
+  } finally {
+    setIsSendingJobCard(false);
+    setShowJobCard(false);
+  }
+};
+
+// ...existing code...
 
 const handleGenerateBill = async () => {
   setIsGeneratingBill(true);
@@ -3714,6 +4058,7 @@ const handleGenerateEstimate = async () => {
 
   return (
     <Layout>
+      <ToastContainer />
       <form onSubmit={handleSubmit}>
         {/* {showAlert && (
           <Alert
@@ -3817,7 +4162,7 @@ const handleGenerateEstimate = async () => {
             {/* // Update your existing status history section 18 feb */ }
 
             {/* // Then, modify your left sidebar dropdown containers to ensure they stay open properly */}
-            <div className="dropdown-container" style={{ marginTop: "15px" }}>
+            {/* <div className="dropdown-container" style={{ marginTop: "15px" }}>
   <Button
     onClick={() => setIsOpenLeft(!isOpenLeft)}
     variant="dark"
@@ -3832,6 +4177,60 @@ const handleGenerateEstimate = async () => {
       <Card className="rounded-top-0 border-top-0">
         <Card.Body style={{ maxHeight: '300px', overflowY: 'auto' }}>
           <StatusHistoryDisplay statusHistory={formState.arrivalStatus.status_history || []} />  
+        </Card.Body>
+      </Card>
+    </div>
+  </Collapse>
+</div> */}
+
+
+<div className="dropdown-container" style={{ marginTop: "15px" }}>
+  <Button
+    onClick={() => setIsOpenLeft(!isOpenLeft)}
+    variant="dark"
+    className={`w-full d-flex justify-content-between align-items-center rounded-bottom-0 ${isOpenLeft ? 'border-bottom-0' : ''}`}
+  >
+    Status History
+    {isOpenLeft ? <FaChevronUp /> : <FaChevronDown />}
+  </Button>
+
+  <Collapse in={isOpenLeft} mountOnEnter={true} unmountOnExit={false}>
+    <div>
+      <Card className="rounded-top-0 border-top-0">
+        <Card.Body>
+          <StatusHistoryDisplay statusHistory={formState.arrivalStatus.status_history} />
+          
+          {/* Add Status Counter Display */}
+          {/* <div className="mt-4 p-3 bg-gray-50 rounded">
+            <h5 className="mb-3 font-medium">Status Counters</h5>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="flex justify-between">
+                <span>Follow Up:</span>
+                <span className="font-medium">{statusCounterData.follow_up_count}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Dead:</span>
+                <span className="font-medium">{statusCounterData.dead_count}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Job Card:</span>
+                <span className="font-medium">{statusCounterData.job_card_count}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Completed:</span>
+                <span className="font-medium">{statusCounterData.completed_count}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>At Workshop:</span>
+                <span className="font-medium">{statusCounterData.at_workshop_count}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Payment Due:</span>
+                <span className="font-medium">{statusCounterData.payment_due_count}</span>
+              </div>
+           
+            </div>
+          </div> */}
         </Card.Body>
       </Card>
     </div>
@@ -3969,7 +4368,7 @@ const handleGenerateEstimate = async () => {
 
 
                   {/* Dropdown Menu - positioned absolutely */}
-                  <div className="mt-2">
+                  {/* <div className="mt-2">
                     <select
                       value={formState.basicInfo.carType} // Add this
                       onChange={(e) => handleInputChange('basicInfo', 'carType', e.target.value)} // Add this
@@ -3992,14 +4391,81 @@ const handleGenerateEstimate = async () => {
     {validationErrors.carType}
   </div>
 )}
-                  </div>
+                  </div> */}
 
+{/*               
+
+<div className="mt-2 flex items-center gap-2">
+
+   <button
+    className="group/btn inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-medium rounded-lg shadow-sm hover:shadow-md active:scale-95 transition-all duration-150 min-w-[60px]"
+    onClick={() => formState.customerInfo.mobileNumber ? handleClick2Call(formState.customerInfo.mobileNumber) : setError('No phone number available to call')}
+    title="Click2Call"
+  >
+    <svg 
+      className="w-3.5 h-3.5" 
+      fill="currentColor" 
+      viewBox="0 0 20 20"
+    >
+      <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+    </svg>
+    <span>Call</span>
+  </button>
+  
+
+  <select
+    value={formState.basicInfo.carType}
+    onChange={(e) => handleInputChange('basicInfo', 'carType', e.target.value)}
+    className={`p-2 border rounded min-w-[120px] ${
+      !formState.basicInfo.carType ? 'border-red-300' : 'border-gray-200'
+    }`}
+    required={!isAdmin}
+  >
+    <option value="">Lead Type*</option>
+    <option value="Luxury">Luxury</option>
+    <option value="Normal">Normal</option>
+    <option value="Insurance">Insurance</option>
+    <option value="Sell/Buy">Sell/Buy</option>
+    <option value="Spares">Spares</option>
+  </select>
+  
+ 
+  
+  {validationErrors.carType && (
+    <div className="text-red-500 text-xs mt-1">
+      {validationErrors.carType}
+    </div>
+  )}
+</div> */}
+<div className="mt-2 flex items-center gap-2">
+  <select
+    value={formState.basicInfo.carType}
+    onChange={(e) => handleInputChange('basicInfo', 'carType', e.target.value)}
+    className={`px-3 py-2 text-sm font-medium border rounded-md min-w-[140px] h-10 bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-150 ${
+      !formState.basicInfo.carType ? 'border-red-300' : 'border-gray-200'
+    }`}
+    required={!isAdmin}
+  >
+    <option value="">Lead Type*</option>
+    <option value="Luxury">Luxury</option>
+    <option value="Normal">Normal</option>
+    <option value="Insurance">Insurance</option>
+    <option value="Sell/Buy">Sell/Buy</option>
+    <option value="Spares">Spares</option>
+  </select>
+
+  {validationErrors.carType && (
+    <div className="text-red-500 text-xs mt-1">
+      {validationErrors.carType}
+    </div>
+  )}
+</div>
                 </div>
 
               </div>
 
               {/* Bottom Section */}
-              <div className="mt-4 p-3 flex gap-4">
+              {/* <div className="mt-4 p-3 flex gap-4">
                 <div className="flex-1">
                   <input
                     type="tel"
@@ -4028,7 +4494,54 @@ const handleGenerateEstimate = async () => {
     {validationErrors.mobileNumber}
   </div>
 )}
-                </div>
+                </div> */}
+   <div className="mt-4 p-3 flex gap-4">
+  <div className="flex-1">
+    <div className="relative flex">
+      <input
+        type="tel"
+        value={formState.customerInfo.mobileNumber}
+        onChange={(e) => handleInputChange('customerInfo', 'mobileNumber', e.target.value)}
+        className={`flex-1 p-2 border rounded-l border-r-0 ${
+          validationErrors.mobileNumber 
+            ? 'form-field-invalid' 
+            : formState.customerInfo.mobileNumber 
+              ? 'form-field-valid' 
+              : ''
+        }`}
+        placeholder="Mobile Number*"
+        required
+        maxLength={10}
+        pattern="[0-9]{10}"
+        onKeyPress={(e) => {
+          // Only allow numbers
+          if (!/[0-9]/.test(e.key)) {
+            e.preventDefault();
+          }
+        }}
+      />
+      <button
+        className="flex items-center justify-center px-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-r border border-emerald-500 shadow-sm hover:shadow-md active:scale-95 transition-all duration-150"
+        onClick={() => formState.customerInfo.mobileNumber ? handleClick2Call(formState.customerInfo.mobileNumber) : setError('No phone number available to call')}
+        title="Click2Call"
+        type="button"
+      >
+        <svg 
+          className="w-4 h-4" 
+          fill="currentColor" 
+          viewBox="0 0 20 20"
+        >
+          <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+        </svg>
+      </button>
+    </div>
+    {validationErrors.mobileNumber && (
+      <div className="text-red-500 text-xs mt-1">
+        {validationErrors.mobileNumber}
+      </div>
+    )}
+  </div>
+{/* </div> */}
 
                 <div className="flex-1">
                   <input
@@ -5299,22 +5812,6 @@ const handleGenerateEstimate = async () => {
   </div>
 )} */}
               </div>
-{formState.arrivalStatus.leadStatus === 'Job Card' && (
-  <>
-{/* GSTIN input on a single line, not stretched */}
-    <div className="flex mt-2">
-      <input
-        type="text"
-        value={formState.arrivalStatus.gstin}
-        onChange={(e) => handleInputChange('arrivalStatus', 'gstin', e.target.value)}
-        placeholder="GSTIN"
-        className="p-2 border border-gray-300 rounded-md"
-        style={{ width: 280, minWidth: 180, maxWidth: 320 }}
-        required
-      />
-    </div>
-  </>
-)}
 
             </div>
 
@@ -5513,7 +6010,7 @@ const handleGenerateEstimate = async () => {
 </Button>      
     )} */}
 
-    {cards && (['Job Card', 'Estimate', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
+    {cards && (['Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
   <>
     <Button
       variant="outline-dark"
@@ -5552,6 +6049,60 @@ const handleGenerateEstimate = async () => {
                   
         
     )}
+
+    {/* {cards && (['Job Card', 'Estimate', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
+  <Button
+    variant="outline-success"
+    type="button"
+    disabled={isSubmitting || isSendingJobCard}
+    onClick={handleSendJobCard}
+    className="position-relative"
+  >
+    {isSendingJobCard ? (
+      <>
+        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+        <span className="animate-pulse">Sending JobCard...</span>
+      </>
+    ) : (
+      'Send JobCard'
+    )}
+  </Button>
+)} */}
+
+
+{/* Option 2: Badge indicator approach */}
+{cards && (['Job Card', 'Estimate', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
+  <Button
+    variant="outline-success"
+    type="button"
+    disabled={isSubmitting || isSendingJobCard}
+    onClick={handleSendJobCard}
+    className="position-relative d-flex align-items-center"
+  >
+    {isSendingJobCard ? (
+      <>
+        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+        <span className="animate-pulse">Sending JobCard...</span>
+      </>
+    ) : (
+      <>
+        <span className="me-2">
+          {statusCounterData.job_card_count >= 1 ? 'Resend JobCard' : 'Send JobCard'}
+        </span>
+        {statusCounterData.job_card_count >= 1 && (
+          <span 
+            className="badge bg-success"
+            title={`JobCard sent ${statusCounterData.job_card_count} time(s)`}
+          >
+            {statusCounterData.job_card_count}
+          </span>
+        )}
+      </>
+    )}
+  </Button>
+)}
+
+
 
 {/* { cards && (['Job Card', 'Estimate', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
    
@@ -5814,6 +6365,11 @@ Generate Bill
         totalPayablePriceBill: formState.overview.finalAmount,
         workshopAddress: formState.workshop.locality || '', // or .address if you store it as address
         customerGSTIN: '', // leave blank for now
+        customerDetailName: formState.gstDetail.customer_name || formState.customerInfo.customerName,
+        customerDetailAddress: formState.gstDetail.customer_address || formState.location.address,
+        customerDetailGSTIN: formState.gstDetail.customer_gstin || 'N/A',
+        customerDetailState: formState.gstDetail.customer_state || '',
+        additionalWorkItems: formState.arrivalStatus.additionalWork,
         // --- NEW: Work Detail with GST per row ---
       }}
     />
@@ -5871,6 +6427,11 @@ Generate Bill
         customerGSTIN: '',
         commissionReceived: formState.arrivalStatus.commissionReceived || 0,
         commissionDue: formState.arrivalStatus.commissionDue || 0,
+        workshopDetailName: formState.gstDetail.wx_name || formState.workshop.name,
+        workshopDetailAddress: formState.gstDetail.wx_address || formState.workshop.locality,
+        workshopDetailGSTIN: formState.gstDetail.wx_gstin || 'N/A',
+        workshopDetailState: formState.gstDetail.wx_state || '',
+        additionalWorkItems: formState.arrivalStatus.additionalWork,
       }}
     />
   </div>
@@ -5940,7 +6501,7 @@ Generate Bill
     />
   </div>
 )}
-
+{/* 
 {showDesignerPopup && (
 <div
   className="fixed inset-0 z-50 flex items-center justify-center"
@@ -5955,17 +6516,7 @@ Generate Bill
         ×
       </button>
       <h2 className="text-lg font-bold mb-6 text-gray-800">Choose Type</h2>
-      {/* <Button
-        variant="danger"
-        className="w-full mb-4 py-2 text-lg"
-        onClick={() => {
-          // Handle Customer button click
-          setShowDesignerPopup(false);
-          // ...your logic here...
-        }}
-      >
-        Customer
-      </Button> */}
+      
        <Button
   variant="danger"
   type="button"
@@ -6000,7 +6551,564 @@ Generate Bill
 </Button>
     </div>
   </div>
+)} */}
+
+{/* 
+{showDesignerPopup && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.57)" }}>
+    <div className="bg-white rounded-lg shadow-lg p-8 w-80 flex flex-col items-center relative">
+      <button
+        className="absolute top-2 right-2 text-gray-400 hover:text-red-500 text-xl"
+        onClick={() => setShowDesignerPopup(false)}
+        aria-label="Close"
+      >×</button>
+      <h2 className="text-lg font-bold mb-6 text-gray-800">Choose Type</h2>
+      {!gstMode && (
+        <div className="flex gap-4 w-full mb-4">
+          <Button variant="danger" className="flex-1" onClick={() => setGstMode('customer')}>Customer</Button>
+          <Button variant="dark" className="flex-1" onClick={() => setGstMode('workshop')}>Workshop</Button>
+        </div>
+      )}
+      {gstMode === 'customer' && (
+        <div className="w-full space-y-3">
+          <input className="w-full p-2 border rounded" placeholder="Customer Name"
+            value={formState.gstDetail.customer_name}
+            onChange={e => setFormState(prev => ({
+              ...prev,
+              gstDetail: { ...prev.gstDetail, customer_name: e.target.value }
+            }))}
+          />
+          <input className="w-full p-2 border rounded" placeholder="Customer Address"
+            value={formState.gstDetail.customer_address}
+            onChange={e => setFormState(prev => ({
+              ...prev,
+              gstDetail: { ...prev.gstDetail, customer_address: e.target.value }
+            }))}
+          />
+          <input className="w-full p-2 border rounded" placeholder="Customer GSTIN"
+            value={formState.gstDetail.customer_gstin}
+            onChange={e => setFormState(prev => ({
+              ...prev,
+              gstDetail: { ...prev.gstDetail, customer_gstin: e.target.value }
+            }))}
+          />
+          <input className="w-full p-2 border rounded" placeholder="Customer State"
+            value={formState.gstDetail.customer_state}
+            onChange={e => setFormState(prev => ({
+              ...prev,
+              gstDetail: { ...prev.gstDetail, customer_state: e.target.value }
+            }))}
+          />
+          <Button className="w-full mt-2" variant="danger" onClick={() => {
+            setShowDesignerPopup(false);
+            setGstMode(null);
+            // Optionally trigger bill preview here
+          }}>Generate Customer Bill</Button>
+        </div>
+      )}
+      {gstMode === 'workshop' && (
+        <div className="w-full space-y-3">
+          <input className="w-full p-2 border rounded" placeholder="Workshop Name"
+            value={formState.gstDetail.wx_name}
+            onChange={e => setFormState(prev => ({
+              ...prev,
+              gstDetail: { ...prev.gstDetail, wx_name: e.target.value }
+            }))}
+          />
+          <input className="w-full p-2 border rounded" placeholder="Workshop Address"
+            value={formState.gstDetail.wx_address}
+            onChange={e => setFormState(prev => ({
+              ...prev,
+              gstDetail: { ...prev.gstDetail, wx_address: e.target.value }
+            }))}
+          />
+          <input className="w-full p-2 border rounded" placeholder="Workshop GSTIN"
+            value={formState.gstDetail.wx_gstin}
+            onChange={e => setFormState(prev => ({
+              ...prev,
+              gstDetail: { ...prev.gstDetail, wx_gstin: e.target.value }
+            }))}
+          />
+          <input className="w-full p-2 border rounded" placeholder="Workshop State"
+            value={formState.gstDetail.wx_state}
+            onChange={e => setFormState(prev => ({
+              ...prev,
+              gstDetail: { ...prev.gstDetail, wx_state: e.target.value }
+            }))}
+          />
+          <Button className="w-full mt-2" variant="dark" onClick={() => {
+            setShowDesignerPopup(false);
+            setGstMode(null);
+            // Optionally trigger wxbill preview here
+          }}>Generate Workshop Bill</Button>
+        </div>
+      )}
+      {gstMode && (
+        <Button variant="outline-secondary" className="mt-4" onClick={() => setGstMode(null)}>Back</Button>
+      )}
+    </div>
+  </div>
+)} */}
+{/* 
+{showDesignerPopup && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.57)" }}>
+    <div className="bg-white rounded-lg shadow-lg p-8 w-80 flex flex-col items-center relative">
+      <button
+        className="absolute top-2 right-2 text-gray-400 hover:text-red-500 text-xl"
+        onClick={() => setShowDesignerPopup(false)}
+        aria-label="Close"
+      >×</button>
+      <h2 className="text-lg font-bold mb-6 text-gray-800">Choose Type</h2>
+      {!gstMode && (
+        <div className="flex gap-4 w-full mb-4">
+          <Button variant="danger" className="flex-1" onClick={() => setGstMode('customer')}>Customer</Button>
+          <Button variant="dark" className="flex-1" onClick={() => setGstMode('workshop')}>Workshop</Button>
+        </div>
+      )}
+      {gstMode === 'customer' && (
+  <div className="w-full space-y-3">
+    <input 
+      className="w-full p-2 border rounded" 
+      placeholder="Customer Name"
+      value={formState.gstDetail.customer_name || formState.customerInfo.customerName}
+      onChange={e => setFormState(prev => ({
+        ...prev,
+        gstDetail: { ...prev.gstDetail, customer_name: e.target.value }
+      }))}
+    />
+          <input 
+            className="w-full p-2 border rounded" 
+            placeholder="Customer Address"
+            value={formState.gstDetail.customer_address || formState.location.address}
+            onChange={e => setFormState(prev => ({
+              ...prev,
+              gstDetail: { ...prev.gstDetail, customer_address: e.target.value }
+            }))}
+          />
+          <input 
+            className="w-full p-2 border rounded" 
+            placeholder="Customer GSTIN"
+            value={formState.gstDetail.customer_gstin || formState.arrivalStatus.gstin}
+            onChange={e => setFormState(prev => ({
+              ...prev,
+              gstDetail: { ...prev.gstDetail, customer_gstin: e.target.value }
+            }))}
+          />
+          <input 
+            className="w-full p-2 border rounded" 
+            placeholder="Customer State"
+            value={formState.gstDetail.customer_state || formState.location.state}
+            onChange={e => setFormState(prev => ({
+              ...prev,
+              gstDetail: { ...prev.gstDetail, customer_state: e.target.value }
+            }))}
+          />
+          <Button className="w-full mt-2" variant="danger" onClick={handleGenerateBill}>Generate Customer Bill</Button>
+        </div>
+      )}
+      {gstMode === 'workshop' && (
+        <div className="w-full space-y-3">
+          <input 
+            className="w-full p-2 border rounded" 
+            placeholder="Workshop Name"
+            value={formState.gstDetail.wx_name || formState.workshop.name}
+            onChange={e => setFormState(prev => ({
+              ...prev,
+              gstDetail: { ...prev.gstDetail, wx_name: e.target.value }
+            }))}
+          />
+          <input 
+            className="w-full p-2 border rounded" 
+            placeholder="Workshop Address"
+            value={formState.gstDetail.wx_address || formState.workshop.locality}
+            onChange={e => setFormState(prev => ({
+              ...prev,
+              gstDetail: { ...prev.gstDetail, wx_address: e.target.value }
+            }))}
+          />
+          <input 
+            className="w-full p-2 border rounded" 
+            placeholder="Workshop GSTIN"
+            value={formState.gstDetail.wx_gstin}
+            onChange={e => setFormState(prev => ({
+              ...prev,
+              gstDetail: { ...prev.gstDetail, wx_gstin: e.target.value }
+            }))}
+          />
+          <input 
+            className="w-full p-2 border rounded" 
+            placeholder="Workshop State"
+            value={formState.gstDetail.wx_state || formState.location.state}
+            onChange={e => setFormState(prev => ({
+              ...prev,
+              gstDetail: { ...prev.gstDetail, wx_state: e.target.value }
+            }))}
+          />
+          <Button className="w-full mt-2" variant="dark" onClick={handleGenerateWxBill}>Generate Workshop Bill</Button>
+        </div>
+      )}
+      {gstMode && (
+        <Button variant="outline-secondary" className="mt-4" onClick={() => setGstMode(null)}>Back</Button>
+      )}
+    </div>
+  </div>
+)} */}
+
+{showDesignerPopup && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.57)" }}>
+    <div className="bg-white rounded-lg shadow-lg p-8 w-96 flex flex-col items-center relative">
+      {/* Header with title and navigation */}
+      <div className="w-full flex items-center justify-between mb-6">
+        {gstMode && (
+          <button
+            className="text-gray-600 hover:text-gray-800"
+            onClick={() => setGstMode(null)}
+            aria-label="Back"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+              <path fillRule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
+            </svg>
+          </button>
+        )}
+        
+        <h2 className="text-lg font-bold text-gray-800 flex-1 text-center">
+          {!gstMode ? "Bill To" : 
+           gstMode === 'customer' ? "Customer GST" : "Workshop GST"}
+        </h2>
+        
+        <button
+          className="text-gray-400 hover:text-red-500 text-xl"
+          onClick={() => setShowDesignerPopup(false)}
+          aria-label="Close"
+        >
+          ×
+        </button>
+      </div>
+
+      {/* Selection buttons */}
+      {!gstMode && (
+        <div className="flex gap-4 w-full mb-4">
+          <Button 
+            variant="danger" 
+            className="flex-1 py-3 text-lg font-medium" 
+            onClick={() => setGstMode('customer')}
+          >
+            Customer
+          </Button>
+          <Button 
+            variant="dark" 
+            className="flex-1 py-3 text-lg font-medium" 
+            onClick={() => setGstMode('workshop')}
+          >
+            Workshop
+          </Button>
+        </div>
+      )}
+
+      {/* Customer GST Form */}
+      {gstMode === 'customer' && (
+        <div className="w-full space-y-4">
+          <div className="relative border border-gray-300 rounded-md">
+            <input 
+              className="w-full p-3 border-0 focus:ring-2 focus:ring-red-500" 
+              placeholder="Customer Name"
+              value={formState.gstDetail.customer_name || formState.customerInfo.customerName}
+              onChange={e => setFormState(prev => ({
+                ...prev,
+                gstDetail: { ...prev.gstDetail, customer_name: e.target.value }
+              }))}
+            />
+            <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">
+              Customer Name
+            </label>
+          </div>
+
+          <div className="relative border border-gray-300 rounded-md">
+            <input 
+              className="w-full p-3 border-0 focus:ring-2 focus:ring-red-500" 
+              placeholder="Customer Address"
+              value={formState.gstDetail.customer_address || formState.location.address}
+              onChange={e => setFormState(prev => ({
+                ...prev,
+                gstDetail: { ...prev.gstDetail, customer_address: e.target.value }
+              }))}
+            />
+            <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">
+              Customer Address
+            </label>
+          </div>
+
+          <div className="relative border border-gray-300 rounded-md">
+            <input 
+              className="w-full p-3 border-0 focus:ring-2 focus:ring-red-500" 
+              placeholder="Customer GSTIN"
+              value={formState.gstDetail.customer_gstin || formState.arrivalStatus.gstin}
+              onChange={e => setFormState(prev => ({
+                ...prev,
+                gstDetail: { ...prev.gstDetail, customer_gstin: e.target.value }
+              }))}
+            />
+            <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">
+              Customer GSTIN
+            </label>
+          </div>
+
+          {/* <div className="relative border border-gray-300 rounded-md">
+            <input 
+              className="w-full p-3 border-0 focus:ring-2 focus:ring-red-500" 
+              placeholder="Customer State"
+              value={formState.gstDetail.customer_state || formState.location.state}
+              onChange={e => setFormState(prev => ({
+                ...prev,
+                gstDetail: { ...prev.gstDetail, customer_state: e.target.value }
+              }))}
+            />
+            <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">
+              Customer State
+            </label>
+          </div> */}
+
+          {/* Customer State Dropdown */}
+<div className="relative border border-gray-300 rounded-md customer-state-dropdown">
+  <input 
+    className="w-full p-3 border-0 focus:ring-2 focus:ring-red-500" 
+    placeholder="Customer State"
+    value={formState.gstDetail.customer_state || stateSearchCustomer}
+    onChange={e => {
+      setStateSearchCustomer(e.target.value);
+      setFormState(prev => ({
+        ...prev,
+        gstDetail: { ...prev.gstDetail, customer_state: e.target.value }
+      }));
+      setShowCustomerStateDropdown(true);
+    }}
+    onFocus={() => setShowCustomerStateDropdown(true)}
+    onKeyDown={e => {
+      // Prevent form submission on Enter key
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        
+        // Optionally select the first filtered state
+        const filteredStates = indianStates.filter(state => 
+          state.toLowerCase().includes((formState.gstDetail.customer_state || stateSearchCustomer).toLowerCase())
+        );
+        
+        if (filteredStates.length > 0) {
+          const selectedState = filteredStates[0];
+          setFormState(prev => ({
+            ...prev,
+            gstDetail: { ...prev.gstDetail, customer_state: selectedState }
+          }));
+          setStateSearchCustomer(selectedState);
+          setShowCustomerStateDropdown(false);
+        }
+      }
+    }}
+  />
+  <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">
+    Customer State
+  </label>
+  
+  {/* Dropdown for states */}
+  {showCustomerStateDropdown && (
+    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+      <div className="p-2 sticky top-0 bg-white border-b">
+        <div className="text-xs text-gray-500">Select a state or continue typing</div>
+      </div>
+      {indianStates
+        .filter(state => state.toLowerCase().includes((formState.gstDetail.customer_state || stateSearchCustomer).toLowerCase()))
+        .map((state, index) => (
+          <div 
+            key={index} 
+            className="p-2 hover:bg-gray-100 cursor-pointer"
+            onClick={() => {
+              setFormState(prev => ({
+                ...prev,
+                gstDetail: { ...prev.gstDetail, customer_state: state }
+              }));
+              setStateSearchCustomer(state);
+              setShowCustomerStateDropdown(false);
+            }}
+          >
+            {state}
+          </div>
+        ))}
+    </div>
+  )}
+</div>
+
+          <Button 
+            className="w-full mt-6 py-3 text-lg font-medium" 
+            variant="danger" 
+            onClick={handleGenerateBill}
+            disabled={isGeneratingBill}
+          >
+            {isGeneratingBill ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                <span className="animate-pulse">Generating PDF...</span>
+              </>
+            ) : (
+              'Generate Customer Bill'
+            )}
+          </Button>
+        </div>
+      )}
+
+      {/* Workshop GST Form */}
+      {gstMode === 'workshop' && (
+        <div className="w-full space-y-4">
+          <div className="relative border border-gray-300 rounded-md">
+            <input 
+              className="w-full p-3 border-0 focus:ring-2 focus:ring-red-500" 
+              placeholder="Workshop Name"
+              value={formState.gstDetail.wx_name || formState.workshop.name}
+              onChange={e => setFormState(prev => ({
+                ...prev,
+                gstDetail: { ...prev.gstDetail, wx_name: e.target.value }
+              }))}
+            />
+            <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">
+              Workshop Name
+            </label>
+          </div>
+
+          <div className="relative border border-gray-300 rounded-md">
+            <input 
+              className="w-full p-3 border-0 focus:ring-2 focus:ring-red-500" 
+              placeholder="Workshop Address"
+              value={formState.gstDetail.wx_address || formState.workshop.locality}
+              onChange={e => setFormState(prev => ({
+                ...prev,
+                gstDetail: { ...prev.gstDetail, wx_address: e.target.value }
+              }))}
+            />
+            <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">
+              Workshop Address
+            </label>
+          </div>
+
+          <div className="relative border border-gray-300 rounded-md">
+            <input 
+              className="w-full p-3 border-0 focus:ring-2 focus:ring-red-500" 
+              placeholder="Workshop GSTIN"
+              value={formState.gstDetail.wx_gstin}
+              onChange={e => setFormState(prev => ({
+                ...prev,
+                gstDetail: { ...prev.gstDetail, wx_gstin: e.target.value }
+              }))}
+            />
+            <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">
+              Workshop GSTIN
+            </label>
+          </div>
+
+          {/* <div className="relative border border-gray-300 rounded-md">
+            <input 
+              className="w-full p-3 border-0 focus:ring-2 focus:ring-red-500" 
+              placeholder="Workshop State"
+              value={formState.gstDetail.wx_state}
+              onChange={e => setFormState(prev => ({
+                ...prev,
+                gstDetail: { ...prev.gstDetail, wx_state: e.target.value }
+              }))}
+            />
+            <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">
+              Workshop State
+            </label>
+          </div> */}
+
+          {/* Workshop State Dropdown */}
+<div className="relative border border-gray-300 rounded-md workshop-state-dropdown">
+  <input 
+    className="w-full p-3 border-0 focus:ring-2 focus:ring-red-500" 
+    placeholder="Workshop State"
+    value={formState.gstDetail.wx_state || stateSearchWorkshop}
+    onChange={e => {
+      setStateSearchWorkshop(e.target.value);
+      setFormState(prev => ({
+        ...prev,
+        gstDetail: { ...prev.gstDetail, wx_state: e.target.value }
+      }));
+      setShowWorkshopStateDropdown(true);
+    }}
+    onFocus={() => setShowWorkshopStateDropdown(true)}
+    onKeyDown={e => {
+      // Prevent form submission on Enter key
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        
+        // Optionally select the first filtered state
+        const filteredStates = indianStates.filter(state => 
+          state.toLowerCase().includes((formState.gstDetail.wx_state || stateSearchWorkshop).toLowerCase())
+        );
+        
+        if (filteredStates.length > 0) {
+          const selectedState = filteredStates[0];
+          setFormState(prev => ({
+            ...prev,
+            gstDetail: { ...prev.gstDetail, wx_state: selectedState }
+          }));
+          setStateSearchWorkshop(selectedState);
+          setShowWorkshopStateDropdown(false);
+        }
+      }
+    }}
+  />
+  <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">
+    Workshop State
+  </label>
+  
+  {/* Dropdown for states */}
+  {showWorkshopStateDropdown && (
+    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+      <div className="p-2 sticky top-0 bg-white border-b">
+        <div className="text-xs text-gray-500">Select a state or continue typing</div>
+      </div>
+      {indianStates
+        .filter(state => state.toLowerCase().includes((formState.gstDetail.wx_state || stateSearchWorkshop).toLowerCase()))
+        .map((state, index) => (
+          <div 
+            key={index} 
+            className="p-2 hover:bg-gray-100 cursor-pointer"
+            onClick={() => {
+              setFormState(prev => ({
+                ...prev,
+                gstDetail: { ...prev.gstDetail, wx_state: state }
+              }));
+              setStateSearchWorkshop(state);
+              setShowWorkshopStateDropdown(false);
+            }}
+          >
+            {state}
+          </div>
+        ))}
+    </div>
+  )}
+</div>
+
+
+          <Button 
+            className="w-full mt-6 py-3 text-lg font-medium" 
+            variant="dark" 
+            onClick={handleGenerateWxBill}
+            disabled={isGeneratingWxBill}
+          >
+            {isGeneratingWxBill ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                <span className="animate-pulse">Generating PDF...</span>
+              </>
+            ) : (
+              'Generate Workshop Bill'
+            )}
+          </Button>
+        </div>
+      )}
+    </div>
+  </div>
 )}
+
 
       </form>
     </Layout>
@@ -6013,6 +7121,6 @@ export default EditPage;
 
 
 
-// https://admin.onlybigcars.com/api/callerdesk-webhook/?type=call_report&coins=4&Status=ANSWER&campid=&CallSid=1744881973.2699220&EndTime=2025-04-17%2015:00:02&Uniqueid=&Direction=IVR&StartTime=2025-04-17%2014:56:13&key_press=&call_group=callgroup1&error_code=0&CallDuration=231&SourceNumber=09958134912&TalkDuration=215&hangup_cause=ANSWER(16)&receiver_name=loknath&DialWhomNumber=09218028154&LegB_Start_time=2025-04-17%2014:56:16&CallRecordingUrl=https://newcallrecords.callerdesk.io/incoming/04_2025/17/86070/20250417-145615-4912-8062649373-1744881973.2699220.wav&LegA_Picked_time=2025-04-17%2014:56:13&LegB_Picked_time=2025-04-17%2014:56:28&DestinationNumber=9999967591
+// https://admin.onlybigcars.com/api/callerdesk-webhook/?type=call_report&coins=4&Status=ANSWER&campid=&CallSid=1744881973.2699220&EndTime=2025-04-17%2015:00:02&Uniqueid=&Direction=IVR&StartTime=2025-04-17%2014:56:13&key_press=&call_group=callgroup1&error_code=0&CallDuration=231&SourceNumber=8700837048&TalkDuration=215&hangup_cause=ANSWER(16)&receiver_name=loknath&DialWhomNumber=09218028154&LegB_Start_time=2025-04-17%2014:56:16&CallRecordingUrl=https://newcallrecords.callerdesk.io/incoming/04_2025/17/86070/20250417-145615-4912-8062649373-1744881973.2699220.wav&LegA_Picked_time=2025-04-17%2014:56:13&LegB_Picked_time=2025-04-17%2014:56:28&DestinationNumber=9999967591
 
 // https://admin.onlybigcars.com/api/callerdesk-webhook/?type=call_report&coins=4&Status=CANCEL&campid=&CallSid=1744881973.2699220&EndTime=2025-04-17%2015:00:02&Uniqueid=&Direction=IVR&StartTime=2025-04-17%2014:56:13&key_press=&call_group=callgroup1&error_code=0&CallDuration=231&SourceNumber=09958134912&TalkDuration=215&hangup_cause=ANSWER(16)&receiver_name=Anjali&DialWhomNumber=09218028154&LegB_Start_time=2025-04-17%2014:56:16&CallRecordingUrl=https://newcallrecords.callerdesk.io/incoming/04_2025/17/86070/20250417-145615-4912-8062649373-1744881973.2699220.wav&LegA_Picked_time=2025-04-17%2014:56:13&LegB_Picked_time=2025-04-17%2014:56:28&DestinationNumber=9999967591
