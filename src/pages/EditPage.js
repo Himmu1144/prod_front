@@ -927,7 +927,8 @@ useEffect(() => {
               previousStatus: leadData.lead_status,
               arrivalMode: leadData.arrival_mode || '',
               disposition: leadData.disposition || '',
-              dateTime: leadData.arrival_time ? new Date(leadData.arrival_time).toISOString().slice(0, 16) : '',
+              // dateTime: leadData.arrival_time ? new Date(leadData.arrival_time).toISOString().slice(0, 16) : '',
+              dateTime: leadData.arrival_time ? new Date(leadData.arrival_time).toLocaleString('sv-SE', {timeZone: 'Asia/Kolkata'}).slice(0, 16) : '',
               jobCardNumber: leadData.job_card_number || '', // Add this new field
               estimatedDeliveryTime: leadData.estimated_delivery_time ? new Date(leadData.estimated_delivery_time).toISOString().slice(0, 16) : '', // Add this new field
               status_history: leadData.status_history || [], // 18 feb
