@@ -131,6 +131,16 @@ const EditPage = () => {
   const [showDesignerPopup, setShowDesignerPopup] = useState(false);
   const [gstMode, setGstMode] = useState(null);
   const [isSendingJobCard, setIsSendingJobCard] = useState(false);
+  // Add these with your other state declarations
+  const [isSendingEstimate, setIsSendingEstimate] = useState(false);
+  // Add this with your other state declarations
+  const [showSendCardPopup, setShowSendCardPopup] = useState(false);
+  // Add these with your other state declarations
+const [hasShownJobCardReminder, setHasShownJobCardReminder] = useState(false);
+const [hasShownEstimateReminder, setHasShownEstimateReminder] = useState(false);
+const [showReminderPopup, setShowReminderPopup] = useState(false);
+const [reminderType, setReminderType] = useState(''); // 'jobcard' or 'estimate'
+  // const [showEstimate, setShowEstimate] = useState(false);
   
 
 // Add this with other state declarations around line 90-100
@@ -250,6 +260,33 @@ const handleRemoveExistingImage = (index) => {
   
     setShowGaragePopup(false);
   };
+
+  // Add this function to check if reminder should be shown
+const checkAndShowReminder = () => {
+  const currentStatus = formState.arrivalStatus.leadStatus;
+  
+  // Check for JobCard reminder
+  if (currentStatus === 'Job Card' && 
+      statusCounterData.job_card_count === 0 && 
+      !hasShownJobCardReminder) {
+    setReminderType('jobcard');
+    setShowReminderPopup(true);
+    setHasShownJobCardReminder(true);
+    return true;
+  }
+  
+  // Check for Estimate reminder  
+  if (currentStatus === 'Payment Due' && 
+      statusCounterData.payment_due_count === 0 && 
+      !hasShownEstimateReminder) {
+    setReminderType('estimate');
+    setShowReminderPopup(true);
+    setHasShownEstimateReminder(true);
+    return true;
+  }
+  
+  return false;
+};
 
   // 18 feb start
   // Update the StatusHistoryDisplay component for better error handling and debugging
@@ -593,7 +630,7 @@ const handleRemoveExistingImage = (index) => {
     try {
       setIsLoadingPreviousLeads(true);
       const response = await axios.get(
-        `https://admin.onlybigcars.com/api/customers/${phoneNumber}/leads/?current_lead=${id || ''}`,
+        `http://localhost:8000/api/customers/${phoneNumber}/leads/?current_lead=${id || ''}`,
         {
           headers: {
             'Authorization': `Token ${token}`
@@ -619,7 +656,7 @@ useEffect(() => {
   const fetchCarData = async () => {
       try {
           // Assuming '/api/car-data/' endpoint returns data structured like [{ name: 'Brand', models: [{ name: 'Model', image_url: '...' }] }]
-          const response = await axios.get(`https://admin.onlybigcars.com/api/car-data/`, {
+          const response = await axios.get(`http://localhost:8000/api/car-data/`, {
               headers: { Authorization: `Token ${token}` },
           });
           setCarBrandsData(response.data);
@@ -650,7 +687,7 @@ useEffect(() => {
       setIsSubmitting(true);
       
       // Use axios instead of fetch for better error handling and consistency
-      axios.get(`https://admin.onlybigcars.com/api/customers/${mobileNumber}/leads/`, {
+      axios.get(`http://localhost:8000/api/customers/${mobileNumber}/leads/`, {
         params: { current_lead: id },
         headers: {
           'Authorization': `Token ${token}`
@@ -796,7 +833,7 @@ useEffect(() => {
     
 
     if (!id) {
-      axios.get('https://admin.onlybigcars.com/', {
+      axios.get('http://localhost:8000/', {
         headers: {
           'Authorization': `Token ${token}`
         }
@@ -816,7 +853,7 @@ useEffect(() => {
         try {
           console.log("Fetching lead with ID:", id); // Debug log
           const response = await axios.get(
-            `https://admin.onlybigcars.com/api/leads/${id}/`,
+            `http://localhost:8000/api/leads/${id}/`,
             {
               headers: {
                 'Authorization': `Token ${token}`
@@ -848,7 +885,7 @@ useEffect(() => {
         
           
           const customerResponse = await axios.get(
-            `https://admin.onlybigcars.com/api/customers/${leadData.number}/`,
+            `http://localhost:8000/api/customers/${leadData.number}/`,
             {
               headers: {
                 'Authorization': `Token ${token}`
@@ -1182,6 +1219,20 @@ useEffect(() => {
     document.removeEventListener('mousedown', handleClickOutside);
   };
 }, [showCustomerStateDropdown, showWorkshopStateDropdown]);
+
+// Reset reminder flags when status changes or counters update
+useEffect(() => {
+  // Reset JobCard reminder if status changes away from Job Card or counter becomes > 0
+  if (formState.arrivalStatus.leadStatus !== 'Job Card' || statusCounterData.job_card_count > 0) {
+    setHasShownJobCardReminder(false);
+  }
+  
+  // Reset Estimate reminder if status changes away from Payment Due or counter becomes > 0
+  if (formState.arrivalStatus.leadStatus !== 'Payment Due' || statusCounterData.payment_due_count > 0) {
+    setHasShownEstimateReminder(false);
+  }
+}, [formState.arrivalStatus.leadStatus, statusCounterData.job_card_count, statusCounterData.payment_due_count]);
+
   // useEffect(() => {
   //   if (isLoaded && addressInputRef.current) {
   //     const autocomplete = new window.google.maps.places.Autocomplete(addressInputRef.current);
@@ -1228,7 +1279,7 @@ const handleGSTHeaderClick = () => {
 const handleClick2Call = async (receiverNo) => {
   try {
     const response = await axios.post(
-      'https://admin.onlybigcars.com/api/click2call/',
+      'http://localhost:8000/api/click2call/',
       { receiver_no: receiverNo },
       { headers: { Authorization: `Token ${token}` } }
     );
@@ -1452,7 +1503,7 @@ const handleTotalChange = (index, value) => {
     if (section === 'customerInfo' && field === 'mobileNumber' && value.length === 10) {
       try {
         const response = await axios.get(
-          `https://admin.onlybigcars.com/api/customers/${value}/`,
+          `http://localhost:8000/api/customers/${value}/`,
           {
             headers: {
               'Authorization': `Token ${token}`
@@ -1714,6 +1765,8 @@ const validateForm = () => {
 // Selected car: ${formData.cars[0]?.carBrand} ${formData.cars[0]?.carModel}
 // Cars array length: ${formData.cars.length}
 // `);
+
+
     
     
     if (Object.keys(errors).length > 0) {
@@ -1742,6 +1795,13 @@ const validateForm = () => {
       setIsSubmitting(false);
     }
   
+
+    // Check if reminder should be shown BEFORE proceeding with save
+  const shouldShowReminder = checkAndShowReminder();
+  if (shouldShowReminder) {
+    setIsSubmitting(false);
+    return; // Don't proceed with save, show reminder first
+  }
 
 
 
@@ -1897,8 +1957,8 @@ submissionData.overview = cleanedOverview;
 
 
         const url = id 
-            ? `https://admin.onlybigcars.com/api/leads/${id}/update/`
-            : 'https://admin.onlybigcars.com/api/edit-form-submit/';
+            ? `http://localhost:8000/api/leads/${id}/update/`
+            : 'http://localhost:8000/api/edit-form-submit/';
             
         const method = id ? 'put' : 'post';
         
@@ -3441,7 +3501,7 @@ function getNextSellBuyStatus(previousStatus) {
 
 const fetchCustomerData = async (mobileNumber) => {
   try {
-    const response = await fetch(`https://admin.onlybigcars.com/api/customers/${mobileNumber}`, {
+    const response = await fetch(`http://localhost:8000/api/customers/${mobileNumber}`, {
       headers: {
         'Authorization': `Token ${token}`,
       }
@@ -3523,7 +3583,7 @@ const [isGeneratingBill, setIsGeneratingBill] = useState(false);
 
 //       // Send to backend
 //       const response = await axios.post(
-//         'https://admin.onlybigcars.com/api/send-jobcard/',
+//         'http://localhost:8000/api/send-jobcard/',
 //         formData,
 //         {
 //           headers: {
@@ -3627,7 +3687,7 @@ const handleSendJobCard = async () => {
 
       // Send to backend
       const response = await axios.post(
-        'https://admin.onlybigcars.com/api/send-jobcard/',
+        'http://localhost:8000/api/send-jobcard/',
         formData,
         {
           headers: {
@@ -3638,16 +3698,29 @@ const handleSendJobCard = async () => {
       );
 
       if (response.data.success) {
-        toast.success(`JobCard sent successfully! File: ${response.data.filename}`, {
-          position: "top-right",
-          autoClose: 4000,
-        });
-      } else {
-        toast.error(response.data.message || 'Failed to send JobCard', {
-          position: "top-right",
-          autoClose: 3000,
-        });
-      }
+    toast.success(`JobCard sent successfully! File: ${response.data.filename}`, {
+      position: "top-right",
+      autoClose: 4000,
+    });
+    
+    // Update the statusCounterData state in real-time
+    setStatusCounterData(prevData => ({
+      ...prevData,
+      job_card_count: prevData.job_card_count + 1
+    }));
+    
+    // Close the reminder popup and proceed with save
+    setShowReminderPopup(false);
+    // setTimeout(() => {
+    //   handleSubmit(new Event('submit'));
+    // }, 100);
+    
+  } else {
+    toast.error(response.data.message || 'Failed to send JobCard', {
+      position: "top-right",
+      autoClose: 3000,
+    });
+  }
     } else {
       throw new Error('JobCard reference not available');
     }
@@ -3661,6 +3734,117 @@ const handleSendJobCard = async () => {
   } finally {
     setIsSendingJobCard(false);
     setShowJobCard(false);
+  }
+};
+
+const handleSendEstimate = async () => {
+  if (!formState.customerInfo.whatsappNumber && !formState.customerInfo.mobileNumber) {
+    toast.error('No WhatsApp number found for customer', {
+      position: "top-right",
+      autoClose: 3000,
+    });
+    return;
+  }
+
+  setIsSendingEstimate(true);
+  setShowEstimate(true);
+  
+  try {
+    // Wait for component to render
+    await new Promise(resolve => setTimeout(resolve, 4000));
+    
+    if (estimateRef.current) {
+      // Generate PDF blob
+      const pdfBlob = await estimateRef.current.generatePDFBlob();
+      
+      if (!pdfBlob) {
+        throw new Error('Failed to generate estimate PDF');
+      }
+
+      // Get token
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      // Prepare form data
+      const formData = new FormData();
+      
+      // Generate dynamic filename (same logic as JobCard)
+      const sanitizeForFilename = (text) => text ? text.replace(/[^a-zA-Z0-9\-_]/g, '_') : '';
+      const brandPart = sanitizeForFilename(formState.cars[0]?.carBrand || '');
+      const modelPart = sanitizeForFilename(formState.cars[0]?.carModel || '');
+      const orderPart = formState.arrivalStatus.orderId ? `-${sanitizeForFilename(formState.arrivalStatus.orderId)}` : '';
+      const dynamicFilename = `Estimate-${brandPart}-${modelPart}${orderPart}.pdf`;
+
+      formData.append('pdf', pdfBlob, dynamicFilename);
+      formData.append('whatsapp_number', formState.customerInfo.whatsappNumber || formState.customerInfo.mobileNumber);
+      formData.append('customer_name', formState.customerInfo.customerName || 'Customer');
+      formData.append('lead_id', id || '');
+      formData.append('car_brand', formState.cars[0]?.carBrand || '');
+      formData.append('car_model', formState.cars[0]?.carModel || '');
+      formData.append('order_id', formState.arrivalStatus.orderId || '');
+
+      // Log details for debugging
+      console.log('Sending Estimate with details:', {
+        whatsapp_number: formState.customerInfo.whatsappNumber || formState.customerInfo.mobileNumber,
+        customer_name: formState.customerInfo.customerName || 'Customer',
+        lead_id: id || '',
+        car_brand: formState.cars[0]?.carBrand || '',
+        car_model: formState.cars[0]?.carModel || '',
+        order_id: formState.arrivalStatus.orderId || '',
+        pdf_size: pdfBlob.size
+      });
+
+      // Send to backend
+      const response = await axios.post(
+        'http://localhost:8000/api/send-estimate/',
+        formData,
+        {
+          headers: {
+            'Authorization': `Token ${token}`,
+            // Don't set Content-Type manually when using FormData
+          }
+        }
+      );
+
+      if (response.data.success) {
+    toast.success(`Estimate sent successfully! File: ${response.data.filename}`, {
+      position: "top-right",
+      autoClose: 4000,
+    });
+    
+    // Update the statusCounterData state in real-time
+    setStatusCounterData(prevData => ({
+      ...prevData,
+      payment_due_count: prevData.payment_due_count + 1
+    }));
+    
+    // Close the reminder popup and proceed with save
+    setShowReminderPopup(false);
+    // setTimeout(() => {
+    //   handleSubmit(new Event('submit'));
+    // }, 100);
+    
+  } else {
+    toast.error(response.data.message || 'Failed to send Estimate', {
+      position: "top-right",
+      autoClose: 3000,
+    });
+  }
+    } else {
+      throw new Error('Estimate reference not available');
+    }
+  } catch (error) {
+    console.error('Error sending Estimate:', error);
+    console.error('Error details:', error.response?.data);
+    toast.error('Failed to send Estimate: ' + (error.response?.data?.message || error.message), {
+      position: "top-right",
+      autoClose: 4000,
+    });
+  } finally {
+    setIsSendingEstimate(false);
+    setShowEstimate(false);
   }
 };
 
@@ -4061,6 +4245,7 @@ const handleGenerateEstimate = async () => {
     <Layout>
       <ToastContainer />
       <form onSubmit={handleSubmit}>
+        
         {/* {showAlert && (
           <Alert
             variant="primary"
@@ -5285,7 +5470,6 @@ const handleGenerateEstimate = async () => {
                 ))}
               </tbody>
             </table>
-
 {/* Inside the overview section in EditPageCopy.js, after the table */}
 <div className="flex gap-4 mt-3">
   <div className="flex-1">
@@ -5296,16 +5480,48 @@ const handleGenerateEstimate = async () => {
       className="w-full p-3 border rounded h-30 resize-none"
       required={!isAdmin}
     />
-    <div className="flex-1 flex items-center justify-end">
-    <Button
-      variant="outline-dark"
-      type="button"
-      onClick={handleGenerateEstimate}
-      className="h-fit"
-    >
-      Generate Estimate
-    </Button>
-  </div>
+    <div className="flex-1 flex items-center justify-end gap-2">
+      <Button
+        variant="outline-dark"
+        type="button"
+        onClick={handleGenerateEstimate}
+        className="h-fit"
+      >
+        Generate Estimate
+      </Button>
+      
+      {/* Send Estimate Button beside Generate Estimate */}
+      {cards && (['Estimate', 'Job Card', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
+        <Button
+          variant="outline-success"
+          type="button"
+          disabled={isSubmitting || isSendingEstimate}
+          onClick={handleSendEstimate}
+          className="position-relative d-flex align-items-center h-fit"
+        >
+          {isSendingEstimate ? (
+            <>
+              <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+              <span className="animate-pulse">Sending Estimate...</span>
+            </>
+          ) : (
+            <>
+              <span className="me-2">
+                {statusCounterData.payment_due_count >= 1 ? 'Resend Estimate' : 'Send Estimate'}
+              </span>
+              {statusCounterData.payment_due_count >= 1 && (
+                <span 
+                  className="badge bg-success"
+                  title={`Estimate sent ${statusCounterData.payment_due_count} time(s)`}
+                >
+                  {statusCounterData.payment_due_count}
+                </span>
+              )}
+            </>
+          )}
+        </Button>
+      )}
+    </div>
   </div>
 
   <div className="w-70 space-y-4">
@@ -6072,7 +6288,7 @@ const handleGenerateEstimate = async () => {
 
 
 {/* Option 2: Badge indicator approach */}
-{cards && (['Job Card', 'Estimate', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
+{/* {cards && (['Job Card', 'Estimate', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
   <Button
     variant="outline-success"
     type="button"
@@ -6103,6 +6319,51 @@ const handleGenerateEstimate = async () => {
   </Button>
 )}
 
+{cards && (['Estimate', 'Job Card', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
+  <Button
+    variant="outline-success"
+    type="button"
+    disabled={isSubmitting || isSendingEstimate}
+    onClick={handleSendEstimate}
+    className="position-relative d-flex align-items-center"
+  >
+    {isSendingEstimate ? (
+      <>
+        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+        <span className="animate-pulse">Sending Estimate...</span>
+      </>
+    ) : (
+      <>
+        <span className="me-2">
+          {statusCounterData.payment_due_count >= 1 ? 'Resend Estimate' : 'Send Estimate'}
+        </span>
+        {statusCounterData.payment_due_count >= 1 && (
+          <span 
+            className="badge bg-success"
+            title={`Estimate sent ${statusCounterData.payment_due_count} time(s)`}
+          >
+            {statusCounterData.payment_due_count}
+          </span>
+        )}
+      </>
+    )}
+  </Button>
+)} */}
+
+
+{/* Replace both Send JobCard and Send Estimate buttons with this single button */}
+{cards && (['Job Card', 'Estimate', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
+  <Button
+    variant="outline-success"
+    type="button"
+    disabled={isSubmitting}
+    onClick={() => setShowSendCardPopup(true)}
+    className="position-relative d-flex align-items-center"
+  >
+    <span className="me-2">Send Card</span>
+   
+  </Button>
+)}
 
 
 {/* { cards && (['Job Card', 'Estimate', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
@@ -6755,6 +7016,143 @@ Generate Bill
   </div>
 )} */}
 
+{/* Send Card Popup */}
+{showSendCardPopup && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.57)" }}>
+    <div className="bg-white rounded-lg shadow-lg p-8 w-96 flex flex-col items-center relative">
+      {/* Close button */}
+      <button
+        className="absolute top-2 right-2 text-gray-400 hover:text-red-500 text-xl"
+        onClick={() => setShowSendCardPopup(false)}
+        aria-label="Close"
+      >
+        ×
+      </button>
+      
+      <h2 className="text-lg font-bold mb-6 text-gray-800">Send Card</h2>
+      
+      {/* Send JobCard Button */}
+      <Button
+        variant="outline-success"
+        type="button"
+        disabled={isSubmitting || isSendingJobCard}
+        onClick={() => {
+          // setShowSendCardPopup(false);
+          handleSendJobCard();
+        }}
+        className="w-full mb-4 py-3 text-lg position-relative d-flex align-items-center justify-content-center"
+      >
+        {isSendingJobCard ? (
+          <>
+            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+            <span className="animate-pulse">Sending JobCard...</span>
+          </>
+        ) : (
+          <>
+            <span className="me-2">
+              {statusCounterData.job_card_count >= 1 ? 'Resend JobCard' : 'Send JobCard'}
+            </span>
+            {statusCounterData.job_card_count >= 1 && (
+              <span 
+                className="badge bg-success"
+                title={`JobCard sent ${statusCounterData.job_card_count} time(s)`}
+              >
+                {statusCounterData.job_card_count}
+              </span>
+            )}
+          </>
+        )}
+      </Button>
+      
+      {/* Send Estimate Button */}
+      <Button
+        variant="outline-info"
+        type="button"
+        disabled={isSubmitting || isSendingEstimate}
+        onClick={() => {
+          // setShowSendCardPopup(false);
+          handleSendEstimate();
+        }}
+        className="w-full py-3 text-lg position-relative d-flex align-items-center justify-content-center"
+      >
+        {isSendingEstimate ? (
+          <>
+            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+            <span className="animate-pulse">Sending Estimate...</span>
+          </>
+        ) : (
+          <>
+            <span className="me-2">
+              {statusCounterData.payment_due_count >= 1 ? 'Resend Estimate' : 'Send Estimate'}
+            </span>
+            {statusCounterData.payment_due_count >= 1 && (
+              <span 
+                className="badge bg-info"
+                title={`Estimate sent ${statusCounterData.payment_due_count} time(s)`}
+              >
+                {statusCounterData.payment_due_count}
+              </span>
+            )}
+          </>
+        )}
+      </Button>
+    </div>
+  </div>
+)}
+
+{/* Reminder Popup */}
+{showReminderPopup && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.57)" }}>
+    <div className="bg-white rounded-lg shadow-lg p-8 w-96 flex flex-col items-center relative">
+      {/* Close button */}
+      <button
+        className="absolute top-2 right-2 text-gray-400 hover:text-red-500 text-xl"
+        onClick={() => {
+          setShowReminderPopup(false);
+          // DON'T continue with save - just close popup
+        }}
+        aria-label="Close"
+      >
+        ×
+      </button>
+      
+      <div className="text-center mb-6">
+        <div className="mx-auto w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
+          <span className="text-yellow-600 text-2xl">⚠️</span>
+        </div>
+        <h2 className="text-lg font-bold text-gray-800 mb-2">Reminder</h2>
+        <p className="text-gray-600">
+          {reminderType === 'jobcard' 
+            ? 'No JobCard has been sent yet. Would you like to send the JobCard to the customer?'
+            : 'No Estimate has been sent yet. Would you like to send the Estimate to the customer?'
+          }
+        </p>
+      </div>
+      
+      <div className="flex gap-3 w-full">
+        
+        {/* Skip & Save Button */}
+        <Button
+          variant="outline-secondary"
+          type="button"
+          onClick={() => {
+            setShowReminderPopup(false);
+            // Continue with save without sending
+            setTimeout(() => {
+              handleSubmit(new Event('submit'));
+            }, 100);
+          }}
+          className="flex-1 py-2"
+        >
+          Skip & Save
+        </Button>
+      </div>
+    </div>
+  </div>
+)}
+
+
+
 {showDesignerPopup && (
   <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.57)" }}>
     <div className="bg-white rounded-lg shadow-lg p-8 w-96 flex flex-col items-center relative">
@@ -7122,6 +7520,6 @@ export default EditPage;
 
 
 
-// https://admin.onlybigcars.com/api/callerdesk-webhook/?type=call_report&coins=4&Status=ANSWER&campid=&CallSid=1744881973.2699220&EndTime=2025-04-17%2015:00:02&Uniqueid=&Direction=IVR&StartTime=2025-04-17%2014:56:13&key_press=&call_group=callgroup1&error_code=0&CallDuration=231&SourceNumber=8700837048&TalkDuration=215&hangup_cause=ANSWER(16)&receiver_name=loknath&DialWhomNumber=09218028154&LegB_Start_time=2025-04-17%2014:56:16&CallRecordingUrl=https://newcallrecords.callerdesk.io/incoming/04_2025/17/86070/20250417-145615-4912-8062649373-1744881973.2699220.wav&LegA_Picked_time=2025-04-17%2014:56:13&LegB_Picked_time=2025-04-17%2014:56:28&DestinationNumber=9999967591
+// http://localhost:8000/api/callerdesk-webhook/?type=call_report&coins=4&Status=ANSWER&campid=&CallSid=1744881973.2699220&EndTime=2025-04-17%2015:00:02&Uniqueid=&Direction=IVR&StartTime=2025-04-17%2014:56:13&key_press=&call_group=callgroup1&error_code=0&CallDuration=231&SourceNumber=8700837048&TalkDuration=215&hangup_cause=ANSWER(16)&receiver_name=loknath&DialWhomNumber=09218028154&LegB_Start_time=2025-04-17%2014:56:16&CallRecordingUrl=https://newcallrecords.callerdesk.io/incoming/04_2025/17/86070/20250417-145615-4912-8062649373-1744881973.2699220.wav&LegA_Picked_time=2025-04-17%2014:56:13&LegB_Picked_time=2025-04-17%2014:56:28&DestinationNumber=9999967591
 
-// https://admin.onlybigcars.com/api/callerdesk-webhook/?type=call_report&coins=4&Status=CANCEL&campid=&CallSid=1744881973.2699220&EndTime=2025-04-17%2015:00:02&Uniqueid=&Direction=IVR&StartTime=2025-04-17%2014:56:13&key_press=&call_group=callgroup1&error_code=0&CallDuration=231&SourceNumber=09958134912&TalkDuration=215&hangup_cause=ANSWER(16)&receiver_name=Anjali&DialWhomNumber=09218028154&LegB_Start_time=2025-04-17%2014:56:16&CallRecordingUrl=https://newcallrecords.callerdesk.io/incoming/04_2025/17/86070/20250417-145615-4912-8062649373-1744881973.2699220.wav&LegA_Picked_time=2025-04-17%2014:56:13&LegB_Picked_time=2025-04-17%2014:56:28&DestinationNumber=9999967591
+// http://localhost:8000/api/callerdesk-webhook/?type=call_report&coins=4&Status=CANCEL&campid=&CallSid=1744881973.2699220&EndTime=2025-04-17%2015:00:02&Uniqueid=&Direction=IVR&StartTime=2025-04-17%2014:56:13&key_press=&call_group=callgroup1&error_code=0&CallDuration=231&SourceNumber=09958134912&TalkDuration=215&hangup_cause=ANSWER(16)&receiver_name=Anjali&DialWhomNumber=09218028154&LegB_Start_time=2025-04-17%2014:56:16&CallRecordingUrl=https://newcallrecords.callerdesk.io/incoming/04_2025/17/86070/20250417-145615-4912-8062649373-1744881973.2699220.wav&LegA_Picked_time=2025-04-17%2014:56:13&LegB_Picked_time=2025-04-17%2014:56:28&DestinationNumber=9999967591

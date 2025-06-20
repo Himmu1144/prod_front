@@ -393,18 +393,34 @@ const Estimate = forwardRef(({ data }, ref) => {
     }
   }, [data]);
 
-  const generatePDF = async () => {
+  const generatePDF = async (retry = 0) => {
     try {
       if (instance.loading) {
+        if (retry > 50) throw new Error('PDF generation timeout after multiple retries.');
         await new Promise(resolve => setTimeout(resolve, 100));
-        return generatePDF();
+        return generatePDF(retry + 1);
       }
+      if (!instance.blob) {
+        if (retry > 50) throw new Error('PDF blob not available after multiple retries.');
+        await new Promise(resolve => setTimeout(resolve, 100));
+        return generatePDF(retry + 1);
+      }
+      
       const blob = instance.blob;
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'estimate.pdf';
+      
+      // Dynamic filename generation similar to JobCard
+      const sanitizeForFilename = (text) => text ? String(text).replace(/[^a-zA-Z0-9-_]/g, '_') : '';
+      const brandPart = sanitizeForFilename(mergedData.carBrand);
+      const modelPart = sanitizeForFilename(mergedData.carModel);
+      const orderPart = mergedData.orderId ? `-${sanitizeForFilename(mergedData.orderId)}` : '';
+
+      link.download = `Estimate-${brandPart}-${modelPart}${orderPart}.pdf`;
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
       URL.revokeObjectURL(url);
       return true;
     } catch (error) {
@@ -413,8 +429,29 @@ const Estimate = forwardRef(({ data }, ref) => {
     }
   };
 
+  // Add generatePDFBlob method (same as JobCard)
+  const generatePDFBlob = async () => {
+    try {
+      if (instance.loading) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        return generatePDFBlob();
+      }
+      
+      const blob = instance.blob;
+      if (!blob) {
+        throw new Error('PDF blob not available');
+      }
+      
+      return blob;
+    } catch (error) {
+      console.error('PDF blob generation error:', error);
+      throw error;
+    }
+  };
+
   useImperativeHandle(ref, () => ({
     generatePDF,
+    generatePDFBlob, // Add this line
   }));
 
   if (!details) return <div>Loading...</div>;
