@@ -666,7 +666,7 @@ const checkAndShowReminder = () => {
     try {
       setIsLoadingPreviousLeads(true);
       const response = await axios.get(
-        `http://localhost:8000/api/customers/${phoneNumber}/leads/?current_lead=${id || ''}`,
+        `https://admin.onlybigcars.com/api/customers/${phoneNumber}/leads/?current_lead=${id || ''}`,
         {
           headers: {
             'Authorization': `Token ${token}`
@@ -692,7 +692,7 @@ useEffect(() => {
   const fetchCarData = async () => {
       try {
           // Assuming '/api/car-data/' endpoint returns data structured like [{ name: 'Brand', models: [{ name: 'Model', image_url: '...' }] }]
-          const response = await axios.get(`http://localhost:8000/api/car-data/`, {
+          const response = await axios.get(`https://admin.onlybigcars.com/api/car-data/`, {
               headers: { Authorization: `Token ${token}` },
           });
           setCarBrandsData(response.data);
@@ -733,7 +733,7 @@ useEffect(() => {
       setIsSubmitting(true);
       
       // Use axios instead of fetch for better error handling and consistency
-      axios.get(`http://localhost:8000/api/customers/${mobileNumber}/leads/`, {
+      axios.get(`https://admin.onlybigcars.com/api/customers/${mobileNumber}/leads/`, {
         params: { current_lead: id },
         headers: {
           'Authorization': `Token ${token}`
@@ -879,7 +879,7 @@ useEffect(() => {
     
 
     if (!id) {
-      axios.get('http://localhost:8000/', {
+      axios.get('https://admin.onlybigcars.com/', {
         headers: {
           'Authorization': `Token ${token}`
         }
@@ -899,7 +899,7 @@ useEffect(() => {
         try {
           console.log("Fetching lead with ID:", id); // Debug log
           const response = await axios.get(
-            `http://localhost:8000/api/leads/${id}/`,
+            `https://admin.onlybigcars.com/api/leads/${id}/`,
             {
               headers: {
                 'Authorization': `Token ${token}`
@@ -931,7 +931,7 @@ useEffect(() => {
         
           
           const customerResponse = await axios.get(
-            `http://localhost:8000/api/customers/${leadData.number}/`,
+            `https://admin.onlybigcars.com/api/customers/${leadData.number}/`,
             {
               headers: {
                 'Authorization': `Token ${token}`
@@ -1327,7 +1327,7 @@ const handleGSTHeaderClick = () => {
 const handleClick2Call = async (receiverNo) => {
   try {
     const response = await axios.post(
-      'http://localhost:8000/api/click2call/',
+      'https://admin.onlybigcars.com/api/click2call/',
       { receiver_no: receiverNo },
       { headers: { Authorization: `Token ${token}` } }
     );
@@ -1551,7 +1551,7 @@ const handleTotalChange = (index, value) => {
     if (section === 'customerInfo' && field === 'mobileNumber' && value.length === 10) {
       try {
         const response = await axios.get(
-          `http://localhost:8000/api/customers/${value}/`,
+          `https://admin.onlybigcars.com/api/customers/${value}/`,
           {
             headers: {
               'Authorization': `Token ${token}`
@@ -2005,8 +2005,8 @@ submissionData.overview = cleanedOverview;
 
 
         const url = id 
-            ? `http://localhost:8000/api/leads/${id}/update/`
-            : 'http://localhost:8000/api/edit-form-submit/';
+            ? `https://admin.onlybigcars.com/api/leads/${id}/update/`
+            : 'https://admin.onlybigcars.com/api/edit-form-submit/';
             
         const method = id ? 'put' : 'post';
         
@@ -3374,7 +3374,7 @@ const handleRephraseWarranty = async () => {
   setIsRephrasing(true);
   try {
       const response = await axios.post(
-          'http://localhost:8000/api/rephrase-text/',
+          'https://admin.onlybigcars.com/api/rephrase-text/',
           { text: warrantyDetails.warranty },
           {
               headers: {
@@ -3606,7 +3606,7 @@ function getNextSellBuyStatus(previousStatus) {
 
 const fetchCustomerData = async (mobileNumber) => {
   try {
-    const response = await fetch(`http://localhost:8000/api/customers/${mobileNumber}`, {
+    const response = await fetch(`https://admin.onlybigcars.com/api/customers/${mobileNumber}`, {
       headers: {
         'Authorization': `Token ${token}`,
       }
@@ -3688,7 +3688,7 @@ const [isGeneratingBill, setIsGeneratingBill] = useState(false);
 
 //       // Send to backend
 //       const response = await axios.post(
-//         'http://localhost:8000/api/send-jobcard/',
+//         'https://admin.onlybigcars.com/api/send-jobcard/',
 //         formData,
 //         {
 //           headers: {
@@ -3792,7 +3792,7 @@ const handleSendJobCard = async () => {
 
       // Send to backend
       const response = await axios.post(
-        'http://localhost:8000/api/send-jobcard/',
+        'https://admin.onlybigcars.com/api/send-jobcard/',
         formData,
         {
           headers: {
@@ -3903,7 +3903,7 @@ const handleSendEstimate = async () => {
 
       // Send to backend
       const response = await axios.post(
-        'http://localhost:8000/api/send-estimate/',
+        'https://admin.onlybigcars.com/api/send-estimate/',
         formData,
         {
           headers: {
@@ -7575,6 +7575,6 @@ export default EditPage;
 
 
 
-// http://localhost:8000/api/callerdesk-webhook/?type=call_report&coins=4&Status=ANSWER&campid=&CallSid=1744881973.2699220&EndTime=2025-04-17%2015:00:02&Uniqueid=&Direction=IVR&StartTime=2025-04-17%2014:56:13&key_press=&call_group=callgroup1&error_code=0&CallDuration=231&SourceNumber=8700837048&TalkDuration=215&hangup_cause=ANSWER(16)&receiver_name=loknath&DialWhomNumber=09218028154&LegB_Start_time=2025-04-17%2014:56:16&CallRecordingUrl=https://newcallrecords.callerdesk.io/incoming/04_2025/17/86070/20250417-145615-4912-8062649373-1744881973.2699220.wav&LegA_Picked_time=2025-04-17%2014:56:13&LegB_Picked_time=2025-04-17%2014:56:28&DestinationNumber=9999967591
+// https://admin.onlybigcars.com/api/callerdesk-webhook/?type=call_report&coins=4&Status=ANSWER&campid=&CallSid=1744881973.2699220&EndTime=2025-04-17%2015:00:02&Uniqueid=&Direction=IVR&StartTime=2025-04-17%2014:56:13&key_press=&call_group=callgroup1&error_code=0&CallDuration=231&SourceNumber=8700837048&TalkDuration=215&hangup_cause=ANSWER(16)&receiver_name=loknath&DialWhomNumber=09218028154&LegB_Start_time=2025-04-17%2014:56:16&CallRecordingUrl=https://newcallrecords.callerdesk.io/incoming/04_2025/17/86070/20250417-145615-4912-8062649373-1744881973.2699220.wav&LegA_Picked_time=2025-04-17%2014:56:13&LegB_Picked_time=2025-04-17%2014:56:28&DestinationNumber=9999967591
 
-// http://localhost:8000/api/callerdesk-webhook/?type=call_report&coins=4&Status=CANCEL&campid=&CallSid=1744881973.2699220&EndTime=2025-04-17%2015:00:02&Uniqueid=&Direction=IVR&StartTime=2025-04-17%2014:56:13&key_press=&call_group=callgroup1&error_code=0&CallDuration=231&SourceNumber=09958134912&TalkDuration=215&hangup_cause=ANSWER(16)&receiver_name=Anjali&DialWhomNumber=09218028154&LegB_Start_time=2025-04-17%2014:56:16&CallRecordingUrl=https://newcallrecords.callerdesk.io/incoming/04_2025/17/86070/20250417-145615-4912-8062649373-1744881973.2699220.wav&LegA_Picked_time=2025-04-17%2014:56:13&LegB_Picked_time=2025-04-17%2014:56:28&DestinationNumber=9999967591
+// https://admin.onlybigcars.com/api/callerdesk-webhook/?type=call_report&coins=4&Status=CANCEL&campid=&CallSid=1744881973.2699220&EndTime=2025-04-17%2015:00:02&Uniqueid=&Direction=IVR&StartTime=2025-04-17%2014:56:13&key_press=&call_group=callgroup1&error_code=0&CallDuration=231&SourceNumber=09958134912&TalkDuration=215&hangup_cause=ANSWER(16)&receiver_name=Anjali&DialWhomNumber=09218028154&LegB_Start_time=2025-04-17%2014:56:16&CallRecordingUrl=https://newcallrecords.callerdesk.io/incoming/04_2025/17/86070/20250417-145615-4912-8062649373-1744881973.2699220.wav&LegA_Picked_time=2025-04-17%2014:56:13&LegB_Picked_time=2025-04-17%2014:56:28&DestinationNumber=9999967591

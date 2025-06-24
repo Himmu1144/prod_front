@@ -167,7 +167,7 @@ const GarageSelector = ({ onClose, onSelectGarage, userLocation }) => {
   useEffect(() => {
     const fetchGarages = async () => {
       try {
-        const response = await axios.get('http://localhost:8000/api/garages/', {
+        const response = await axios.get('https://admin.onlybigcars.com/api/garages/', {
           headers: {
             'Authorization': `Token ${token}`
           }
