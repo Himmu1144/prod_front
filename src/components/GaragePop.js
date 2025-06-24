@@ -167,7 +167,7 @@ const GarageSelector = ({ onClose, onSelectGarage, userLocation }) => {
   useEffect(() => {
     const fetchGarages = async () => {
       try {
-        const response = await axios.get('https://admin.onlybigcars.com/api/garages/', {
+        const response = await axios.get('http://localhost:8000/api/garages/', {
           headers: {
             'Authorization': `Token ${token}`
           }
@@ -311,10 +311,10 @@ const GarageSelector = ({ onClose, onSelectGarage, userLocation }) => {
                                           {garage.name}
                                         </h3>
                                         <p className={`text-sm font-medium ${!garage.is_active ? 'text-gray-400' : 'text-gray-600'}`}>
-                                          Locality: {garage.locality}
+                                          Locality: <span className="font-bold">{garage.locality}</span>
                                         </p>
                                         <p className={`text-sm mb-1 font-medium ${!garage.is_active ? 'text-gray-400' : 'text-gray-600'}`}>
-                                          Mechanic: {garage.mechanic}, Mobile: {garage.mobile}
+                                          Mechanic: <span className="font-bold">{garage.mechanic}</span>, Mobile: <span className="font-bold">{garage.mobile}</span>
                                         </p>
                                         {/* Removed old status message paragraph */}
                                         {!garage.is_active && (

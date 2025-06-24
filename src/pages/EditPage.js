@@ -129,7 +129,18 @@ const EditPage = () => {
   const [imageTooltipText, setImageTooltipText] = useState('');
   const [isUploadingImages, setIsUploadingImages] = useState(false);
   const [showDesignerPopup, setShowDesignerPopup] = useState(false);
+  const [gstDetails, setGstDetails] = useState({
+    customer_name: '',
+    customer_address: '',
+    customer_gstin: '',
+    customer_state: '',
+    wx_name: '',
+    wx_address: '',
+    wx_gstin: '',
+    wx_state: ''
+  });
   const [gstMode, setGstMode] = useState(null);
+  const [isSavingGst, setIsSavingGst] = useState(false);
   const [isSendingJobCard, setIsSendingJobCard] = useState(false);
   // Add these with your other state declarations
   const [isSendingEstimate, setIsSendingEstimate] = useState(false);
@@ -141,6 +152,11 @@ const [hasShownEstimateReminder, setHasShownEstimateReminder] = useState(false);
 const [showReminderPopup, setShowReminderPopup] = useState(false);
 const [reminderType, setReminderType] = useState(''); // 'jobcard' or 'estimate'
   // const [showEstimate, setShowEstimate] = useState(false);
+const [showWarrantyPopup, setShowWarrantyPopup] = useState(false);
+const [warrantyDetails, setWarrantyDetails] = useState({
+  warranty: '',
+});
+const [isRephrasing, setIsRephrasing] = useState(false);
   
 
 // Add this with other state declarations around line 90-100
@@ -260,6 +276,26 @@ const handleRemoveExistingImage = (index) => {
   
     setShowGaragePopup(false);
   };
+
+
+
+const handleGstDetailsChange = (field, value) => {
+    setGstDetails(prev => ({ ...prev, [field]: value }));
+  };
+
+
+const handleSaveGstDetails = () => {
+    // Update the main formState with the temporary details from the UI
+    setFormState(prev => ({
+        ...prev,
+        gstDetail: { ...gstDetails }
+    }));
+    toast.info("GST details saved. Click the main save button to persist changes.");
+     // Close the popup after saving
+    setShowDesignerPopup(false);
+};
+
+
 
   // Add this function to check if reminder should be shown
 const checkAndShowReminder = () => {
@@ -630,7 +666,7 @@ const checkAndShowReminder = () => {
     try {
       setIsLoadingPreviousLeads(true);
       const response = await axios.get(
-        `https://admin.onlybigcars.com/api/customers/${phoneNumber}/leads/?current_lead=${id || ''}`,
+        `http://localhost:8000/api/customers/${phoneNumber}/leads/?current_lead=${id || ''}`,
         {
           headers: {
             'Authorization': `Token ${token}`
@@ -656,7 +692,7 @@ useEffect(() => {
   const fetchCarData = async () => {
       try {
           // Assuming '/api/car-data/' endpoint returns data structured like [{ name: 'Brand', models: [{ name: 'Model', image_url: '...' }] }]
-          const response = await axios.get(`https://admin.onlybigcars.com/api/car-data/`, {
+          const response = await axios.get(`http://localhost:8000/api/car-data/`, {
               headers: { Authorization: `Token ${token}` },
           });
           setCarBrandsData(response.data);
@@ -670,6 +706,16 @@ useEffect(() => {
       fetchCarData();
   }
 }, [token]); // Dependency on token
+
+// Add this with your other useEffect hooks
+useEffect(() => {
+  // When the bill designer popup is opened and a mode is selected
+  if (showDesignerPopup && gstMode) {
+    // Populate the temporary gstDetails state with the current data from formState
+    setGstDetails(formState.gstDetail);
+  }
+}, [showDesignerPopup, gstMode, formState.gstDetail]);
+
 
 useEffect(() => {
   const currentStatus = formState.arrivalStatus.leadStatus;
@@ -687,7 +733,7 @@ useEffect(() => {
       setIsSubmitting(true);
       
       // Use axios instead of fetch for better error handling and consistency
-      axios.get(`https://admin.onlybigcars.com/api/customers/${mobileNumber}/leads/`, {
+      axios.get(`http://localhost:8000/api/customers/${mobileNumber}/leads/`, {
         params: { current_lead: id },
         headers: {
           'Authorization': `Token ${token}`
@@ -833,7 +879,7 @@ useEffect(() => {
     
 
     if (!id) {
-      axios.get('https://admin.onlybigcars.com/', {
+      axios.get('http://localhost:8000/', {
         headers: {
           'Authorization': `Token ${token}`
         }
@@ -853,7 +899,7 @@ useEffect(() => {
         try {
           console.log("Fetching lead with ID:", id); // Debug log
           const response = await axios.get(
-            `https://admin.onlybigcars.com/api/leads/${id}/`,
+            `http://localhost:8000/api/leads/${id}/`,
             {
               headers: {
                 'Authorization': `Token ${token}`
@@ -885,7 +931,7 @@ useEffect(() => {
         
           
           const customerResponse = await axios.get(
-            `https://admin.onlybigcars.com/api/customers/${leadData.number}/`,
+            `http://localhost:8000/api/customers/${leadData.number}/`,
             {
               headers: {
                 'Authorization': `Token ${token}`
@@ -981,6 +1027,7 @@ useEffect(() => {
               speedometerRd: leadData.speedometer_rd || '', // Add this new field
               inventory: leadData.inventory || [],
               orderId: leadData.orderId || 'NA', // Add this new field
+              
             
               
             },
@@ -1001,6 +1048,7 @@ useEffect(() => {
             },
             created_at: leadData.created_at,
             updated_at: leadData.updated_at,
+            warranty:leadData.warranty || '', 
           });
 
 
@@ -1279,7 +1327,7 @@ const handleGSTHeaderClick = () => {
 const handleClick2Call = async (receiverNo) => {
   try {
     const response = await axios.post(
-      'https://admin.onlybigcars.com/api/click2call/',
+      'http://localhost:8000/api/click2call/',
       { receiver_no: receiverNo },
       { headers: { Authorization: `Token ${token}` } }
     );
@@ -1503,7 +1551,7 @@ const handleTotalChange = (index, value) => {
     if (section === 'customerInfo' && field === 'mobileNumber' && value.length === 10) {
       try {
         const response = await axios.get(
-          `https://admin.onlybigcars.com/api/customers/${value}/`,
+          `http://localhost:8000/api/customers/${value}/`,
           {
             headers: {
               'Authorization': `Token ${token}`
@@ -1957,8 +2005,8 @@ submissionData.overview = cleanedOverview;
 
 
         const url = id 
-            ? `https://admin.onlybigcars.com/api/leads/${id}/update/`
-            : 'https://admin.onlybigcars.com/api/edit-form-submit/';
+            ? `http://localhost:8000/api/leads/${id}/update/`
+            : 'http://localhost:8000/api/edit-form-submit/';
             
         const method = id ? 'put' : 'post';
         
@@ -3295,6 +3343,63 @@ const handleAddEmptyRow = () => {
   });
 };
 
+const handleOpenWarrantyPopup = () => {
+  console.log('Opening warranty popup');
+  setWarrantyDetails({ // Populate with existing warranty from form state
+    warranty: formState.warranty || '',
+  });
+  setShowWarrantyPopup(true);
+};
+
+const handleWarrantyInputChange = (value) => {
+  setWarrantyDetails({ warranty: value });
+};
+
+const handleSaveWarranty = () => {
+  setFormState(prev => ({
+    ...prev,
+    warranty: warrantyDetails.warranty
+  }));
+  setShowWarrantyPopup(false);
+  toast.info("Warranty saved. Click the main save button to persist changes.");
+};
+
+
+const handleRephraseWarranty = async () => {
+  if (!warrantyDetails.warranty || !warrantyDetails.warranty.trim()) {
+      toast.warn('Please enter some text to rephrase.', { position: "top-right" });
+      return;
+  }
+
+  setIsRephrasing(true);
+  try {
+      const response = await axios.post(
+          'http://localhost:8000/api/rephrase-text/',
+          { text: warrantyDetails.warranty },
+          {
+              headers: {
+                  'Authorization': `Token ${token}`,
+              }
+          }
+      );
+
+      if (response.data && response.data.rephrased_text) {
+          handleWarrantyInputChange(response.data.rephrased_text);
+          console.log('Rephrased text:', response.data.rephrased_text);
+          toast.success('Text rephrased successfully!', { position: "top-right" });
+      } else {
+          toast.error(response.data.error || 'Failed to get rephrased text.', { position: "top-right" });
+      }
+  } catch (error) {
+      console.error('Error rephrasing text:', error);
+      toast.error(error.response?.data?.error || 'An error occurred while rephrasing.', { position: "top-right" });
+  } finally {
+      setIsRephrasing(false);
+  }
+};
+
+
+
   // First add this CSS at the top of your file or in your CSS file
 const serviceCardStyles = {
   descriptionContainer: {
@@ -3501,7 +3606,7 @@ function getNextSellBuyStatus(previousStatus) {
 
 const fetchCustomerData = async (mobileNumber) => {
   try {
-    const response = await fetch(`https://admin.onlybigcars.com/api/customers/${mobileNumber}`, {
+    const response = await fetch(`http://localhost:8000/api/customers/${mobileNumber}`, {
       headers: {
         'Authorization': `Token ${token}`,
       }
@@ -3583,7 +3688,7 @@ const [isGeneratingBill, setIsGeneratingBill] = useState(false);
 
 //       // Send to backend
 //       const response = await axios.post(
-//         'https://admin.onlybigcars.com/api/send-jobcard/',
+//         'http://localhost:8000/api/send-jobcard/',
 //         formData,
 //         {
 //           headers: {
@@ -3687,7 +3792,7 @@ const handleSendJobCard = async () => {
 
       // Send to backend
       const response = await axios.post(
-        'https://admin.onlybigcars.com/api/send-jobcard/',
+        'http://localhost:8000/api/send-jobcard/',
         formData,
         {
           headers: {
@@ -3798,7 +3903,7 @@ const handleSendEstimate = async () => {
 
       // Send to backend
       const response = await axios.post(
-        'https://admin.onlybigcars.com/api/send-estimate/',
+        'http://localhost:8000/api/send-estimate/',
         formData,
         {
           headers: {
@@ -5289,13 +5394,23 @@ const handleGenerateEstimate = async () => {
               <div className="w-full p-2 rounded-lg">
               <div className="text-gray-700 mb-2 flex justify-between items-center" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>
   <span>Work Summary*</span>
-  <button
-    type="button"
-    onClick={handleAddEmptyRow}
-    className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm"
-  >
-    Add New Row
-  </button>
+  
+  <div className="flex items-center gap-2">
+    <button
+      type="button"
+      onClick={handleOpenWarrantyPopup}
+      className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm"
+    >
+      Add Warranty
+    </button>
+    <button
+      type="button"
+      onClick={handleAddEmptyRow}
+      className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm"
+    >
+      Add New Row
+    </button>
+  </div>
 </div>
           <div className="w-full mt-3">
             <table className="w-full">
@@ -6594,7 +6709,7 @@ Generate Bill
           month: 'short',
           year: 'numeric'
         }),
-        orderId: formState.arrivalStatus.jobCardNumber || '',
+        orderId: formState.arrivalStatus.orderId || '',
         speedometerRd: formState.arrivalStatus.speedometerRd,
         carColor: formState.cars[0]?.color || '',
         vinNo: formState.cars[0]?.vin || '',
@@ -6655,7 +6770,7 @@ Generate Bill
           month: 'short',
           year: 'numeric'
         }),
-        orderId: formState.arrivalStatus.jobCardNumber || '',
+        orderId: formState.arrivalStatus.orderId || '',
         speedometerRd: formState.arrivalStatus.speedometerRd,
         carColor: formState.cars[0]?.color || '',
         vinNo: formState.cars[0]?.vin || '',
@@ -6759,6 +6874,7 @@ Generate Bill
         finalPriceBill: formState.overview.total,
         totalPayable: formState.overview.finalAmount,
         date: formState.arrivalStatus.dateTime, // Add the full arrival date time
+        warranty: formState.warranty,
       }}
     />
   </div>
@@ -7153,6 +7269,7 @@ Generate Bill
 
 
 
+// Replace the existing showDesignerPopup block with this
 {showDesignerPopup && (
   <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.57)" }}>
     <div className="bg-white rounded-lg shadow-lg p-8 w-96 flex flex-col items-center relative">
@@ -7211,11 +7328,10 @@ Generate Bill
             <input 
               className="w-full p-3 border-0 focus:ring-2 focus:ring-red-500" 
               placeholder="Customer Name"
-              value={formState.gstDetail.customer_name || formState.customerInfo.customerName}
-              onChange={e => setFormState(prev => ({
-                ...prev,
-                gstDetail: { ...prev.gstDetail, customer_name: e.target.value }
-              }))}
+              // CORRECTION: Read from gstDetails state
+              value={gstDetails.customer_name} 
+              // CORRECTION: Write to gstDetails state
+              onChange={e => handleGstDetailsChange('customer_name', e.target.value)}
             />
             <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">
               Customer Name
@@ -7226,11 +7342,10 @@ Generate Bill
             <input 
               className="w-full p-3 border-0 focus:ring-2 focus:ring-red-500" 
               placeholder="Customer Address"
-              value={formState.gstDetail.customer_address || formState.location.address}
-              onChange={e => setFormState(prev => ({
-                ...prev,
-                gstDetail: { ...prev.gstDetail, customer_address: e.target.value }
-              }))}
+               // CORRECTION: Read from gstDetails state
+              value={gstDetails.customer_address}
+               // CORRECTION: Write to gstDetails state
+              onChange={e => handleGstDetailsChange('customer_address', e.target.value)}
             />
             <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">
               Customer Address
@@ -7241,272 +7356,212 @@ Generate Bill
             <input 
               className="w-full p-3 border-0 focus:ring-2 focus:ring-red-500" 
               placeholder="Customer GSTIN"
-              value={formState.gstDetail.customer_gstin || formState.arrivalStatus.gstin}
-              onChange={e => setFormState(prev => ({
-                ...prev,
-                gstDetail: { ...prev.gstDetail, customer_gstin: e.target.value }
-              }))}
+               // CORRECTION: Read from gstDetails state
+              value={gstDetails.customer_gstin}
+               // CORRECTION: Write to gstDetails state
+              onChange={e => handleGstDetailsChange('customer_gstin', e.target.value)}
             />
             <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">
               Customer GSTIN
             </label>
           </div>
 
-          {/* <div className="relative border border-gray-300 rounded-md">
-            <input 
-              className="w-full p-3 border-0 focus:ring-2 focus:ring-red-500" 
-              placeholder="Customer State"
-              value={formState.gstDetail.customer_state || formState.location.state}
-              onChange={e => setFormState(prev => ({
-                ...prev,
-                gstDetail: { ...prev.gstDetail, customer_state: e.target.value }
-              }))}
-            />
-            <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">
-              Customer State
-            </label>
-          </div> */}
+            {/* State Dropdown (already correct) */}
+            <div className="relative border border-gray-300 rounded-md customer-state-dropdown">
+                <input
+                    className="w-full p-3 border-0 focus:ring-2 focus:ring-red-500"
+                    placeholder="Customer State"
+                    value={gstDetails.customer_state}
+                    onChange={e => {
+                        handleGstDetailsChange('customer_state', e.target.value);
+                        setStateSearchCustomer(e.target.value);
+                        setShowCustomerStateDropdown(true);
+                    }}
+                    onFocus={() => setShowCustomerStateDropdown(true)}
+                />
+                 <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">
+                    Customer State
+                </label>
+                {showCustomerStateDropdown && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                    {indianStates
+                        .filter(state => state.toLowerCase().includes(stateSearchCustomer.toLowerCase()))
+                        .map((state, index) => (
+                        <div
+                            key={index}
+                            className="p-2 hover:bg-gray-100 cursor-pointer"
+                            onClick={() => {
+                                handleGstDetailsChange('customer_state', state);
+                                setShowCustomerStateDropdown(false);
+                            }}
+                        >
+                            {state}
+                        </div>
+                        ))}
+                    </div>
+                )}
+            </div>
 
-          {/* Customer State Dropdown */}
-<div className="relative border border-gray-300 rounded-md customer-state-dropdown">
-  <input 
-    className="w-full p-3 border-0 focus:ring-2 focus:ring-red-500" 
-    placeholder="Customer State"
-    value={formState.gstDetail.customer_state || stateSearchCustomer}
-    onChange={e => {
-      setStateSearchCustomer(e.target.value);
-      setFormState(prev => ({
-        ...prev,
-        gstDetail: { ...prev.gstDetail, customer_state: e.target.value }
-      }));
-      setShowCustomerStateDropdown(true);
-    }}
-    onFocus={() => setShowCustomerStateDropdown(true)}
-    onKeyDown={e => {
-      // Prevent form submission on Enter key
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        
-        // Optionally select the first filtered state
-        const filteredStates = indianStates.filter(state => 
-          state.toLowerCase().includes((formState.gstDetail.customer_state || stateSearchCustomer).toLowerCase())
-        );
-        
-        if (filteredStates.length > 0) {
-          const selectedState = filteredStates[0];
-          setFormState(prev => ({
-            ...prev,
-            gstDetail: { ...prev.gstDetail, customer_state: selectedState }
-          }));
-          setStateSearchCustomer(selectedState);
-          setShowCustomerStateDropdown(false);
-        }
-      }
-    }}
-  />
-  <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">
-    Customer State
-  </label>
-  
-  {/* Dropdown for states */}
-  {showCustomerStateDropdown && (
-    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-      <div className="p-2 sticky top-0 bg-white border-b">
-        <div className="text-xs text-gray-500">Select a state or continue typing</div>
-      </div>
-      {indianStates
-        .filter(state => state.toLowerCase().includes((formState.gstDetail.customer_state || stateSearchCustomer).toLowerCase()))
-        .map((state, index) => (
-          <div 
-            key={index} 
-            className="p-2 hover:bg-gray-100 cursor-pointer"
-            onClick={() => {
-              setFormState(prev => ({
-                ...prev,
-                gstDetail: { ...prev.gstDetail, customer_state: state }
-              }));
-              setStateSearchCustomer(state);
-              setShowCustomerStateDropdown(false);
-            }}
-          >
-            {state}
-          </div>
-        ))}
-    </div>
-  )}
-</div>
-
-          <Button 
-            className="w-full mt-6 py-3 text-lg font-medium" 
-            variant="danger" 
-            onClick={handleGenerateBill}
-            disabled={isGeneratingBill}
-          >
-            {isGeneratingBill ? (
-              <>
-                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                <span className="animate-pulse">Generating PDF...</span>
-              </>
-            ) : (
-              'Generate Customer Bill'
+          <div className="flex gap-4 w-full mt-6">
+            <Button 
+              className="flex-1 py-3 text-lg font-medium" 
+              variant="outline-dark" 
+              onClick={handleSaveGstDetails} // This button saves the temporary state
+              disabled={isSavingGst || isGeneratingBill}
+            >
+             {isSavingGst ? 'Saving...' : 'Save Details'}
+            </Button>
+            <Button 
+              className="flex-1 py-3 text-lg font-medium" 
+              variant="danger" 
+              onClick={handleGenerateBill}
+              disabled={isGeneratingBill || isSavingGst}
+            >
+              {isGeneratingBill ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                  <span className="animate-pulse">Generating...</span>
+                </>
+              ) : (
+                'Generate Bill'
             )}
           </Button>
         </div>
+          </div>
       )}
 
       {/* Workshop GST Form */}
       {gstMode === 'workshop' && (
-        <div className="w-full space-y-4">
-          <div className="relative border border-gray-300 rounded-md">
-            <input 
-              className="w-full p-3 border-0 focus:ring-2 focus:ring-red-500" 
-              placeholder="Workshop Name"
-              value={formState.gstDetail.wx_name || formState.workshop.name}
-              onChange={e => setFormState(prev => ({
-                ...prev,
-                gstDetail: { ...prev.gstDetail, wx_name: e.target.value }
-              }))}
-            />
-            <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">
-              Workshop Name
-            </label>
-          </div>
+         <div className="w-full space-y-4">
+            <div className="relative border border-gray-300 rounded-md">
+                <input 
+                    className="w-full p-3 border-0 focus:ring-2 focus:ring-dark" 
+                    placeholder="Workshop Name"
+                    // CORRECTION: Read from gstDetails state
+                    value={gstDetails.wx_name}
+                    // CORRECTION: Write to gstDetails state
+                    onChange={e => handleGstDetailsChange('wx_name', e.target.value)}
+                />
+                <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">Workshop Name</label>
+            </div>
+             <div className="relative border border-gray-300 rounded-md">
+                <input 
+                    className="w-full p-3 border-0 focus:ring-2 focus:ring-dark" 
+                    placeholder="Workshop Address"
+                    value={gstDetails.wx_address}
+                    onChange={e => handleGstDetailsChange('wx_address', e.target.value)}
+                />
+                <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">Workshop Address</label>
+            </div>
+             <div className="relative border border-gray-300 rounded-md">
+                <input 
+                    className="w-full p-3 border-0 focus:ring-2 focus:ring-dark" 
+                    placeholder="Workshop GSTIN"
+                    value={gstDetails.wx_gstin}
+                    onChange={e => handleGstDetailsChange('wx_gstin', e.target.value)}
+                />
+                <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">Workshop GSTIN</label>
+            </div>
+             {/* State dropdown (already correct) */}
+             <div className="relative border border-gray-300 rounded-md workshop-state-dropdown">
+                <input
+                    className="w-full p-3 border-0 focus:ring-2 focus:ring-dark"
+                    placeholder="Workshop State"
+                    value={gstDetails.wx_state}
+                    onChange={e => {
+                        handleGstDetailsChange('wx_state', e.target.value);
+                        setStateSearchWorkshop(e.target.value);
+                        setShowWorkshopStateDropdown(true);
+                    }}
+                    onFocus={() => setShowWorkshopStateDropdown(true)}
+                 />
+                <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">Workshop State</label>
+                {showWorkshopStateDropdown && (
+                    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                        {indianStates
+                            .filter(state => state.toLowerCase().includes(stateSearchWorkshop.toLowerCase()))
+                            .map((state, index) => (
+                            <div key={index} className="p-2 hover:bg-gray-100 cursor-pointer"
+                                onClick={() => {
+                                    handleGstDetailsChange('wx_state', state);
+                                    setShowWorkshopStateDropdown(false);
+                                }}
+                            >{state}</div>
+                        ))}
+                    </div>
+                 )}
+            </div>
 
-          <div className="relative border border-gray-300 rounded-md">
-            <input 
-              className="w-full p-3 border-0 focus:ring-2 focus:ring-red-500" 
-              placeholder="Workshop Address"
-              value={formState.gstDetail.wx_address || formState.workshop.locality}
-              onChange={e => setFormState(prev => ({
-                ...prev,
-                gstDetail: { ...prev.gstDetail, wx_address: e.target.value }
-              }))}
-            />
-            <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">
-              Workshop Address
-            </label>
-          </div>
-
-          <div className="relative border border-gray-300 rounded-md">
-            <input 
-              className="w-full p-3 border-0 focus:ring-2 focus:ring-red-500" 
-              placeholder="Workshop GSTIN"
-              value={formState.gstDetail.wx_gstin}
-              onChange={e => setFormState(prev => ({
-                ...prev,
-                gstDetail: { ...prev.gstDetail, wx_gstin: e.target.value }
-              }))}
-            />
-            <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">
-              Workshop GSTIN
-            </label>
-          </div>
-
-          {/* <div className="relative border border-gray-300 rounded-md">
-            <input 
-              className="w-full p-3 border-0 focus:ring-2 focus:ring-red-500" 
-              placeholder="Workshop State"
-              value={formState.gstDetail.wx_state}
-              onChange={e => setFormState(prev => ({
-                ...prev,
-                gstDetail: { ...prev.gstDetail, wx_state: e.target.value }
-              }))}
-            />
-            <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">
-              Workshop State
-            </label>
-          </div> */}
-
-          {/* Workshop State Dropdown */}
-<div className="relative border border-gray-300 rounded-md workshop-state-dropdown">
-  <input 
-    className="w-full p-3 border-0 focus:ring-2 focus:ring-red-500" 
-    placeholder="Workshop State"
-    value={formState.gstDetail.wx_state || stateSearchWorkshop}
-    onChange={e => {
-      setStateSearchWorkshop(e.target.value);
-      setFormState(prev => ({
-        ...prev,
-        gstDetail: { ...prev.gstDetail, wx_state: e.target.value }
-      }));
-      setShowWorkshopStateDropdown(true);
-    }}
-    onFocus={() => setShowWorkshopStateDropdown(true)}
-    onKeyDown={e => {
-      // Prevent form submission on Enter key
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        
-        // Optionally select the first filtered state
-        const filteredStates = indianStates.filter(state => 
-          state.toLowerCase().includes((formState.gstDetail.wx_state || stateSearchWorkshop).toLowerCase())
-        );
-        
-        if (filteredStates.length > 0) {
-          const selectedState = filteredStates[0];
-          setFormState(prev => ({
-            ...prev,
-            gstDetail: { ...prev.gstDetail, wx_state: selectedState }
-          }));
-          setStateSearchWorkshop(selectedState);
-          setShowWorkshopStateDropdown(false);
-        }
-      }
-    }}
-  />
-  <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">
-    Workshop State
-  </label>
-  
-  {/* Dropdown for states */}
-  {showWorkshopStateDropdown && (
-    <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-      <div className="p-2 sticky top-0 bg-white border-b">
-        <div className="text-xs text-gray-500">Select a state or continue typing</div>
-      </div>
-      {indianStates
-        .filter(state => state.toLowerCase().includes((formState.gstDetail.wx_state || stateSearchWorkshop).toLowerCase()))
-        .map((state, index) => (
-          <div 
-            key={index} 
-            className="p-2 hover:bg-gray-100 cursor-pointer"
-            onClick={() => {
-              setFormState(prev => ({
-                ...prev,
-                gstDetail: { ...prev.gstDetail, wx_state: state }
-              }));
-              setStateSearchWorkshop(state);
-              setShowWorkshopStateDropdown(false);
-            }}
-          >
-            {state}
-          </div>
-        ))}
-    </div>
-  )}
-</div>
-
-
-          <Button 
-            className="w-full mt-6 py-3 text-lg font-medium" 
-            variant="dark" 
-            onClick={handleGenerateWxBill}
-            disabled={isGeneratingWxBill}
-          >
-            {isGeneratingWxBill ? (
-              <>
-                <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                <span className="animate-pulse">Generating PDF...</span>
-              </>
-            ) : (
-              'Generate Workshop Bill'
-            )}
-          </Button>
+            <div className="flex gap-4 w-full mt-6">
+                <Button 
+                    className="flex-1 py-3 text-lg font-medium" 
+                    variant="outline-dark" 
+                    onClick={handleSaveGstDetails} // Saves the temporary state
+                    disabled={isSavingGst || isGeneratingWxBill}
+                >
+                    {isSavingGst ? 'Saving...' : 'Save Details'}
+                </Button>
+                <Button 
+                    className="flex-1 py-3 text-lg font-medium" 
+                    variant="dark" 
+                    onClick={handleGenerateWxBill}
+                    disabled={isGeneratingWxBill || isSavingGst}
+                >
+                    {isGeneratingWxBill ? 'Generating...' : 'Generate Bill'}
+                </Button>
+            </div>
         </div>
       )}
     </div>
   </div>
 )}
+
+
+{showWarrantyPopup && (
+     
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Add Warranty Details</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Warranty</label>
+                <textarea
+                  value={warrantyDetails.warranty}
+                  onChange={(e) => handleWarrantyInputChange(e.target.value)}
+                  rows="4"
+                  className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  placeholder="Enter warranty details..."
+                ></textarea>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setShowWarrantyPopup(false)}
+                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleRephraseWarranty}
+                className="px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 disabled:bg-yellow-300"
+                disabled={isRephrasing}
+              >
+                {isRephrasing ? 'Rephrasing...' : 'Rephrase It'}
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveWarranty}
+                className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+              >
+                Save Warranty
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
 
       </form>
@@ -7520,6 +7575,6 @@ export default EditPage;
 
 
 
-// https://admin.onlybigcars.com/api/callerdesk-webhook/?type=call_report&coins=4&Status=ANSWER&campid=&CallSid=1744881973.2699220&EndTime=2025-04-17%2015:00:02&Uniqueid=&Direction=IVR&StartTime=2025-04-17%2014:56:13&key_press=&call_group=callgroup1&error_code=0&CallDuration=231&SourceNumber=8700837048&TalkDuration=215&hangup_cause=ANSWER(16)&receiver_name=loknath&DialWhomNumber=09218028154&LegB_Start_time=2025-04-17%2014:56:16&CallRecordingUrl=https://newcallrecords.callerdesk.io/incoming/04_2025/17/86070/20250417-145615-4912-8062649373-1744881973.2699220.wav&LegA_Picked_time=2025-04-17%2014:56:13&LegB_Picked_time=2025-04-17%2014:56:28&DestinationNumber=9999967591
+// http://localhost:8000/api/callerdesk-webhook/?type=call_report&coins=4&Status=ANSWER&campid=&CallSid=1744881973.2699220&EndTime=2025-04-17%2015:00:02&Uniqueid=&Direction=IVR&StartTime=2025-04-17%2014:56:13&key_press=&call_group=callgroup1&error_code=0&CallDuration=231&SourceNumber=8700837048&TalkDuration=215&hangup_cause=ANSWER(16)&receiver_name=loknath&DialWhomNumber=09218028154&LegB_Start_time=2025-04-17%2014:56:16&CallRecordingUrl=https://newcallrecords.callerdesk.io/incoming/04_2025/17/86070/20250417-145615-4912-8062649373-1744881973.2699220.wav&LegA_Picked_time=2025-04-17%2014:56:13&LegB_Picked_time=2025-04-17%2014:56:28&DestinationNumber=9999967591
 
-// https://admin.onlybigcars.com/api/callerdesk-webhook/?type=call_report&coins=4&Status=CANCEL&campid=&CallSid=1744881973.2699220&EndTime=2025-04-17%2015:00:02&Uniqueid=&Direction=IVR&StartTime=2025-04-17%2014:56:13&key_press=&call_group=callgroup1&error_code=0&CallDuration=231&SourceNumber=09958134912&TalkDuration=215&hangup_cause=ANSWER(16)&receiver_name=Anjali&DialWhomNumber=09218028154&LegB_Start_time=2025-04-17%2014:56:16&CallRecordingUrl=https://newcallrecords.callerdesk.io/incoming/04_2025/17/86070/20250417-145615-4912-8062649373-1744881973.2699220.wav&LegA_Picked_time=2025-04-17%2014:56:13&LegB_Picked_time=2025-04-17%2014:56:28&DestinationNumber=9999967591
+// http://localhost:8000/api/callerdesk-webhook/?type=call_report&coins=4&Status=CANCEL&campid=&CallSid=1744881973.2699220&EndTime=2025-04-17%2015:00:02&Uniqueid=&Direction=IVR&StartTime=2025-04-17%2014:56:13&key_press=&call_group=callgroup1&error_code=0&CallDuration=231&SourceNumber=09958134912&TalkDuration=215&hangup_cause=ANSWER(16)&receiver_name=Anjali&DialWhomNumber=09218028154&LegB_Start_time=2025-04-17%2014:56:16&CallRecordingUrl=https://newcallrecords.callerdesk.io/incoming/04_2025/17/86070/20250417-145615-4912-8062649373-1744881973.2699220.wav&LegA_Picked_time=2025-04-17%2014:56:13&LegB_Picked_time=2025-04-17%2014:56:28&DestinationNumber=9999967591
