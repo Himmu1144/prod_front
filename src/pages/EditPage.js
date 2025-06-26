@@ -767,7 +767,7 @@ useEffect(() => {
               ...prevState,
               customerInfo: {
                 ...prevState.customerInfo,
-                source: previousLead.source || prevState.customerInfo.source, // Copy source from previous lead
+                // source: previousLead.source || prevState.customerInfo.source, // Copy source from previous lead
               },
               location: {
                 address: previousLead.address || prevState.location.address,
