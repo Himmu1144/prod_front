@@ -1,4 +1,4 @@
-import React, { forwardRef, useImperativeHandle, useState, useEffect, useMemo } from 'react';
+import React, { forwardRef, useImperativeHandle, useState, useEffect } from 'react';
 import { PDFViewer, usePDF, Document, Page, View, Text, Image, StyleSheet,Font } from '@react-pdf/renderer';
 import obcLogo from '../assets/images/OBC-logo.png'
 import timeTableIcon from '../assets/images/timetable.png';
@@ -29,7 +29,6 @@ const styles = StyleSheet.create({
     padding: 15,
     fontSize: 10,
     backgroundColor: '#ffffff',
-    fontFamily: 'OpenSans', // Default font for the page
   },
   container: {
     border: '1pt solid #d1d5db',
@@ -56,13 +55,7 @@ const styles = StyleSheet.create({
   section: {
     padding: 15,
     borderBottom: '1pt solid #d1d5db',
-  },
-  customerDetailsSection: { // Style for the customer details section box
-    padding: 15, // Padding inside the border
-    borderBottom: '1pt solid #d1d5db', // Keep existing bottom border for separation
-    border: '1pt solid #9ca3af', // Border like in billhh.js
-    borderRadius: 4, // Border radius like in billhh.js
-    marginBottom: 15, // Add some margin if it's directly within the main container or adjust as needed
+    // fontWeight: 'bold'
   },
   grid2: {
     flexDirection: 'row',
@@ -82,7 +75,7 @@ const styles = StyleSheet.create({
     padding: 7.5,
     borderRadius: 5,
     fontFamily: 'OpenSans',
-    fontWeight: 700,
+    fontWeight: 700, // Use exact weight value that matches the registered font
     textAlign: 'center',
   },
   value: {
@@ -90,8 +83,6 @@ const styles = StyleSheet.create({
     padding: 7.5,
     border: '1pt solid #e5e7eb',
     borderRadius: 5,
-    fontFamily: 'OpenSans',
-    fontWeight: 400,
   },
   redHeader: {
     backgroundColor: '#dc2626',
@@ -100,7 +91,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     borderRadius: 5,
     textAlign: 'center',
-    fontFamily: 'OpenSans', // Ensure OpenSans is used
+    // fontFamily: 'OpenSans',
     fontWeight: 700,
     marginBottom: 15,
   },
@@ -111,68 +102,45 @@ const styles = StyleSheet.create({
   inventoryItem: {
     flexDirection: 'row',
     marginBottom: 7.5,
-    fontFamily: 'OpenSans',
-    fontWeight: 400,
   },
   number: {
     width: 22.5,
     textAlign: 'right',
-    fontFamily: 'OpenSans',
-    fontWeight: 400, // Use registered weight
+    fontWeight: 'medium',
     marginRight: 7.5,
   },
-  workSummarySectionWrapper: { // Wrapper for work summary to control breaks
-    padding: 15,
-    borderBottom: '1pt solid #d1d5db',
-    // break: 'avoid', // Avoid breaking the entire section if possible
-  },
-  table: { // Updated table style for Work Summary
+  table: {
     borderCollapse: 'collapse',
     width: '100%',
-    border: '1pt solid #9ca3af', // Consistent with billhh.js
-    borderRadius: 4, // Consistent with billhh.js
-    orphans: 3, // Prevent single lines at start of new page
-    widows: 3,  // Prevent single lines at end of page
-    // break: 'avoid', // Try to keep table on one page if it fits
-    // minPresenceAhead: 150, // Suggestion from billhh.js if break: 'avoid' is used
+    border: '1pt solid #e5e7eb',
+    borderRadius: 4,
   },
   tableHeader: {
     flexDirection: 'row',
-    backgroundColor: '#f3f4f6',
-    borderBottom: '1pt solid #9ca3af', // Consistent with billhh.js
-    fontFamily: 'OpenSans',
-    fontWeight: 700,
+    backgroundColor: '#f3f4f6', // bg-gray-100
+    borderBottom: '1pt solid #e5e7eb',
   },
   tableRow: {
     flexDirection: 'row',
-    borderBottom: '0.75pt solid #9ca3af', // Consistent with billhh.js
-    fontFamily: 'OpenSans',
-    fontWeight: 400,
-    // wrap: false, // Consider for rows if content might overflow and break badly
-    // break: 'avoid', // To keep individual rows from breaking
+    borderBottom: '1pt solid #e5e7eb',
   },
   tableCell: {
     flex: 1,
     textAlign: 'left',
     padding: 7.5,
-    borderRight: '0.75pt solid #9ca3af', // Consistent with billhh.js
-    fontFamily: 'OpenSans',
-    fontWeight: 400,
+    borderRight: '1pt solid #e5e7eb',
   },
   tableCellLast: {
     flex: 1,
     textAlign: 'left',
     padding: 7.5,
     borderRight: 'none',
-    fontFamily: 'OpenSans',
-    fontWeight: 400,
   },
-  tableTotal: { // Kept for potential future use, not directly in current JobCard work summary
+  tableTotal: {
     flexDirection: 'row',
-    backgroundColor: '#f9fafb',
-    fontFamily: 'OpenSans',
-    fontWeight: 700,
-    borderBottom: '1pt solid #9ca3af',
+    backgroundColor: '#f9fafb', // bg-gray-50
+    fontWeight: 'bold',
+    borderBottom: '1pt solid #e5e7eb',
   },
   workshopItem: {
     alignItems: 'center',
@@ -183,82 +151,51 @@ const styles = StyleSheet.create({
     height: 45,
   },
   workshopLabel: {
-    fontFamily: 'OpenSans',
-    fontWeight: 'medium', // Bolder
-    color: '#1f2937', // Darker color
+    fontWeight: 'medium',
+    color: '#4b5563',
     marginTop: 7.5,
-    textAlign: 'center',
-  },
-  workshopValue: { // Style for workshop data text
-    fontFamily: 'OpenSans',
-    fontWeight: 400,
-    color: '#374151', // Darker text color
-    marginTop: 4,
-    textAlign: 'center',
   },
   termsHeader: {
     backgroundColor: '#f3f4f6',
     padding: 7.5,
     borderRadius: 5,
     textAlign: 'center',
-    fontFamily: 'OpenSans',
-    fontWeight: 700,
+    fontWeight: 'bold',
     marginBottom: 15,
   },
   term: {
     marginBottom: 7.5,
     paddingHorizontal: 15,
     color: '#374151',
-    fontFamily: 'OpenSans',
-    fontWeight: 400,
   },
-  // Old additionalWorkItem style removed
-  additionalWorkColumn: { // Style for each column in the additional work section
-    width: '33%',
-    paddingHorizontal: 2, // Minimal padding for the column itself
-  },
-  additionalWorkColumnItem: { // Style for each text item within an additional work column
-    marginBottom: 5,
-    fontSize: 10,
-    fontFamily: 'OpenSans',
-    fontWeight: 400,
-    color: '#1f2937',
-    // textAlign: 'left', // Default for Text
-  },
-  noAdditionalWorkText: {
-    textAlign: 'center',
-    color: '#6b7280',
-    paddingHorizontal: 15,
-    // fontStyle: 'italic', // Removed to prevent font error
-    fontFamily: 'OpenSans',
-  },
-  imageGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-start',
-    gap: 10,
-  },
-  vehicleImage: {
-    width: '30%',
-    height: 150,
-    objectFit: 'cover',
-    marginBottom: 10,
-    borderRadius: 3,
-  },
-  noImagesText: {
-    textAlign: 'center',
-    color: '#6b7280',
-    padding: 15,
-    // fontStyle: 'italic', // Removed to prevent font error
-    fontFamily: 'OpenSans',
-  },
+
+  // Add these to your existing StyleSheet
+imageGrid: {
+  flexDirection: 'row',
+  flexWrap: 'wrap',
+  justifyContent: 'flex-start',
+  gap: 10,
+},
+vehicleImage: {
+  width: '30%',  // Makes images take ~30% width (3 per row)
+  height: 150,    // Fixed height for consistent look
+  objectFit: 'cover',
+  marginBottom: 10,
+  borderRadius: 3,
+},
+noImagesText: {
+  textAlign: 'center',
+  color: '#6b7280',
+  padding: 15,
+  fontStyle: 'italic',
+},
 });
 
 // PDF Document Component
 const PDFDocument = ({ data }) => {
   const defaultData = {
     inventory: '',
-    additionalWork: [], // Expecting an array of strings
+    additionalWork: [],
     customerName: '',
     carBrand: '',
     carModel: '',
@@ -270,21 +207,12 @@ const PDFDocument = ({ data }) => {
     orderId: '',
     carYearFuel: '',
     workshop: '',
-    battery: '',
+    batteryFeature: '',
     workSummary: [{ type: '', name: '', workdone: '', total: 0 }],
     invoiceSummary: { total: 0, discount: 0, totalPayable: 0 },
     images:[],
   };
   const mergedData = { ...defaultData, ...data };
-
-  // Ensure additionalWork is an array of strings
-  let additionalWorkItems = [];
-  if (Array.isArray(mergedData.additionalWork)) {
-    additionalWorkItems = mergedData.additionalWork.map(item => String(item).trim()).filter(item => item);
-  } else if (typeof mergedData.additionalWork === 'string') {
-    additionalWorkItems = mergedData.additionalWork.split(',').map(item => item.trim()).filter(item => item);
-  }
-
 
   const terms = [
     "1. Pickup & Drop Service - OnlyBigCars offers FREE pickup and drop service, subject to driver availability (hereafter referred to as \"Valet\").",
@@ -314,112 +242,51 @@ const PDFDocument = ({ data }) => {
             <Text style={styles.title}>JOB CARD</Text>
           </View>
 
-          {/* Customer Details - Updated UI */}
-          <View style={{...styles.section, border: '1pt solid #9ca3af', borderRadius: 4, borderBottomWidth: 0 }}> 
-            {/* Removed bottom border from here as section below will have its top border */}
+          {/* Customer Details */}
+          <View style={styles.section}>
             <View style={styles.grid2}>
               <View style={styles.column}>
                 <View style={styles.row}>
-                  <Text style={{
-                                  ...styles.label,
-                                  border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                  }}>Name</Text>
-                  <Text style={{
-                                  ...styles.value,
-                                  border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                  }}>{mergedData.customerName}</Text>
+                  <Text style={styles.label}>Name</Text>
+                  <Text style={styles.value}>{mergedData.customerName}</Text>
                 </View>
                 <View style={styles.row}>
-                  <Text style={{
-                                  ...styles.label,
-                                  border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                  }}>Mobile</Text>
-                  <Text style={{
-                                  ...styles.value,
-                                  border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                  }}>{mergedData.customerMobile}</Text>
+                  <Text style={styles.label}>Mobile</Text>
+                  <Text style={styles.value}>{mergedData.customerMobile}</Text>
                 </View>
                 <View style={styles.row}>
-                  <Text style={{
-                                  ...styles.label,
-                                  border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                  }}>Order ID</Text>
-                  <Text style={{
-                                  ...styles.value,
-                                  border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                  }}>{mergedData.orderId || 'N/A'}</Text>
+                  <Text style={styles.label}>Order ID</Text>
+                  <Text style={styles.value}>{mergedData.orderId || 'N/A'}</Text>
                 </View>
                 <View style={styles.row}>
-                  <Text style={{
-                                  ...styles.label,
-                                  border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                  }}>Reg No</Text>
-                  <Text style={{
-                                  ...styles.value,
-                                  border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                  }}>{mergedData.regNumber || 'N/A'}</Text>
+                  <Text style={styles.label}>Reg No</Text>
+                  <Text style={styles.value}>{mergedData.regNumber || 'N/A'}</Text>
                 </View>
                 <View style={styles.row}>
-                  <Text style={{
-                                  ...styles.label,
-                                  border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                  }}>Battery</Text>
-                  <Text style={{
-                                  ...styles.value,
-                                  border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                  }}>{mergedData.batteryFeature || 'N/A'}</Text>
+                  <Text style={styles.label}>Battery Features</Text>
+                  <Text style={styles.value}>{mergedData.batteryFeature || 'N/A'}</Text>
                 </View>
               </View>
               <View style={styles.column}>
                 <View style={styles.row}>
-                  <Text style={{
-                                  ...styles.label,
-                                  border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                  }}>Brand</Text>
-                  <Text style={{
-                                  ...styles.value,
-                                  border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                  }}>{mergedData.carBrand}</Text>
+                  <Text style={styles.label}>Brand</Text>
+                  <Text style={styles.value}>{mergedData.carBrand}</Text>
                 </View>
                 <View style={styles.row}>
-                  <Text style={{
-                                  ...styles.label,
-                                  border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                  }}>Model</Text>
-                  <Text style={{
-                                  ...styles.value,
-                                  border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                  }}>{mergedData.carModel}</Text>
+                  <Text style={styles.label}>Model</Text>
+                  <Text style={styles.value}>{mergedData.carModel}</Text>
                 </View>
                 <View style={styles.row}>
-                  <Text style={{
-                                  ...styles.label,
-                                  border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                  }}>Fuel Type</Text>
-                  <Text style={{
-                                  ...styles.value,
-                                  border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                  }}>{mergedData.carYearFuel}</Text>
+                  <Text style={styles.label}>Fuel Type</Text>
+                  <Text style={styles.value}>{mergedData.carYearFuel}</Text>
                 </View>
                 <View style={styles.row}>
-                  <Text style={{
-                                  ...styles.label,
-                                  border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                  }}>Fuel Status</Text>
-                  <Text style={{
-                                  ...styles.value,
-                                  border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                  }}>{mergedData.fuelStatus}</Text>
+                  <Text style={styles.label}>Fuel Status</Text>
+                  <Text style={styles.value}>{mergedData.fuelStatus}</Text>
                 </View>
                 <View style={styles.row}>
-                  <Text style={{
-                                  ...styles.label,
-                                  border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                  }}>Odometer</Text>
-                  <Text style={{
-                                  ...styles.value,
-                                  border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                  }}>{mergedData.speedometerRd}</Text>
+                  <Text style={styles.label}>Odometer</Text>
+                  <Text style={styles.value}>{mergedData.speedometerRd}</Text>
                 </View>
               </View>
             </View>
@@ -447,107 +314,83 @@ const PDFDocument = ({ data }) => {
             </View>
           </View>
 
-          {/* Work Summary - Updated UI */}
-          <View style={styles.workSummarySectionWrapper}>
+          {/* Work Summary */}
+          <View style={styles.section}>
             <Text style={styles.redHeader}>WORK SUMMARY</Text>
             <View style={styles.table}>
               <View style={styles.tableHeader}>
-                <Text style={{...styles.tableCell, flex: 2, fontWeight: 700}}>Work Detail</Text>
-                <Text style={{...styles.tableCellLast, flex: 3, fontWeight: 700}}>Work to be done</Text>
+                <Text style={{...styles.tableCell, flex: 2}}>Work Detail</Text>
+                <Text style={{...styles.tableCellLast, flex: 3}}>Work to be done</Text>
               </View>
-              {mergedData.workSummary && mergedData.workSummary.length > 0 ? (
-                mergedData.workSummary.map((work, index) => (
-                  <View key={index} style={styles.tableRow}>
-                    <Text style={{...styles.tableCell, flex: 2}}>{work.name || ''}</Text>
-                    <Text style={{...styles.tableCellLast, flex: 3}}>{work.workdone || ''}</Text>
-                  </View>
-                ))
-              ) : (
-                <View style={styles.tableRow}>
-                  <Text style={{...styles.tableCell, flex: 5, textAlign: 'center' /* fontStyle: 'italic' removed */}}>No work summary available.</Text>
+              {mergedData.workSummary.map((work, index) => (
+                <View key={index} style={styles.tableRow}>
+                  <Text style={{...styles.tableCell, flex: 2}}>{work.name || ''}</Text>
+                  <Text style={{...styles.tableCellLast, flex: 3}}>{work.workdone || ''}</Text>
                 </View>
-              )}
+              ))}
             </View>
           </View>
 
-          {/* Additional Work - Updated UI */}
+          {/* Additional Work */}
           <View style={styles.section}>
             <Text style={styles.redHeader}>Additional Work</Text>
-            {additionalWorkItems && additionalWorkItems.length > 0 ? (
-              <View style={styles.grid3}>
-                {additionalWorkItems.reduce((columns, item, index) => {
-                  const colIndex = index % 3;
-                  if (!columns[colIndex]) columns[colIndex] = [];
-                  columns[colIndex].push(item); // Store the raw item string
-                  return columns;
-                }, []).map((columnItems, colIndex) => (
-                  <View key={colIndex} style={styles.additionalWorkColumn}>
-                    {columnItems.map((workItem, itemIndex) => (
-                      <Text key={itemIndex} style={styles.additionalWorkColumnItem}>
-                        - {workItem}
-                      </Text>
-                    ))}
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <Text style={styles.noAdditionalWorkText}>
-                No additional work requirements specified.
-              </Text>
-            )}
+            <Text style={{ textAlign: 'center', paddingHorizontal: 15 }}>
+              {mergedData.additionalWork}
+            </Text>
           </View>
 
-          {/* Workshop Details - Updated UI */}
+          {/* Workshop Details */}
           <View style={styles.section}>
-                      <Text style={styles.redHeader}>WORKSHOP DETAILS</Text>
-                      <View style={styles.grid3}>
-                        <View style={styles.workshopItem}>
-                          <Image src={garageIcon} style={styles.workshopImage} />
-                          <Text style={styles.workshopLabel}>WORKSHOP</Text>
-                          <Text>{mergedData.workshop}</Text>
-                        </View>
-                        <View style={styles.workshopItem}>
-                          <Image src={timeTableIcon} style={styles.workshopImage} />
-                          <Text style={styles.workshopLabel}>DATE & TIME</Text>
-                          <Text>{mergedData.arrival_time}</Text>
-                        </View>
-                        <View style={styles.workshopItem}>
-                          <Image src={qaIcon} style={styles.workshopImage} />
-                          <Text style={styles.workshopLabel}>QA BY</Text>
-                          <Text>ONLYBIGCARS ENGINEER</Text>
-                        </View>
-                      </View>
-                    </View>
+            <Text style={styles.redHeader}>WORKSHOP DETAILS</Text>
+            <View style={styles.grid3}>
+              <View style={styles.workshopItem}>
+                <Image src={garageIcon} style={styles.workshopImage} />
+                <Text style={styles.workshopLabel}>WORKSHOP</Text>
+                <Text>{mergedData.workshop}</Text>
+              </View>
+              <View style={styles.workshopItem}>
+                <Image src={timeTableIcon} style={styles.workshopImage} />
+                <Text style={styles.workshopLabel}>DATE & TIME</Text>
+                <Text>{mergedData.arrival_time}</Text>
+              </View>
+              <View style={styles.workshopItem}>
+                <Image src={qaIcon} style={styles.workshopImage} />
+                <Text style={styles.workshopLabel}>QA BY</Text>
+                <Text>ONLYBIGCARS ENGINEER</Text>
+              </View>
+            </View>
+          </View>
 
           {/* Vehicle Images */}
           <View style={styles.section}>
-            <Text style={styles.redHeader}>VEHICLE IMAGES</Text>
-            {mergedData.images && mergedData.images.length > 0 ? (
-              <View style={styles.imageGrid}>
-                {mergedData.images.map((imageUrl, index) => (
-                  <Image 
-                    key={index}
-                    src={imageUrl} 
-                    style={styles.vehicleImage}
-                    cache={false} // Consider implications of disabling cache
-                  />
-                ))}
-              </View>
-            ) : (
-              <Text style={styles.noImagesText}>No vehicle images available</Text>
-            )}
-          </View>
+  <Text style={styles.redHeader}>VEHICLE IMAGES</Text>
+  
+  {mergedData.images && mergedData.images.length > 0 ? (
+    <View style={styles.imageGrid}>
+      {mergedData.images.map((imageUrl, index) => (
+        <Image 
+          key={index}
+          src={imageUrl} 
+          style={styles.vehicleImage}
+          cache={false}
+        />
+      ))}
+    </View>
+  ) : (
+    <Text style={styles.noImagesText}>No vehicle images available</Text>
+  )}
+</View>
 
           {/* Declaration */}
           <View style={styles.section}>
             <Text style={styles.redHeader}>Declaration</Text>
-            <Text style={{ paddingHorizontal: 15, fontFamily: 'OpenSans', fontWeight: 400 }}>
+            <Text style={{ paddingHorizontal: 15 }}>
               I authorize to execute the jobs described herein using the necessary material cost. I understand that the vehicle is stored, repaired and tested at my own risk.
             </Text>
           </View>
 
           {/* Terms & Conditions */}
-          <View style={{ padding: 15, borderBottom: 'none' }}> {/* Removed borderBottom from the last section wrapper */}
+          <View style={{ padding: 15 }}>
             <Text style={styles.termsHeader}>Terms & Conditions</Text>
             {terms.map((term, index) => (
               <Text key={index} style={styles.term}>{term}</Text>
@@ -581,56 +424,46 @@ const JobCard = forwardRef(({ data }, ref) => {
     images:[],
   };
 
-  const mergedData = useMemo(() => ({ ...defaultData, ...data }), [data]);
+  
+
+  const mergedData = { ...defaultData, ...data };
   const [isLoading, setIsLoading] = useState(true);
-  // Pass mergedData directly to usePDF, it will re-render when mergedData changes.
   const [instance, updateInstance] = usePDF({ document: <PDFDocument data={mergedData} /> });
 
-
   useEffect(() => {
-    if (data) { // Or check mergedData if it's more appropriate
+    if (data) {
       setIsLoading(false);
-      // updateInstance is called by usePDF hook when its props change (document which depends on mergedData)
-      // Explicitly calling updateInstance might be redundant if usePDF handles document prop changes.
-      // However, if direct control is needed or if the document instance needs to be forced:
       updateInstance(<PDFDocument data={mergedData} />);
     }
-  }, [mergedData, updateInstance]); // Depend on mergedData and updateInstance
+  }, [data]);
 
-  const generatePDF = async (retry = 0) => {
+  const generatePDF = async () => {
     try {
       if (instance.loading) {
-        if (retry > 50) throw new Error('PDF generation timeout after multiple retries.'); // Added retry limit
-        await new Promise(resolve => setTimeout(resolve, 100)); // Wait a bit
-        return generatePDF(retry + 1); // Retry
-      }
-      if (!instance.blob) { // Check if blob is available
-        if (retry > 50) throw new Error('PDF blob not available after multiple retries.');
         await new Promise(resolve => setTimeout(resolve, 100));
-        return generatePDF(retry + 1); // Retry
+        return generatePDF();
       }
       const blob = instance.blob;
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      const sanitizeForFilename = (text) => text ? String(text).replace(/[^a-zA-Z0-9-_]/g, '_') : '';
+      // With this code that builds a dynamic filename
+      const sanitizeForFilename = (text) => text ? text.replace(/[^a-zA-Z0-9-_]/g, '_') : '';
       const brandPart = sanitizeForFilename(mergedData.carBrand);
       const modelPart = sanitizeForFilename(mergedData.carModel);
       const orderPart = mergedData.orderId ? `-${sanitizeForFilename(mergedData.orderId)}` : '';
 
       link.download = `JobCard-${brandPart}-${modelPart}${orderPart}.pdf`;
-      document.body.appendChild(link); // Append link to body for Firefox compatibility
       link.click();
-      document.body.removeChild(link); // Clean up
       URL.revokeObjectURL(url);
       return true;
     } catch (error) {
       console.error('PDF generation error:', error);
-      // Consider user-facing error handling here
-      throw error; // Re-throw if calling code needs to handle it
+      throw error;
     }
   };
-const generatePDFBlob = async () => {
+
+  const generatePDFBlob = async () => {
   try {
     if (instance.loading) {
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -654,12 +487,8 @@ const generatePDFBlob = async () => {
   generatePDFBlob, // Add this line
 }));
 
-  if (isLoading || instance.loading) { // Also check instance.loading
-    return <div>Loading PDF...</div>;
-  }
-  if (instance.error) { // Handle PDF generation errors
-    console.error("Error generating PDF:", instance.error);
-    return <div>Error generating PDF. Please try again.</div>;
+  if (isLoading) {
+    return <div>Loading...</div>;
   }
 
   return (
