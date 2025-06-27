@@ -278,105 +278,135 @@ const PDFDocument = ({ data }) => {
               <View style={styles.column}>
                 <View style={styles.row}>
                   <Text style={{
-                                                    ...styles.label,
-                                                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                                    }}>Name</Text>
+                    ...styles.label,
+                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
+                  }}>Name</Text>
                   <Text style={{
-                                                    ...styles.value,
-                                                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                                    }}>{mergedData.customerName}</Text>
+                    ...styles.value,
+                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
+                  }}>{mergedData.customerName}</Text>
                 </View>
                 <View style={styles.row}>
                   <Text style={{
-                                                    ...styles.label,
-                                                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                                    }}>Mobile</Text>
+                    ...styles.label,
+                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
+                  }}>Mobile</Text>
                   <Text style={{
-                                                    ...styles.value,
-                                                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                                    }}>{mergedData.customerMobile}</Text>
+                    ...styles.value,
+                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
+                  }}>{mergedData.customerMobile}</Text>
                 </View>
                 <View style={styles.row}>
                   <Text style={{
-                                                    ...styles.label,
-                                                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                                    }}>Order ID</Text>
+                    ...styles.label,
+                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
+                  }}>Order ID</Text>
                   <Text style={{
-                                                    ...styles.value,
-                                                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                                    }}>{mergedData.orderId || 'N/A'}</Text>
+                    ...styles.value,
+                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
+                  }}>{mergedData.orderId || 'N/A'}</Text>
                 </View>
                 <View style={styles.row}>
                   <Text style={{
-                                                    ...styles.label,
-                                                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                                    }}>Reg No</Text>
+                    ...styles.label,
+                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
+                  }}>Reg No</Text>
                   <Text style={{
-                                                    ...styles.value,
-                                                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                                    }}>{mergedData.regNumber || 'N/A'}</Text>
+                    ...styles.value,
+                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
+                  }}>{mergedData.regNumber || 'N/A'}</Text>
                 </View>
                 <View style={styles.row}>
-                 <Text style={{
-                                                   ...styles.label,
-                                                   border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                                   }}>Battery</Text>
                   <Text style={{
-                                                    ...styles.value,
-                                                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                                    }}>{mergedData.batteryFeature || 'N/A'}</Text>
+                    ...styles.label,
+                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
+                  }}>Battery</Text>
+                  <Text style={{
+                    ...styles.value,
+                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
+                  }}>{mergedData.batteryFeature || 'N/A'}</Text>
+                </View>
+                <View style={styles.row}>
+                  <Text style={{
+                    ...styles.label,
+                    border: '2pt solid #9ca3af'
+                  }}>Date</Text>
+                  <Text style={{
+                    ...styles.value,
+                    border: '2pt solid #9ca3af'
+                  }}>{new Date().toLocaleDateString('en-IN', {
+                    timeZone: 'Asia/Kolkata',
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric'
+                  })}</Text>
                 </View>
               </View>
               <View style={styles.column}>
                 <View style={styles.row}>
                   <Text style={{
-                                                    ...styles.label,
-                                                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                                    }}>Brand</Text>
+                    ...styles.label,
+                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
+                  }}>Brand</Text>
                   <Text style={{
-                                                    ...styles.value,
-                                                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                                    }}>{mergedData.carBrand}</Text>
-                </View>
-                <View style={styles.row}>
-                 <Text style={{
-                                                   ...styles.label,
-                                                   border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                                   }}>Model</Text>
-                  <Text style={{
-                                                    ...styles.value,
-                                                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                                    }}>{mergedData.carModel}</Text>
+                    ...styles.value,
+                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
+                  }}>{mergedData.carBrand}</Text>
                 </View>
                 <View style={styles.row}>
                   <Text style={{
-                                                    ...styles.label,
-                                                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                                    }}>Fuel Type</Text>
+                    ...styles.label,
+                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
+                  }}>Model</Text>
                   <Text style={{
-                                                    ...styles.value,
-                                                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                                    }}>{mergedData.carYearFuel}</Text>
+                    ...styles.value,
+                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
+                  }}>{mergedData.carModel}</Text>
                 </View>
                 <View style={styles.row}>
                   <Text style={{
-                                                    ...styles.label,
-                                                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                                    }}>Fuel Status</Text>
+                    ...styles.label,
+                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
+                  }}>Fuel Type</Text>
                   <Text style={{
-                                                    ...styles.value,
-                                                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                                    }}>{mergedData.fuelStatus}</Text>
+                    ...styles.value,
+                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
+                  }}>{mergedData.carYearFuel}</Text>
                 </View>
                 <View style={styles.row}>
                   <Text style={{
-                                                    ...styles.label,
-                                                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                                    }}>Odometer</Text>
+                    ...styles.label,
+                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
+                  }}>Fuel Status</Text>
                   <Text style={{
-                                                    ...styles.value,
-                                                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
-                                                    }}>{mergedData.speedometerRd}</Text>
+                    ...styles.value,
+                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
+                  }}>{mergedData.fuelStatus}</Text>
+                </View>
+                <View style={styles.row}>
+                  <Text style={{
+                    ...styles.label,
+                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
+                  }}>Odometer</Text>
+                  <Text style={{
+                    ...styles.value,
+                    border: '2pt solid #9ca3af' // Made border bold by increasing from 1pt to 2pt
+                  }}>{mergedData.speedometerRd}</Text>
+                </View>
+                <View style={styles.row}>
+                  <Text style={{
+                    ...styles.label,
+                    border: '2pt solid #9ca3af'
+                  }}>Time</Text>
+                  <Text style={{
+                    ...styles.value,
+                    border: '2pt solid #9ca3af'
+                  }}>{new Date().toLocaleTimeString('en-IN', {
+                    timeZone: 'Asia/Kolkata',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                  })}</Text>
                 </View>
               </View>
             </View>
@@ -385,7 +415,7 @@ const PDFDocument = ({ data }) => {
           {/* Address & Workshop */}
           <View style={styles.section}>
             <Text style={styles.redHeader}>BUSINESS & CUSTOMER DETAILS</Text>
-            <View style={{ 
+            <View style={{
               flexDirection: 'row',
               border: '1pt solid #e5e7eb',
               borderRadius: 5,
@@ -422,7 +452,7 @@ const PDFDocument = ({ data }) => {
                 }}>
                   GSTIN: 06AJTPV6764A1ZP
                 </Text>
-                <View style={{ 
+                <View style={{
                   backgroundColor: '#ffffff',
                   padding: 7.5,
                   borderRadius: 5,
@@ -445,7 +475,7 @@ const PDFDocument = ({ data }) => {
                   </Text>
                 </View>
               </View>
-              
+
               {/* Right: Customer */}
               <View style={{
                 flex: 1,
@@ -528,7 +558,7 @@ const PDFDocument = ({ data }) => {
                 <Text style={{ ...styles.tableCell, flex: 1 }}>GST</Text>
                 <Text style={{ ...styles.tableCellLast, flex: 1 }}>Net Amount</Text>
               </View>
-              
+
               {(mergedData.workDetail || []).map((work, idx) => (
                 <View
                   key={idx}
@@ -542,48 +572,48 @@ const PDFDocument = ({ data }) => {
                     widows: 1,
                   }}
                 >
-                  <Text style={{ 
-                    ...styles.tableCell, 
+                  <Text style={{
+                    ...styles.tableCell,
                     flex: 1.2,
                     wrap: false,
                     break: 'avoid'
                   }}>
                     {work.descriptions || ''}
                   </Text>
-                  <Text style={{ 
-                    ...styles.tableCell, 
+                  <Text style={{
+                    ...styles.tableCell,
                     flex: 2,
                     wrap: false,
                     break: 'avoid'
                   }}>
                     {work.workDn || ''}
                   </Text>
-                  <Text style={{ 
-                    ...styles.tableCell, 
+                  <Text style={{
+                    ...styles.tableCell,
                     flex: 0.7,
                     wrap: false,
                     break: 'avoid'
                   }}>
                     {work.quant ?? 0}
                   </Text>
-                  <Text style={{ 
-                    ...styles.tableCell, 
+                  <Text style={{
+                    ...styles.tableCell,
                     flex: 1,
                     wrap: false,
                     break: 'avoid'
                   }}>
                     {work.unitPr ?? 0}
                   </Text>
-                  <Text style={{ 
-                    ...styles.tableCell, 
+                  <Text style={{
+                    ...styles.tableCell,
                     flex: 1,
                     wrap: false,
                     break: 'avoid'
                   }}>
                     {work.gst ?? 0}%
                   </Text>
-                  <Text style={{ 
-                    ...styles.tableCellLast, 
+                  <Text style={{
+                    ...styles.tableCellLast,
                     flex: 1,
                     wrap: false,
                     break: 'avoid'
@@ -595,9 +625,9 @@ const PDFDocument = ({ data }) => {
 
               {/* Table Footer */}
               {mergedData.totalDiscountedPriceBill > 0 && (
-                <View style={{ 
-                  ...styles.tableTotal, 
-                  wrap: false, 
+                <View style={{
+                  ...styles.tableTotal,
+                  wrap: false,
                   break: 'avoid',
                   minPresenceAhead: 25,
                   orphans: 1,
@@ -611,9 +641,9 @@ const PDFDocument = ({ data }) => {
                   <Text style={{ ...styles.tableCellLast, flex: 1 }}>-{mergedData.totalDiscountedPriceBill}</Text>
                 </View>
               )}
-              <View style={{ 
-                ...styles.tableTotal, 
-                wrap: false, 
+              <View style={{
+                ...styles.tableTotal,
+                wrap: false,
                 break: 'avoid',
                 minPresenceAhead: 25,
                 orphans: 1,
@@ -628,7 +658,7 @@ const PDFDocument = ({ data }) => {
                   {mergedData.workDetail.reduce((sum, w) => sum + ((parseFloat(w.unitPr) || 0) * (parseFloat(w.quant) || 0)), 0).toFixed(2)}
                 </Text>
                 <Text style={{ ...styles.tableCell, flex: 1 }}>
-                  {mergedData.workDetail.length > 0 
+                  {mergedData.workDetail.length > 0
                     ? (mergedData.workDetail.reduce((sum, w) => sum + (parseFloat(w.gst) || 0), 0) / mergedData.workDetail.length).toFixed(1)
                     : '0.0'}%
                 </Text>
