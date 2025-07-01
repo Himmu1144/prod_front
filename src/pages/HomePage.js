@@ -123,7 +123,7 @@ const [filterFormData, setFilterFormData] = useState(() => {
     // const fetchLeads = async () => {
     //     try {
     //         setIsLoading(true);
-    //         const response = await axios.get(`http://localhost:8000/?page=1`, {
+    //         const response = await axios.get(`https://admin.onlybigcars.com/?page=1`, {
     //             headers: { 'Authorization': `Token ${token}` }
     //         });
     
@@ -155,20 +155,20 @@ const [filterFormData, setFilterFormData] = useState(() => {
     //         if (currentView === 'filter') {
     //             console.log('Fetching filtered leads with params:', savedFilterParams);
     //             response = await axios.post(
-    //                 'http://localhost:8000/api/leads/filter/',
+    //                 'https://admin.onlybigcars.com/api/leads/filter/',
     //                 { ...savedFilterParams, page: nextPage },
     //                 { headers: { 'Authorization': `Token ${token}` } }
     //             );
     //         } else if (currentView === 'search') {
     //             console.log('Fetching search results with query:', savedSearchQuery);
     //             response = await axios.get(
-    //                 `http://localhost:8000/api/leads/search/?query=${savedSearchQuery}&page=${nextPage}`,
+    //                 `https://admin.onlybigcars.com/api/leads/search/?query=${savedSearchQuery}&page=${nextPage}`,
     //                 { headers: { 'Authorization': `Token ${token}` } }
     //             );
     //         } else {
     //             console.log('Fetching default leads');
     //             response = await axios.get(
-    //                 `http://localhost:8000/?page=${nextPage}`,
+    //                 `https://admin.onlybigcars.com/?page=${nextPage}`,
     //                 { headers: { 'Authorization': `Token ${token}` } }
     //             );
     //         }
@@ -200,7 +200,7 @@ const [filterFormData, setFilterFormData] = useState(() => {
 const handleClick2Call = async (receiverNo) => {
   try {
     const response = await axios.post(
-      'http://localhost:8000/api/click2call/',
+      'https://admin.onlybigcars.com/api/click2call/',
       { receiver_no: receiverNo },
       { headers: { Authorization: `Token ${token}` } }
     );
@@ -218,7 +218,7 @@ const handleClick2Call = async (receiverNo) => {
     const fetchLeads = async () => {
         try {
             setIsLoading(true);
-            const response = await axios.get(`http://localhost:8000/?page=1`, {
+            const response = await axios.get(`https://admin.onlybigcars.com/?page=1`, {
                 headers: { 'Authorization': `Token ${token}` }
             });
             setLeads(response.data.leads);
@@ -263,18 +263,18 @@ const handleClick2Call = async (receiverNo) => {
     
             if (currentView === 'filter') {
                 response = await axios.post(
-                    'http://localhost:8000/api/leads/filter/',
+                    'https://admin.onlybigcars.com/api/leads/filter/',
                     { ...savedFilterParams, page: nextPage },
                     { headers: { 'Authorization': `Token ${token}` } }
                 );
             } else if (currentView === 'search') {
                 response = await axios.get(
-                    `http://localhost:8000/api/leads/search/?query=${savedSearchQuery}&page=${nextPage}`,
+                    `https://admin.onlybigcars.com/api/leads/search/?query=${savedSearchQuery}&page=${nextPage}`,
                     { headers: { 'Authorization': `Token ${token}` } }
                 );
             } else {
                 response = await axios.get(
-                    `http://localhost:8000/?page=${nextPage}`,
+                    `https://admin.onlybigcars.com/?page=${nextPage}`,
                     { headers: { 'Authorization': `Token ${token}` } }
                 );
             }
@@ -325,7 +325,7 @@ const handleClick2Call = async (receiverNo) => {
         setSearchMessage('');
         try {
             const response = await axios.get(
-                `http://localhost:8000/api/leads/search/?query=${searchQuery}&page=1`,
+                `https://admin.onlybigcars.com/api/leads/search/?query=${searchQuery}&page=1`,
                 { headers: { 'Authorization': `Token ${token}` } }
             );
           
@@ -491,7 +491,7 @@ const handleDateRangeChange = (range) => {
             }
         };
             const response = await axios.post(
-                'http://localhost:8000/api/leads/filter/',
+                'https://admin.onlybigcars.com/api/leads/filter/',
                { ...filterPayload, page: 1 },
                 { headers: { 'Authorization': `Token ${token}` }}
             );
@@ -674,7 +674,7 @@ formatColumns('Date:', lead.arrival_time ?
     useEffect(() => {
         console.log('Here we are - ')
         // Fetch welcome message and users
-        axios.get('http://localhost:8000/', {
+        axios.get('https://admin.onlybigcars.com/', {
             headers: {
                 Authorization: `Token ${token}`
             }
@@ -797,7 +797,7 @@ useEffect(() => {
         // Get recent calls (implement this API endpoint in your backend)
         console.log("📞 Calling API: /api/recent-calls/");
         const response = await axios.get(
-          'http://localhost:8000/api/recent-calls/',
+          'https://admin.onlybigcars.com/api/recent-calls/',
           {
             headers: {
               'Authorization': `Token ${token}`
@@ -879,7 +879,7 @@ useEffect(() => {
   useEffect(() => {
     const fetchUserStatus = async () => {
       try {
-        const response = await axios.get('http://localhost:8000/api/user-status/', {
+        const response = await axios.get('https://admin.onlybigcars.com/api/user-status/', {
           headers: { 'Authorization': `Token ${token}` }
         });
         setUserStatus(response.data.status);
@@ -918,7 +918,7 @@ useEffect(() => {
             
             if (currentView === 'filter') {
                 
-                   url= 'http://localhost:8000/api/leads/export/filter/';
+                   url= 'https://admin.onlybigcars.com/api/leads/export/filter/';
                    method = 'POST';
                    data = {
                     ...savedFilterParams,
@@ -933,12 +933,12 @@ useEffect(() => {
                     
             } else if (currentView === 'search') {
                 
-                   url= `http://localhost:8000/api/leads/export/search/?query=${encodeURIComponent(savedSearchQuery)}`;
+                   url= `https://admin.onlybigcars.com/api/leads/export/search/?query=${encodeURIComponent(savedSearchQuery)}`;
                     
             } else {
                 
-                // url = 'http://localhost:8000/api/leads/export/';
-                url= 'http://localhost:8000/api/leads/export/filter/';
+                // url = 'https://admin.onlybigcars.com/api/leads/export/';
+                url= 'https://admin.onlybigcars.com/api/leads/export/filter/';
                 method = 'POST';
                 
                     
