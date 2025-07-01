@@ -123,7 +123,7 @@ const [filterFormData, setFilterFormData] = useState(() => {
     // const fetchLeads = async () => {
     //     try {
     //         setIsLoading(true);
-    //         const response = await axios.get(`https://admin.onlybigcars.com/?page=1`, {
+    //         const response = await axios.get(`http://localhost:8000/?page=1`, {
     //             headers: { 'Authorization': `Token ${token}` }
     //         });
     
@@ -155,20 +155,20 @@ const [filterFormData, setFilterFormData] = useState(() => {
     //         if (currentView === 'filter') {
     //             console.log('Fetching filtered leads with params:', savedFilterParams);
     //             response = await axios.post(
-    //                 'https://admin.onlybigcars.com/api/leads/filter/',
+    //                 'http://localhost:8000/api/leads/filter/',
     //                 { ...savedFilterParams, page: nextPage },
     //                 { headers: { 'Authorization': `Token ${token}` } }
     //             );
     //         } else if (currentView === 'search') {
     //             console.log('Fetching search results with query:', savedSearchQuery);
     //             response = await axios.get(
-    //                 `https://admin.onlybigcars.com/api/leads/search/?query=${savedSearchQuery}&page=${nextPage}`,
+    //                 `http://localhost:8000/api/leads/search/?query=${savedSearchQuery}&page=${nextPage}`,
     //                 { headers: { 'Authorization': `Token ${token}` } }
     //             );
     //         } else {
     //             console.log('Fetching default leads');
     //             response = await axios.get(
-    //                 `https://admin.onlybigcars.com/?page=${nextPage}`,
+    //                 `http://localhost:8000/?page=${nextPage}`,
     //                 { headers: { 'Authorization': `Token ${token}` } }
     //             );
     //         }
@@ -200,7 +200,7 @@ const [filterFormData, setFilterFormData] = useState(() => {
 const handleClick2Call = async (receiverNo) => {
   try {
     const response = await axios.post(
-      'https://admin.onlybigcars.com/api/click2call/',
+      'http://localhost:8000/api/click2call/',
       { receiver_no: receiverNo },
       { headers: { Authorization: `Token ${token}` } }
     );
@@ -218,7 +218,7 @@ const handleClick2Call = async (receiverNo) => {
     const fetchLeads = async () => {
         try {
             setIsLoading(true);
-            const response = await axios.get(`https://admin.onlybigcars.com/?page=1`, {
+            const response = await axios.get(`http://localhost:8000/?page=1`, {
                 headers: { 'Authorization': `Token ${token}` }
             });
             setLeads(response.data.leads);
@@ -263,18 +263,18 @@ const handleClick2Call = async (receiverNo) => {
     
             if (currentView === 'filter') {
                 response = await axios.post(
-                    'https://admin.onlybigcars.com/api/leads/filter/',
+                    'http://localhost:8000/api/leads/filter/',
                     { ...savedFilterParams, page: nextPage },
                     { headers: { 'Authorization': `Token ${token}` } }
                 );
             } else if (currentView === 'search') {
                 response = await axios.get(
-                    `https://admin.onlybigcars.com/api/leads/search/?query=${savedSearchQuery}&page=${nextPage}`,
+                    `http://localhost:8000/api/leads/search/?query=${savedSearchQuery}&page=${nextPage}`,
                     { headers: { 'Authorization': `Token ${token}` } }
                 );
             } else {
                 response = await axios.get(
-                    `https://admin.onlybigcars.com/?page=${nextPage}`,
+                    `http://localhost:8000/?page=${nextPage}`,
                     { headers: { 'Authorization': `Token ${token}` } }
                 );
             }
@@ -325,7 +325,7 @@ const handleClick2Call = async (receiverNo) => {
         setSearchMessage('');
         try {
             const response = await axios.get(
-                `https://admin.onlybigcars.com/api/leads/search/?query=${searchQuery}&page=1`,
+                `http://localhost:8000/api/leads/search/?query=${searchQuery}&page=1`,
                 { headers: { 'Authorization': `Token ${token}` } }
             );
           
@@ -491,7 +491,7 @@ const handleDateRangeChange = (range) => {
             }
         };
             const response = await axios.post(
-                'https://admin.onlybigcars.com/api/leads/filter/',
+                'http://localhost:8000/api/leads/filter/',
                { ...filterPayload, page: 1 },
                 { headers: { 'Authorization': `Token ${token}` }}
             );
@@ -600,7 +600,7 @@ formatColumns('Date:', lead.arrival_time ?
           '',
           formatColumns('Work Summary:', lead.products?.map(product => product.name).join(', ') || 'N/A', true),
           '',
-          formatColumns('Total Amount:', `₹${lead.estimated_price || 'N/A'}`, true),
+          formatColumns('Total Amount:', `${lead.estimated_price || 'N/A'}`, true),
           '',
           formatMultiLine('Workshop Name:', lead.workshop_details?.name || 'N/A', false),
           '',
@@ -674,7 +674,7 @@ formatColumns('Date:', lead.arrival_time ?
     useEffect(() => {
         console.log('Here we are - ')
         // Fetch welcome message and users
-        axios.get('https://admin.onlybigcars.com/', {
+        axios.get('http://localhost:8000/', {
             headers: {
                 Authorization: `Token ${token}`
             }
@@ -797,7 +797,7 @@ useEffect(() => {
         // Get recent calls (implement this API endpoint in your backend)
         console.log("📞 Calling API: /api/recent-calls/");
         const response = await axios.get(
-          'https://admin.onlybigcars.com/api/recent-calls/',
+          'http://localhost:8000/api/recent-calls/',
           {
             headers: {
               'Authorization': `Token ${token}`
@@ -879,7 +879,7 @@ useEffect(() => {
   useEffect(() => {
     const fetchUserStatus = async () => {
       try {
-        const response = await axios.get('https://admin.onlybigcars.com/api/user-status/', {
+        const response = await axios.get('http://localhost:8000/api/user-status/', {
           headers: { 'Authorization': `Token ${token}` }
         });
         setUserStatus(response.data.status);
@@ -918,7 +918,7 @@ useEffect(() => {
             
             if (currentView === 'filter') {
                 
-                   url= 'https://admin.onlybigcars.com/api/leads/export/filter/';
+                   url= 'http://localhost:8000/api/leads/export/filter/';
                    method = 'POST';
                    data = {
                     ...savedFilterParams,
@@ -933,12 +933,12 @@ useEffect(() => {
                     
             } else if (currentView === 'search') {
                 
-                   url= `https://admin.onlybigcars.com/api/leads/export/search/?query=${encodeURIComponent(savedSearchQuery)}`;
+                   url= `http://localhost:8000/api/leads/export/search/?query=${encodeURIComponent(savedSearchQuery)}`;
                     
             } else {
                 
-                // url = 'https://admin.onlybigcars.com/api/leads/export/';
-                url= 'https://admin.onlybigcars.com/api/leads/export/filter/';
+                // url = 'http://localhost:8000/api/leads/export/';
+                url= 'http://localhost:8000/api/leads/export/filter/';
                 method = 'POST';
                 
                     
@@ -991,13 +991,13 @@ const excelData = response.data.leads.map(lead => ({
         : (typeof lead.inventory === 'string' ? lead.inventory : 'NA'),
     
     // Payment/Commission fields
-    'Estimated Price': typeof lead.estimated_price !== 'undefined' ? `₹${Number(lead.estimated_price).toLocaleString('en-IN')}` : 'NA',
-    'Discount': typeof lead.overview?.discount !== 'undefined' ? `₹${Number(lead.overview?.discount).toLocaleString('en-IN')}` : 'NA',
+    'Estimated Price': typeof lead.estimated_price !== 'undefined' ? `${Number(lead.estimated_price).toLocaleString('en-IN')}` : 'NA',
+    'Discount': typeof lead.overview?.discount !== 'undefined' ? `${Number(lead.overview?.discount).toLocaleString('en-IN')}` : 'NA',
     // 'Final Amount': typeof lead.overview?.finalAmount !== 'undefined' 
-    //     ? `₹${Number(lead.overview.finalAmount).toLocaleString('en-IN')}` 
-    //     : (typeof lead.final_amount !== 'undefined' ? `₹${Number(lead.final_amount).toLocaleString('en-IN')}` : 'NA'),
-    'Commission Due': typeof lead.commission_due !== 'undefined' ? `₹${Number(lead.commission_due).toLocaleString('en-IN')}` : 'NA',
-    'Commission Received': typeof lead.commission_received !== 'undefined' ? `₹${Number(lead.commission_received).toLocaleString('en-IN')}` : 'NA',
+    //     ? `${Number(lead.overview.finalAmount).toLocaleString('en-IN')}` 
+    //     : (typeof lead.final_amount !== 'undefined' ? `${Number(lead.final_amount).toLocaleString('en-IN')}` : 'NA'),
+    'Commission Due': typeof lead.commission_due !== 'undefined' ? `${Number(lead.commission_due).toLocaleString('en-IN')}` : 'NA',
+    'Commission Received': typeof lead.commission_received !== 'undefined' ? `${Number(lead.commission_received).toLocaleString('en-IN')}` : 'NA',
     'Commission Percent': typeof lead.commission_percent !== 'undefined' ? `${lead.commission_percent}%` : 'NA',
     
     
@@ -1014,7 +1014,7 @@ const excelData = response.data.leads.map(lead => ({
       ).join('; ') 
     : (typeof lead.products === 'string' ? lead.products : 'N/A'),
     'Total Amount': lead.overview?.finalAmount !== undefined && lead.overview?.finalAmount !== null 
-        ? `₹${Number(lead.overview.finalAmount).toLocaleString('en-IN')}`
+        ? `${Number(lead.overview.finalAmount).toLocaleString('en-IN')}`
         : 'NA',
 }));    
     
@@ -1783,7 +1783,7 @@ const excelData = response.data.leads.map(lead => ({
                                                     </span>
                                                 </div>
                                             </td> */}
-                                           <td className="p-2 text-center">
+   <td className="p-2 text-center">
     <div className="flex flex-col items-center gap-2">
         <span className={`${lead.status === "Assigned" ? "font-bold text-red-500" : "text-gray-600"}`}>
             {lead.status}

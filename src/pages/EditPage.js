@@ -149,6 +149,8 @@ const EditPage = () => {
   // Add these with your other state declarations
 const [hasShownJobCardReminder, setHasShownJobCardReminder] = useState(false);
 const [hasShownEstimateReminder, setHasShownEstimateReminder] = useState(false);
+// Add these with your other state declarations
+const [hasShownCompletionReminder, setHasShownCompletionReminder] = useState(false);
 const [showReminderPopup, setShowReminderPopup] = useState(false);
 const [reminderType, setReminderType] = useState(''); // 'jobcard' or 'estimate'
   // const [showEstimate, setShowEstimate] = useState(false);
@@ -187,6 +189,10 @@ const [statusCounterData, setStatusCounterData] = useState({
 
   const [previousLeads, setPreviousLeads] = useState([]);
   const [isLoadingPreviousLeads, setIsLoadingPreviousLeads] = useState(false);
+
+  // Add these new state variables
+  const [suggestionStates, setSuggestionStates] = useState({}); // Track suggestions for each row
+  const [selectedSuggestions, setSelectedSuggestions] = useState({}); // Track selected suggestions for each row
 
   // const { isLoaded } = useLoadScript({
   //   googleMapsApiKey: "AIzaSyBlzkfa69pC6YAAomHbsYoDrKcrBU-5CQM",
@@ -297,8 +303,7 @@ const handleSaveGstDetails = () => {
 
 
 
-  // Add this function to check if reminder should be shown
-const checkAndShowReminder = () => {
+ const checkAndShowReminder = () => {
   const currentStatus = formState.arrivalStatus.leadStatus;
   
   // Check for JobCard reminder
@@ -321,251 +326,260 @@ const checkAndShowReminder = () => {
     return true;
   }
   
+  // NEW: Check for Completion reminder
+  if (currentStatus === 'Completed' && 
+      !hasShownCompletionReminder &&
+      (statusCounterData.job_card_count === 0 || statusCounterData.payment_due_count === 0)) {
+    
+    // Determine which reminder to show based on what's missing
+    if (statusCounterData.job_card_count === 0 && statusCounterData.payment_due_count === 0) {
+      setReminderType('completion-both'); // Both are missing
+    } else if (statusCounterData.job_card_count === 0) {
+      setReminderType('completion-jobcard'); // Only JobCard is missing
+    } else {
+      setReminderType('completion-estimate'); // Only Estimate is missing
+    }
+    
+    setShowReminderPopup(true);
+    setHasShownCompletionReminder(true);
+    return true;
+  }
+  
   return false;
 };
 
   // 18 feb start
   // Update the StatusHistoryDisplay component for better error handling and debugging
-  const StatusHistoryDisplay = ({ statusHistory }) => {
-    console.log('StatusHistoryDisplay received:', statusHistory);
-    
-    // Define all possible statuses in your system
-    const allStatuses = [
-      "Assigned", "Follow Up", "Dead", "Duplicate", "Communicate To Ops", 
-      "Referred To Ops", "Walkin", "Pickup", "Doorstep", "At Workshop", 
-      "Job Card", "Payment Due", "Commision Due", "Completed"
-    ];
-    
-    const hasStatus = (statusToCheck) => {
-      try {
-        // If statusHistory isn't an array or is empty, return false immediately
-        if (!Array.isArray(statusHistory) || statusHistory.length === 0) {
-          console.log(`Status history is empty or not an array. Type: ${typeof statusHistory}`);
-          return false;
-        }
-        
-        // Try to find the status in the array - handle different data structures
-        const found = statusHistory.some(entry => {
-          // For object entries with a status property
-          if (entry && typeof entry === 'object' && entry.status) {
-            return entry.status.toLowerCase().trim() === statusToCheck.toLowerCase().trim();
-          }
-          
-          // For string entries
-          if (typeof entry === 'string') {
-            return entry.toLowerCase().trim() === statusToCheck.toLowerCase().trim();
-          }
-          
-          return false;
-        });
-        
-        return found;
-      } catch (error) {
-        console.error('Error in hasStatus:', error);
-        return false;
-      }
-    };
+const StatusHistoryDisplay = ({ statusHistory, statusCounterData = {} }) => {
+  console.log('StatusHistoryDisplay received:', statusHistory);
+  console.log('StatusCounterData received:', statusCounterData);
   
-    // Get the timestamp for the LAST occurrence of a status
-    const getLatestStatusTimestamp = (statusToCheck) => {
-      if (!Array.isArray(statusHistory) || statusHistory.length === 0) {
-        return null;
-      }
-      
-      // Go through history in reverse to find the last occurrence
-      for (let i = statusHistory.length - 1; i >= 0; i--) {
-        const entry = statusHistory[i];
-        
-        if (entry && typeof entry === 'object' && entry.status) {
-          if (entry.status.toLowerCase().trim() === statusToCheck.toLowerCase().trim()) {
-            return new Date(entry.timestamp).toLocaleString();
-          }
-        }
-      }
-      
-      return null;
-    };
-  
-    // Get all unique comments for a status, from newest to oldest
-    const getStatusComments = (statusToCheck) => {
-      if (!Array.isArray(statusHistory) || statusHistory.length === 0) {
-        return [];
-      }
-      
-      // Get all entries for this status, in reverse order (newest first)
-      const matchingEntries = statusHistory
-        .filter(entry => 
-          entry && 
-          typeof entry === 'object' && 
-          entry.status && 
-          entry.status.toLowerCase().trim() === statusToCheck.toLowerCase().trim()
-        )
-        .reverse();
-      
-      // Extract unique comments
-      const uniqueComments = [];
-      
-      matchingEntries.forEach(entry => {
-        const comment = entry.comment;
-        
-        // Skip entries without comments
-        if (!comment) return;
-        
-        // Check if this comment is contained in any comment that's already in our list
-        const isContainedInExisting = uniqueComments.some(existingComment => 
-          existingComment.includes(comment) && existingComment !== comment
-        );
-        
-        // If not already contained in a previous comment, add it
-        if (!isContainedInExisting) {
-          uniqueComments.push(comment);
-        }
-      });
-      
-      return uniqueComments;
-    };
-  
-    // Render component with updated logic
-    return (
-      <div className="status-history-container p-4">
-        {!Array.isArray(statusHistory) || statusHistory.length === 0 ? (
-          <div className="text-center text-gray-500 py-3">
-            No status history available
-          </div>
-        ) : (
-          <div className="grid gap-4">
-            {allStatuses.map((status, index) => {
-              const hasThisStatus = hasStatus(status);
-              
-              if (!hasThisStatus) {
-                // If status doesn't exist, render the gray version
-                return (
-                  <div 
-                    key={index}
-                    className="flex justify-between items-center p-3 rounded-lg bg-gray-50"
-                  >
-                    <div className="flex flex-col w-[85%]">
-                      <span className="font-medium">{status}</span>
-                    </div>
-                    <FaTimesCircle className="text-red-500 text-xl" />
-                  </div>
-                );
-              }
-              
-              // Get timestamp of latest occurrence
-              const timestamp = getLatestStatusTimestamp(status);
-              
-              // Get all unique comments for this status
-              const comments = getStatusComments(status);
-              
-              return (
-                <div 
-                  key={index}
-                  className="flex justify-between items-center p-3 rounded-lg bg-green-50"
-                >
-                  <div className="flex flex-col w-[85%]">
-                    <span className="font-medium">{status}</span>
-                    {timestamp && (
-                      <span className="text-xs text-gray-500">{timestamp}</span>
-                    )}
-                    
-                    {/* // Inside the StatusHistoryDisplay component's return statement, find this section: */}
-{comments.length > 0 && (
-  <div className="text-sm text-gray-600 mt-1">
-    {/* Replace this code */}
-    {/*
-    {comments.map((comment, commentIndex) => (
-      <div key={commentIndex} className={commentIndex > 0 ? "mt-2" : ""}>
-        {comment.length > 100 ? (
-          <CommentWithReadMore text={comment} maxLength={100} />
-        ) : (
-          `"${comment}"`
-        )}
-      </div>
-    ))}
-    */}
-    
-    {/* With this code */}
-    <CommentWithReadMore text={comments} maxLength={100} />
-  </div>
-)}
-                  </div>
-                  <FaCheckCircle className="text-green-500 text-xl" />
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
-  };
-  
-  const CommentWithReadMore = ({ text, maxLength }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-    
-    const toggleReadMore = (e) => {
-      e.preventDefault();
-      setIsExpanded(!isExpanded);
-    };
-    
-    if (!text) return null;
-    
-    // Check if text is an array and join with newlines
-    const combinedText = Array.isArray(text) ? text.join("\n\n") : text;
-    
-    // Instead of truncating at an arbitrary character count,
-    // we'll show a reasonable block of text
-    let displayText = combinedText;
-    let shouldShowButton = false;
-    
-    if (!isExpanded && combinedText.length > maxLength) {
-      // Try to find a natural breakpoint before maxLength
-      const breakpoints = ['\n\n', '\n', '. ', '! ', '? '];
-      let cutoffIndex = maxLength;
-      
-      for (const breakpoint of breakpoints) {
-        const index = combinedText.indexOf(breakpoint, Math.floor(maxLength/2));
-        if (index > 0 && index < maxLength) {
-          cutoffIndex = index + breakpoint.length - (breakpoint === '\n' ? 0 : 1);
-          break;
-        }
-      }
-      
-      displayText = combinedText.substring(0, cutoffIndex);
-      shouldShowButton = true;
+  // Define all possible statuses in your system
+  const allStatuses = [
+    "Assigned", "Follow Up", "Dead", "Duplicate", "Communicate To Ops", 
+    "Referred To Ops", "Walkin", "Pickup", "Doorstep", "At Workshop", 
+    "Job Card", "Payment Due", "Commision Due", "Completed"
+  ];
+
+  // Function to get counter value for specific statuses
+  const getCounterDisplay = (status) => {
+    // Add safety check for statusCounterData
+    if (!statusCounterData) {
+      return { show: false };
     }
     
-    // Replace newlines with line break elements for display
-    const formattedText = isExpanded ? 
-      combinedText.split('\n').map((line, i) => (
-        <React.Fragment key={i}>
-          {i > 0 && <br />}
-          {line}
-        </React.Fragment>
-      )) :
-      displayText.split('\n').map((line, i) => (
-        <React.Fragment key={i}>
-          {i > 0 && <br />}
-          {line}
-        </React.Fragment>
-      ));
-    
-    return (
-      <>
-        <span className="whitespace-pre-line">"{formattedText}{!isExpanded && shouldShowButton ? "..." : ""}"</span>
-        {combinedText.length > maxLength && (
-          <button
-            onClick={toggleReadMore}
-            className="ml-2 text-xs text-red-500 font-medium hover:text-red-700 focus:outline-none"
-          >
-            {isExpanded ? "Show Less" : "Read More"}
-          </button>
-        )}
-      </>
-    );
+    switch(status) {
+      case "Job Card":
+        return {
+          text: `Sent ${statusCounterData.job_card_count || 0}`,
+          show: true
+        };
+      case "Payment Due":
+        return {
+          text: `Est ${statusCounterData.payment_due_count || 0}`,
+          show: true
+        };
+      default:
+        return { show: false };
+    }
+  };
+  
+  const hasStatus = (statusToCheck) => {
+    try {
+      if (!Array.isArray(statusHistory) || statusHistory.length === 0) {
+        console.log(`Status history is empty or not an array. Type: ${typeof statusHistory}`);
+        return false;
+      }
+      
+      const found = statusHistory.some(entry => {
+        if (entry && typeof entry === 'object' && entry.status) {
+          return entry.status.toLowerCase().trim() === statusToCheck.toLowerCase().trim();
+        }
+        
+        if (typeof entry === 'string') {
+          return entry.toLowerCase().trim() === statusToCheck.toLowerCase().trim();
+        }
+        
+        return false;
+      });
+      
+      return found;
+    } catch (error) {
+      console.error('Error in hasStatus:', error);
+      return false;
+    }
   };
 
+  const getLatestStatusTimestamp = (statusToCheck) => {
+    if (!Array.isArray(statusHistory) || statusHistory.length === 0) {
+      return null;
+    }
+    
+    for (let i = statusHistory.length - 1; i >= 0; i--) {
+      const entry = statusHistory[i];
+      
+      if (entry && typeof entry === 'object' && entry.status) {
+        if (entry.status.toLowerCase().trim() === statusToCheck.toLowerCase().trim()) {
+          return new Date(entry.timestamp).toLocaleString();
+        }
+      }
+    }
+    
+    return null;
+  };
 
+  const getStatusComments = (statusToCheck) => {
+    if (!Array.isArray(statusHistory) || statusHistory.length === 0) {
+      return [];
+    }
+    
+    const matchingEntries = statusHistory
+      .filter(entry => 
+        entry && 
+        typeof entry === 'object' && 
+        entry.status && 
+        entry.status.toLowerCase().trim() === statusToCheck.toLowerCase().trim()
+      )
+      .reverse();
+    
+    const uniqueComments = [];
+    
+    matchingEntries.forEach(entry => {
+      const comment = entry.comment;
+      
+      if (!comment) return;
+      
+      const isContainedInExisting = uniqueComments.some(existingComment => 
+        existingComment.includes(comment) && existingComment !== comment
+      );
+      
+      if (!isContainedInExisting) {
+        uniqueComments.push(comment);
+      }
+    });
+    
+    return uniqueComments;
+  };
+  
+  // Render component with updated logic
+  return (
+    <div className="status-history-container p-4">
+      {!Array.isArray(statusHistory) || statusHistory.length === 0 ? (
+        <div className="text-center text-gray-500 py-3">
+          No status history available
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {allStatuses.map((status, index) => {
+            const hasThisStatus = hasStatus(status);
+            const counterInfo = getCounterDisplay(status);
+            const timestamp = hasThisStatus ? getLatestStatusTimestamp(status) : null;
+            const comments = hasThisStatus ? getStatusComments(status) : [];
+            
+            return (
+              <div 
+                key={index}
+                className={`flex justify-between items-center p-3 rounded-lg ${
+                  hasThisStatus ? 'bg-green-50' : 'bg-gray-50'
+                }`}
+              >
+                <div className="flex flex-col w-[85%]">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{status}</span>
+                    {/* Show counter badge for specific statuses regardless of history */}
+                    {counterInfo.show && (
+                      <span className="px-2 py-1 text-xs font-medium text-white bg-green-500 rounded">
+                        {counterInfo.text}
+                      </span>
+                    )}
+                  </div>
+                  {timestamp && (
+                    <span className="text-xs text-gray-500">{timestamp}</span>
+                  )}
+                  
+                  {comments.length > 0 && (
+                    <div className="text-sm text-gray-600 mt-1">
+                      <CommentWithReadMore text={comments} maxLength={100} />
+                    </div>
+                  )}
+                </div>
+                {hasThisStatus ? (
+                  <FaCheckCircle className="text-green-500 text-xl" />
+                ) : (
+                  <FaTimesCircle className="text-red-500 text-xl" />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+  const CommentWithReadMore = ({ text, maxLength }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  const toggleReadMore = (e) => {
+    e.preventDefault();
+    setIsExpanded(!isExpanded);
+  };
+  
+  if (!text) return null;
+  
+  // Check if text is an array and join with newlines
+  const combinedText = Array.isArray(text) ? text.join("\n\n") : text;
+  
+  // Instead of truncating at an arbitrary character count,
+  // we'll show a reasonable block of text
+  let displayText = combinedText;
+  let shouldShowButton = false;
+  
+  if (!isExpanded && combinedText.length > maxLength) {
+    // Try to find a natural breakpoint before maxLength
+    const breakpoints = ['\n\n', '\n', '. ', '! ', '? '];
+    let cutoffIndex = maxLength;
+    
+    for (const breakpoint of breakpoints) {
+      const index = combinedText.indexOf(breakpoint, Math.floor(maxLength/2));
+      if (index > 0 && index < maxLength) {
+        cutoffIndex = index + breakpoint.length - (breakpoint === '\n' ? 0 : 1);
+        break;
+      }
+    }
+    
+    displayText = combinedText.substring(0, cutoffIndex);
+    shouldShowButton = true;
+  }
+  
+  // Replace newlines with line break elements for display
+  const formattedText = isExpanded ? 
+    combinedText.split('\n').map((line, i) => (
+      <React.Fragment key={i}>
+        {i > 0 && <br />}
+        {line}
+      </React.Fragment>
+    )) :
+    displayText.split('\n').map((line, i) => (
+      <React.Fragment key={i}>
+        {i > 0 && <br />}
+        {line}
+      </React.Fragment>
+    ));
+  
+  return (
+    <>
+      <span className="whitespace-pre-line">"{formattedText}{!isExpanded && shouldShowButton ? "..." : ""}"</span>
+      {combinedText.length > maxLength && (
+        <button
+          onClick={toggleReadMore}
+          className="ml-2 text-xs text-red-500 font-medium hover:text-red-700 focus:outline-none"
+        >
+          {isExpanded ? "Show Less" : "Read More"}
+        </button>
+      )}
+    </>
+  );
+};
   
   const shouldHideProducts=()=>{
     return formState.basicInfo.carType=== 'Sell/Buy'|| formState.basicInfo.carType=== 'Spares';
@@ -666,7 +680,7 @@ const checkAndShowReminder = () => {
     try {
       setIsLoadingPreviousLeads(true);
       const response = await axios.get(
-        `https://admin.onlybigcars.com/api/customers/${phoneNumber}/leads/?current_lead=${id || ''}`,
+        `http://localhost:8000/api/customers/${phoneNumber}/leads/?current_lead=${id || ''}`,
         {
           headers: {
             'Authorization': `Token ${token}`
@@ -692,7 +706,7 @@ useEffect(() => {
   const fetchCarData = async () => {
       try {
           // Assuming '/api/car-data/' endpoint returns data structured like [{ name: 'Brand', models: [{ name: 'Model', image_url: '...' }] }]
-          const response = await axios.get(`https://admin.onlybigcars.com/api/car-data/`, {
+          const response = await axios.get(`http://localhost:8000/api/car-data/`, {
               headers: { Authorization: `Token ${token}` },
           });
           setCarBrandsData(response.data);
@@ -733,7 +747,7 @@ useEffect(() => {
       setIsSubmitting(true);
       
       // Use axios instead of fetch for better error handling and consistency
-      axios.get(`https://admin.onlybigcars.com/api/customers/${mobileNumber}/leads/`, {
+      axios.get(`http://localhost:8000/api/customers/${mobileNumber}/leads/`, {
         params: { current_lead: id },
         headers: {
           'Authorization': `Token ${token}`
@@ -879,7 +893,7 @@ useEffect(() => {
     
 
     if (!id) {
-      axios.get('https://admin.onlybigcars.com/', {
+      axios.get('http://localhost:8000/', {
         headers: {
           'Authorization': `Token ${token}`
         }
@@ -899,7 +913,7 @@ useEffect(() => {
         try {
           console.log("Fetching lead with ID:", id); // Debug log
           const response = await axios.get(
-            `https://admin.onlybigcars.com/api/leads/${id}/`,
+            `http://localhost:8000/api/leads/${id}/`,
             {
               headers: {
                 'Authorization': `Token ${token}`
@@ -931,7 +945,7 @@ useEffect(() => {
         
           
           const customerResponse = await axios.get(
-            `https://admin.onlybigcars.com/api/customers/${leadData.number}/`,
+            `http://localhost:8000/api/customers/${leadData.number}/`,
             {
               headers: {
                 'Authorization': `Token ${token}`
@@ -1269,6 +1283,19 @@ useEffect(() => {
 }, [showCustomerStateDropdown, showWorkshopStateDropdown]);
 
 // Reset reminder flags when status changes or counters update
+// useEffect(() => {
+//   // Reset JobCard reminder if status changes away from Job Card or counter becomes > 0
+//   if (formState.arrivalStatus.leadStatus !== 'Job Card' || statusCounterData.job_card_count > 0) {
+//     setHasShownJobCardReminder(false);
+//   }
+  
+//   // Reset Estimate reminder if status changes away from Payment Due or counter becomes > 0
+//   if (formState.arrivalStatus.leadStatus !== 'Payment Due' || statusCounterData.payment_due_count > 0) {
+//     setHasShownEstimateReminder(false);
+//   }
+// }, [formState.arrivalStatus.leadStatus, statusCounterData.job_card_count, statusCounterData.payment_due_count]);
+
+// Reset reminder flags when status changes or counters update
 useEffect(() => {
   // Reset JobCard reminder if status changes away from Job Card or counter becomes > 0
   if (formState.arrivalStatus.leadStatus !== 'Job Card' || statusCounterData.job_card_count > 0) {
@@ -1279,7 +1306,17 @@ useEffect(() => {
   if (formState.arrivalStatus.leadStatus !== 'Payment Due' || statusCounterData.payment_due_count > 0) {
     setHasShownEstimateReminder(false);
   }
-}, [formState.arrivalStatus.leadStatus, statusCounterData.job_card_count, statusCounterData.payment_due_count]);
+  
+  // NEW: Reset Completion reminder if status changes away from Completed or both counters become > 0
+  if (formState.arrivalStatus.leadStatus !== 'Completed' || 
+      (statusCounterData.job_card_count > 0 && statusCounterData.payment_due_count > 0)) {
+    setHasShownCompletionReminder(false);
+  }
+}, [
+  formState.arrivalStatus.leadStatus, 
+  statusCounterData.job_card_count, 
+  statusCounterData.payment_due_count
+]);
 
   // useEffect(() => {
   //   if (isLoaded && addressInputRef.current) {
@@ -1327,7 +1364,7 @@ const handleGSTHeaderClick = () => {
 const handleClick2Call = async (receiverNo) => {
   try {
     const response = await axios.post(
-      'https://admin.onlybigcars.com/api/click2call/',
+      'http://localhost:8000/api/click2call/',
       { receiver_no: receiverNo },
       { headers: { Authorization: `Token ${token}` } }
     );
@@ -1551,7 +1588,7 @@ const handleTotalChange = (index, value) => {
     if (section === 'customerInfo' && field === 'mobileNumber' && value.length === 10) {
       try {
         const response = await axios.get(
-          `https://admin.onlybigcars.com/api/customers/${value}/`,
+          `http://localhost:8000/api/customers/${value}/`,
           {
             headers: {
               'Authorization': `Token ${token}`
@@ -1598,6 +1635,114 @@ const handleTotalChange = (index, value) => {
     }
   };
 
+
+  // Function to get all services from serviceCards
+const getAllServices = () => {
+  return Object.values(serviceCards).flat();
+};
+
+// Function to filter services based on search query
+const getFilteredSuggestions = (query) => {
+  if (!query || query.length < 2) return [];
+  
+  const allServices = getAllServices();
+  return allServices.filter(service =>
+    service.title.toLowerCase().includes(query.toLowerCase())
+  ).slice(0, 5); // Limit to 5 suggestions
+};
+
+// Function to handle suggestion selection
+const handleSuggestionSelect = (rowIndex, service) => {
+  // Close suggestions for this row
+  setSuggestionStates(prev => ({
+    ...prev,
+    [rowIndex]: { isOpen: false, suggestions: [] }
+  }));
+  
+  // Store selected suggestion
+  setSelectedSuggestions(prev => ({
+    ...prev,
+    [rowIndex]: service
+  }));
+  
+  // Auto-fill the row details
+  const newTableData = [...formState.overview.tableData];
+  
+  // Extract work description (same logic as addServiceToTable)
+  const cleanWorkdone = () => {
+    if (service.title === "Comprehensive Service" || 
+        service.title === "Standard Service" || 
+        service.title === "Basic Service") {
+      const serviceList = activeViews[service.title] === 'workshop' 
+        ? service.workshopServices 
+        : service.doorstepServices;
+      
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(serviceList, 'text/html');
+      const items = doc.querySelectorAll('li');
+      return Array.from(items)
+        .map(item => item.textContent.trim())
+        .join(', ');
+    } else {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(service.description, 'text/html');
+      const items = doc.querySelectorAll('li');
+      return Array.from(items)
+        .map(item => item.textContent.trim())
+        .join(', ');
+    }
+  };
+  
+  // Get service price
+  const serviceKey = `${service.id}-${service.title}`;
+  let servicePrice = 0;
+  if (servicePrices[serviceKey] && servicePrices[serviceKey] !== "Determine") {
+    const priceString = servicePrices[serviceKey].replace('₹', '');
+    servicePrice = parseFloat(priceString) || 0;
+  }
+  
+  // Update the row
+  newTableData[rowIndex] = {
+    ...newTableData[rowIndex],
+    type: selectedService || 'Service',
+    name: service.title,
+    workdone: cleanWorkdone(),
+    total: servicePrice,
+    pricePerItem: servicePrice,
+    quantity: newTableData[rowIndex].quantity || 1,
+    gst: 0
+  };
+  
+  // Update form state
+  setFormState(prev => ({
+    ...prev,
+    overview: {
+      ...prev.overview,
+      tableData: newTableData,
+      total: calculateTotalAmount(newTableData),
+      finalAmount: calculateTotalAmount(newTableData) - (parseFloat(discount) || 0)
+    }
+  }));
+  
+  // Update technician comments
+  updateTechnicianComments(newTableData);
+};
+
+// Function to handle input change in sub category field
+const handleSubCategoryChange = (rowIndex, value) => {
+  // Update the name field
+  handleNameChange(rowIndex, value);
+  
+  // Get suggestions and update suggestion state
+  const suggestions = getFilteredSuggestions(value);
+  setSuggestionStates(prev => ({
+    ...prev,
+    [rowIndex]: {
+      isOpen: suggestions.length > 0,
+      suggestions: suggestions
+    }
+  }));
+};
  
   
   const handleAddCar = (carData, isEdit) => {
@@ -2005,8 +2150,8 @@ submissionData.overview = cleanedOverview;
 
 
         const url = id 
-            ? `https://admin.onlybigcars.com/api/leads/${id}/update/`
-            : 'https://admin.onlybigcars.com/api/edit-form-submit/';
+            ? `http://localhost:8000/api/leads/${id}/update/`
+            : 'http://localhost:8000/api/edit-form-submit/';
             
         const method = id ? 'put' : 'post';
         
@@ -3374,7 +3519,7 @@ const handleRephraseWarranty = async () => {
   setIsRephrasing(true);
   try {
       const response = await axios.post(
-          'https://admin.onlybigcars.com/api/rephrase-text/',
+          'http://localhost:8000/api/rephrase-text/',
           { text: warrantyDetails.warranty },
           {
               headers: {
@@ -3606,7 +3751,7 @@ function getNextSellBuyStatus(previousStatus) {
 
 const fetchCustomerData = async (mobileNumber) => {
   try {
-    const response = await fetch(`https://admin.onlybigcars.com/api/customers/${mobileNumber}`, {
+    const response = await fetch(`http://localhost:8000/api/customers/${mobileNumber}`, {
       headers: {
         'Authorization': `Token ${token}`,
       }
@@ -3688,7 +3833,7 @@ const [isGeneratingBill, setIsGeneratingBill] = useState(false);
 
 //       // Send to backend
 //       const response = await axios.post(
-//         'https://admin.onlybigcars.com/api/send-jobcard/',
+//         'http://localhost:8000/api/send-jobcard/',
 //         formData,
 //         {
 //           headers: {
@@ -3792,7 +3937,7 @@ const handleSendJobCard = async () => {
 
       // Send to backend
       const response = await axios.post(
-        'https://admin.onlybigcars.com/api/send-jobcard/',
+        'http://localhost:8000/api/send-jobcard/',
         formData,
         {
           headers: {
@@ -3903,7 +4048,7 @@ const handleSendEstimate = async () => {
 
       // Send to backend
       const response = await axios.post(
-        'https://admin.onlybigcars.com/api/send-estimate/',
+        'http://localhost:8000/api/send-estimate/',
         formData,
         {
           headers: {
@@ -4489,8 +4634,10 @@ const handleGenerateEstimate = async () => {
     <div>
       <Card className="rounded-top-0 border-top-0">
         <Card.Body>
-          <StatusHistoryDisplay statusHistory={formState.arrivalStatus.status_history} />
-          
+          <StatusHistoryDisplay 
+  statusHistory={formState.arrivalStatus.status_history} 
+  statusCounterData={statusCounterData}
+/>
           {/* Add Status Counter Display */}
           {/* <div className="mt-4 p-3 bg-gray-50 rounded">
             <h5 className="mb-3 font-medium">Status Counters</h5>
@@ -5413,7 +5560,7 @@ const handleGenerateEstimate = async () => {
   </div>
 </div>
           <div className="w-full mt-3">
-            <table className="w-full">
+            <table className="w-full overview-table">
               <thead>
               <tr className="bg-red-500 text-white">
   <th className="p-3 text-left">Category</th>
@@ -5464,14 +5611,65 @@ const handleGenerateEstimate = async () => {
                         className="w-full p-1 border rounded"
                       />
                     </td> */}
-                    <td className="p-3">
-                      <input
-                        type="text"
-                        value={row.name}
-                         onChange={(e) => handleNameChange(index, e.target.value)}
+                   <td className="p-3 relative">
+  <input
+    type="text"
+    value={row.name}
+    onChange={(e) => handleSubCategoryChange(index, e.target.value)}
+    onFocus={() => {
+      // Show suggestions if there's already text
+      if (row.name && row.name.length >= 2) {
+        const suggestions = getFilteredSuggestions(row.name);
+        setSuggestionStates(prev => ({
+          ...prev,
+          [index]: {
+            isOpen: suggestions.length > 0,
+            suggestions: suggestions
+          }
+        }));
+      }
+    }}
+    onBlur={(e) => {
+  // Check if the click target is within the suggestions dropdown
+  const suggestionDropdown = e.currentTarget.parentElement.querySelector('.absolute.z-50');
+  if (!suggestionDropdown || !suggestionDropdown.contains(e.relatedTarget)) {
+    setTimeout(() => {
+      setSuggestionStates(prev => ({
+        ...prev,
+        [index]: { ...prev[index], isOpen: false }
+      }));
+    }, 300); // Increased timeout
+  }
+}}
     className="w-full p-1 border rounded"
-                      />
-                    </td>
+    placeholder="Type to search services..."
+  />
+  
+  {/* Suggestions Dropdown */}
+  {suggestionStates[index]?.isOpen && suggestionStates[index]?.suggestions?.length > 0 && (
+    <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+      {suggestionStates[index].suggestions.map((service, suggestionIndex) => (
+        <div
+          key={`${service.id}-${service.title}-${suggestionIndex}`}
+          className="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+          onClick={() => handleSuggestionSelect(index, service)}
+        >
+          <div className="font-medium text-sm text-gray-800">{service.title}</div>
+          <div className="text-xs text-gray-600 mt-1">
+            Price: {
+              servicePrices[`${service.id}-${service.title}`] 
+                ? servicePrices[`${service.id}-${service.title}`]
+                : "Determine"
+            }
+          </div>
+          <div className="text-xs text-gray-500 mt-1">
+            Click to auto-fill details
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+</td>
                     <td className="p-3">
                     <input
   type="text"
@@ -5607,35 +5805,33 @@ const handleGenerateEstimate = async () => {
       
       {/* Send Estimate Button beside Generate Estimate */}
       {cards && (['Estimate', 'Job Card', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
-        <Button
-          variant="outline-success"
-          type="button"
-          disabled={isSubmitting || isSendingEstimate}
-          onClick={handleSendEstimate}
-          className="position-relative d-flex align-items-center h-fit"
+  <Button
+    variant="outline-success"
+    type="button"
+    disabled={isSubmitting || isSendingEstimate}
+    onClick={handleSendEstimate}
+    className="position-relative d-flex align-items-center h-fit"
+  >
+    {isSendingEstimate ? (
+      <>
+        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+        <span className="animate-pulse">Sending Estimate...</span>
+      </>
+    ) : (
+      <>
+        <span className="me-2">
+          {statusCounterData.payment_due_count > 0 ? 'Resend Estimate' : 'Send Estimate'}
+        </span>
+        <span 
+          className="badge bg-success"
+          title={`Estimate sent ${statusCounterData.payment_due_count || 0} time(s)`}
         >
-          {isSendingEstimate ? (
-            <>
-              <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-              <span className="animate-pulse">Sending Estimate...</span>
-            </>
-          ) : (
-            <>
-              <span className="me-2">
-                {statusCounterData.payment_due_count >= 1 ? 'Resend Estimate' : 'Send Estimate'}
-              </span>
-              {statusCounterData.payment_due_count >= 1 && (
-                <span 
-                  className="badge bg-success"
-                  title={`Estimate sent ${statusCounterData.payment_due_count} time(s)`}
-                >
-                  {statusCounterData.payment_due_count}
-                </span>
-              )}
-            </>
-          )}
-        </Button>
-      )}
+          {statusCounterData.payment_due_count || 0}
+        </span>
+      </>
+    )}
+  </Button>
+)}    
     </div>
   </div>
 
@@ -6467,7 +6663,7 @@ const handleGenerateEstimate = async () => {
 
 
 {/* Replace both Send JobCard and Send Estimate buttons with this single button */}
-{cards && (['Job Card', 'Estimate', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
+{/* {cards && (['Job Card', 'Estimate', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
   <Button
     variant="outline-success"
     type="button"
@@ -6477,6 +6673,25 @@ const handleGenerateEstimate = async () => {
   >
     <span className="me-2">Send Card</span>
    
+  </Button>
+)} */}
+
+{cards && (['Job Card', 'Estimate', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
+  <Button
+    variant="outline-success"
+    type="button"
+    disabled={isSubmitting}
+    onClick={() => setShowSendCardPopup(true)}
+    className="position-relative d-flex align-items-center"
+  >
+    <span className="me-2">Send Card</span>
+    {/* Show total count badge */}
+    <span 
+      className="badge bg-success"
+      title={`Total: JobCard sent ${statusCounterData.job_card_count || 0} time(s), Estimate sent ${statusCounterData.payment_due_count || 0} time(s)`}
+    >
+      {(statusCounterData.job_card_count || 0) + (statusCounterData.payment_due_count || 0)}
+    </span>
   </Button>
 )}
 
@@ -7149,69 +7364,64 @@ Generate Bill
       
       {/* Send JobCard Button */}
       <Button
-        variant="outline-success"
-        type="button"
-        disabled={isSubmitting || isSendingJobCard}
-        onClick={() => {
-          // setShowSendCardPopup(false);
-          handleSendJobCard();
-        }}
-        className="w-full mb-4 py-3 text-lg position-relative d-flex align-items-center justify-content-center"
+  variant="outline-success"
+  type="button"
+  disabled={isSubmitting || isSendingJobCard}
+  onClick={() => {
+    handleSendJobCard();
+  }}
+  className="w-full mb-4 py-3 text-lg position-relative d-flex align-items-center justify-content-center"
+>
+  {isSendingJobCard ? (
+    <>
+      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+      <span className="animate-pulse">Sending JobCard...</span>
+    </>
+  ) : (
+    <>
+      <span className="me-2">
+        {statusCounterData.job_card_count > 0 ? 'Resend JobCard' : 'Send JobCard'}
+      </span>
+      <span 
+        className="badge bg-success"
+        title={`JobCard sent ${statusCounterData.job_card_count || 0} time(s)`}
       >
-        {isSendingJobCard ? (
-          <>
-            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-            <span className="animate-pulse">Sending JobCard...</span>
-          </>
-        ) : (
-          <>
-            <span className="me-2">
-              {statusCounterData.job_card_count >= 1 ? 'Resend JobCard' : 'Send JobCard'}
-            </span>
-            {statusCounterData.job_card_count >= 1 && (
-              <span 
-                className="badge bg-success"
-                title={`JobCard sent ${statusCounterData.job_card_count} time(s)`}
-              >
-                {statusCounterData.job_card_count}
-              </span>
-            )}
-          </>
-        )}
-      </Button>
+        {statusCounterData.job_card_count || 0}
+      </span>
+    </>
+  )}
+</Button>
+
       
       {/* Send Estimate Button */}
       <Button
-        variant="outline-info"
-        type="button"
-        disabled={isSubmitting || isSendingEstimate}
-        onClick={() => {
-          // setShowSendCardPopup(false);
-          handleSendEstimate();
-        }}
-        className="w-full py-3 text-lg position-relative d-flex align-items-center justify-content-center"
+  variant="outline-dark"
+  type="button"
+  disabled={isSubmitting || isSendingEstimate}
+  onClick={() => {
+    handleSendEstimate();
+  }}
+  className="w-full py-3 text-lg position-relative d-flex align-items-center justify-content-center"
+>
+  {isSendingEstimate ? (
+    <>
+      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+      <span className="animate-pulse">Sending Estimate...</span>
+    </>
+  ) : (
+    <>
+      <span className="me-2">
+        {statusCounterData.payment_due_count > 0 ? 'Resend Estimate' : 'Send Estimate'}
+      </span>
+      <span 
+        className="badge bg-dark"
+        title={`Estimate sent ${statusCounterData.payment_due_count || 0} time(s)`}
       >
-        {isSendingEstimate ? (
-          <>
-            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-            <span className="animate-pulse">Sending Estimate...</span>
-          </>
-        ) : (
-          <>
-            <span className="me-2">
-              {statusCounterData.payment_due_count >= 1 ? 'Resend Estimate' : 'Send Estimate'}
-            </span>
-            {statusCounterData.payment_due_count >= 1 && (
-              <span 
-                className="badge bg-info"
-                title={`Estimate sent ${statusCounterData.payment_due_count} time(s)`}
-              >
-                {statusCounterData.payment_due_count}
-              </span>
-            )}
-          </>
-        )}
-      </Button>
+        {statusCounterData.payment_due_count || 0}
+      </span>
+    </>
+  )}
+</Button>
     </div>
   </div>
 )}
@@ -7225,7 +7435,6 @@ Generate Bill
         className="absolute top-2 right-2 text-gray-400 hover:text-red-500 text-xl"
         onClick={() => {
           setShowReminderPopup(false);
-          // DON'T continue with save - just close popup
         }}
         aria-label="Close"
       >
@@ -7238,38 +7447,64 @@ Generate Bill
         </div>
         <h2 className="text-lg font-bold text-gray-800 mb-2">Reminder</h2>
         <p className="text-gray-600">
-          {reminderType === 'jobcard' 
-            ? 'No JobCard has been sent yet. Would you like to send the JobCard to the customer?'
-            : 'No Estimate has been sent yet. Would you like to send the Estimate to the customer?'
+          {reminderType === 'jobcard' && 
+            'No JobCard has been sent yet. Would you like to send the JobCard to the customer?'
+          }
+          {reminderType === 'estimate' && 
+            'No Estimate has been sent yet. Would you like to send the Estimate to the customer?'
+          }
+          {reminderType === 'completion-both' && 
+            'Lead is marked as Completed but no JobCard or Estimate has been sent to the customer. Please ensure proper documentation.'
+          }
+          {reminderType === 'completion-jobcard' && 
+            'Lead is marked as Completed but no JobCard has been sent to the customer. Please ensure proper documentation.'
+          }
+          {reminderType === 'completion-estimate' && 
+            'Lead is marked as Completed but no Estimate has been sent to the customer. Please ensure proper documentation.'
           }
         </p>
       </div>
       
       <div className="flex gap-3 w-full">
-        
-        {/* Skip & Save Button */}
         <Button
           variant="outline-secondary"
           type="button"
           onClick={() => {
             setShowReminderPopup(false);
-            // Continue with save without sending
+            // Continue with save
             setTimeout(() => {
               handleSubmit(new Event('submit'));
             }, 100);
           }}
           className="flex-1 py-2"
         >
-          Skip & Save
+          {reminderType.startsWith('completion') ? 'Acknowledge & Save' : 'Skip & Save'}
         </Button>
+        
+        {/* Show send buttons only for non-completion reminders */}
+        {/* {!reminderType.startsWith('completion') && (
+          <Button
+            variant="primary"
+            type="button"
+            onClick={() => {
+              if (reminderType === 'jobcard') {
+                handleSendJobCard();
+              } else if (reminderType === 'estimate') {
+                handleSendEstimate();
+              }
+            }}
+            className="flex-1 py-2"
+          >
+            {reminderType === 'jobcard' ? 'Send JobCard' : 'Send Estimate'}
+          </Button>
+        )} */}
       </div>
     </div>
   </div>
 )}
 
 
-
-// Replace the existing showDesignerPopup block with this
+{/* // Replace the existing showDesignerPopup block with this */}
 {showDesignerPopup && (
   <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.57)" }}>
     <div className="bg-white rounded-lg shadow-lg p-8 w-96 flex flex-col items-center relative">
@@ -7575,6 +7810,6 @@ export default EditPage;
 
 
 
-// https://admin.onlybigcars.com/api/callerdesk-webhook/?type=call_report&coins=4&Status=ANSWER&campid=&CallSid=1744881973.2699220&EndTime=2025-04-17%2015:00:02&Uniqueid=&Direction=IVR&StartTime=2025-04-17%2014:56:13&key_press=&call_group=callgroup1&error_code=0&CallDuration=231&SourceNumber=8700837048&TalkDuration=215&hangup_cause=ANSWER(16)&receiver_name=loknath&DialWhomNumber=09218028154&LegB_Start_time=2025-04-17%2014:56:16&CallRecordingUrl=https://newcallrecords.callerdesk.io/incoming/04_2025/17/86070/20250417-145615-4912-8062649373-1744881973.2699220.wav&LegA_Picked_time=2025-04-17%2014:56:13&LegB_Picked_time=2025-04-17%2014:56:28&DestinationNumber=9999967591
+// http://localhost:8000/api/callerdesk-webhook/?type=call_report&coins=4&Status=ANSWER&campid=&CallSid=1744881973.2699220&EndTime=2025-04-17%2015:00:02&Uniqueid=&Direction=IVR&StartTime=2025-04-17%2014:56:13&key_press=&call_group=callgroup1&error_code=0&CallDuration=231&SourceNumber=8700837048&TalkDuration=215&hangup_cause=ANSWER(16)&receiver_name=loknath&DialWhomNumber=09218028154&LegB_Start_time=2025-04-17%2014:56:16&CallRecordingUrl=https://newcallrecords.callerdesk.io/incoming/04_2025/17/86070/20250417-145615-4912-8062649373-1744881973.2699220.wav&LegA_Picked_time=2025-04-17%2014:56:13&LegB_Picked_time=2025-04-17%2014:56:28&DestinationNumber=9999967591
 
-// https://admin.onlybigcars.com/api/callerdesk-webhook/?type=call_report&coins=4&Status=CANCEL&campid=&CallSid=1744881973.2699220&EndTime=2025-04-17%2015:00:02&Uniqueid=&Direction=IVR&StartTime=2025-04-17%2014:56:13&key_press=&call_group=callgroup1&error_code=0&CallDuration=231&SourceNumber=09958134912&TalkDuration=215&hangup_cause=ANSWER(16)&receiver_name=Anjali&DialWhomNumber=09218028154&LegB_Start_time=2025-04-17%2014:56:16&CallRecordingUrl=https://newcallrecords.callerdesk.io/incoming/04_2025/17/86070/20250417-145615-4912-8062649373-1744881973.2699220.wav&LegA_Picked_time=2025-04-17%2014:56:13&LegB_Picked_time=2025-04-17%2014:56:28&DestinationNumber=9999967591
+// http://localhost:8000/api/callerdesk-webhook/?type=call_report&coins=4&Status=CANCEL&campid=&CallSid=1744881973.2699220&EndTime=2025-04-17%2015:00:02&Uniqueid=&Direction=IVR&StartTime=2025-04-17%2014:56:13&key_press=&call_group=callgroup1&error_code=0&CallDuration=231&SourceNumber=09958134912&TalkDuration=215&hangup_cause=ANSWER(16)&receiver_name=Anjali&DialWhomNumber=09218028154&LegB_Start_time=2025-04-17%2014:56:16&CallRecordingUrl=https://newcallrecords.callerdesk.io/incoming/04_2025/17/86070/20250417-145615-4912-8062649373-1744881973.2699220.wav&LegA_Picked_time=2025-04-17%2014:56:13&LegB_Picked_time=2025-04-17%2014:56:28&DestinationNumber=9999967591

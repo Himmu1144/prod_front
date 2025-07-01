@@ -13,8 +13,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
   const dLon = (lon2 - lon1) * Math.PI / 180;
   const a = 
     Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2);
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   const distance = R * c; // Distance in km
   return distance;
@@ -38,10 +37,6 @@ const getDayOfWeek = (date = new Date()) => {
   return DAYS_OF_WEEK[date.getDay() === 0 ? 6 : date.getDay() - 1];
 };
 
-const getDayIndex = (date = new Date()) => {
-  return date.getDay() === 0 ? 6 : date.getDay() - 1; // 0 for Monday, 6 for Sunday
-};
-
 const formatTime = (timeStr) => {
   if (!timeStr || typeof timeStr !== 'string' || timeStr.split(':').length !== 2) return 'N/A';
   // The input timeStr is already in 24-hour format (e.g., "09:00", "18:00")
@@ -51,36 +46,14 @@ const formatTime = (timeStr) => {
   return `${hours}:${minutes}`; // Return in 24-hour format
 };
 
-// Helper to find the most recent past operational period's close time and day
-const getEffectivePreviousClose = (allHours, currentDayIndex) => {
-  for (let i = 0; i < 7; i++) { // Iterate backwards from yesterday
-    const dayIdxToCheck = (currentDayIndex - 1 - i + 7) % 7;
-    const dayName = DAYS_OF_WEEK[dayIdxToCheck];
-    const dayHours = allHours[dayName];
-    if (dayHours && !dayHours.is_closed && dayHours.close) {
-      return { time: formatTime(dayHours.close), shortDay: DAYS_OF_WEEK_SHORT[dayIdxToCheck] };
-    }
-  }
-  return { time: "N/A", shortDay: "N/A" }; // Fallback
-};
-
-// Helper to find the next upcoming operational period's open time and day
-const getEffectiveNextOpen = (allHours, currentDayIndex, startFromToday = false) => {
-  for (let i = 0; i < 7; i++) {
-    const offset = startFromToday ? i : i + 1;
-    const dayIdxToCheck = (currentDayIndex + offset) % 7;
-    const dayName = DAYS_OF_WEEK[dayIdxToCheck];
-    const dayHours = allHours[dayName];
-    if (dayHours && !dayHours.is_closed && dayHours.open) {
-      return { time: formatTime(dayHours.open), shortDay: DAYS_OF_WEEK_SHORT[dayIdxToCheck] };
-    }
-  }
-  return { time: "N/A", shortDay: "N/A" }; // Fallback
-};
-
+/**
+ * NEW getGarageStatus function with updated logic.
+ * This function determines the garage's current status text and color
+ * based on the user's requirements.
+ */
 const getGarageStatus = (garageOperatingHours) => {
   const todayName = getDayOfWeek();
-  const todayIndex = getDayIndex();
+  const todayIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
   const todayShort = DAYS_OF_WEEK_SHORT[todayIndex];
 
   const now = new Date();
@@ -91,24 +64,19 @@ const getGarageStatus = (garageOperatingHours) => {
 
   // Case 1: Today is explicitly marked as closed (e.g., Sunday is_closed: true)
   if (!todayHours || todayHours.is_closed) {
-    const prevClose = getEffectivePreviousClose(allHours, todayIndex);
-    const nextOpen = getEffectiveNextOpen(allHours, todayIndex); // Looks for next open day starting from tomorrow
-
     return {
-      statusText: `Closed: ${prevClose.time} (${prevClose.shortDay}) - ${nextOpen.time} (${nextOpen.shortDay})`,
+      statusText: `Closed (${todayShort})`,
       statusColor: 'text-red-500',
       isCurrentlyOpen: false,
     };
   }
 
-  // Case 2: Today has operating hours (is_closed: false)
-  // Validate open/close times before parsing
+  // Case 2: Today has operating hours. Validate them.
   if (typeof todayHours.open !== 'string' || typeof todayHours.close !== 'string' ||
       !todayHours.open.includes(':') || !todayHours.close.includes(':')) {
     // Handle invalid time format for an operating day
-    const nextOpen = getEffectiveNextOpen(allHours, todayIndex, true); // Check if it might open later today or next available
     return {
-        statusText: `Closed (schedule error) - Next Open: ${nextOpen.time} (${nextOpen.shortDay})`,
+        statusText: `Closed (schedule error)`,
         statusColor: 'text-red-500',
         isCurrentlyOpen: false,
     };
@@ -125,7 +93,8 @@ const getGarageStatus = (garageOperatingHours) => {
   // Subcase 2.1: Currently Open
   if (currentTime >= openTime && currentTime < closeTime) {
     return {
-      statusText: `Open: ${formattedTodayOpen} (${todayShort}) - ${formattedTodayClose} (${todayShort})`,
+      // Requirement: Show today's full opening hours with a single day abbreviation
+      statusText: `${formattedTodayOpen} - ${formattedTodayClose} (${todayShort})`,
       statusColor: 'text-green-600',
       isCurrentlyOpen: true,
     };
@@ -134,18 +103,18 @@ const getGarageStatus = (garageOperatingHours) => {
   else {
     // Subcase 2.2.1: Before opening time today
     if (currentTime < openTime) {
-      const prevClose = getEffectivePreviousClose(allHours, todayIndex);
+      // Requirement: Show the opening times for the day even if it's currently closed.
       return {
-        statusText: `Closed: ${prevClose.time} (${prevClose.shortDay}) - ${formattedTodayOpen} (${todayShort})`,
-        statusColor: 'text-red-500',
+        statusText: `${formattedTodayOpen} - ${formattedTodayClose} (${todayShort})`,
+        statusColor: 'text-red-500', // Red because it's not actually open yet
         isCurrentlyOpen: false,
       };
     }
     // Subcase 2.2.2: After closing time today
     else { // currentTime >= closeTime
-      const nextOpen = getEffectiveNextOpen(allHours, todayIndex); // Looks for next open day starting from tomorrow
+      // Requirement: Just show that it's closed for the day.
       return {
-        statusText: `Closed: ${formattedTodayClose} (${todayShort}) - ${nextOpen.time} (${nextOpen.shortDay})`,
+        statusText: `Closed (${todayShort})`,
         statusColor: 'text-red-500',
         isCurrentlyOpen: false,
       };
@@ -167,7 +136,7 @@ const GarageSelector = ({ onClose, onSelectGarage, userLocation }) => {
   useEffect(() => {
     const fetchGarages = async () => {
       try {
-        const response = await axios.get('https://admin.onlybigcars.com/api/garages/', {
+        const response = await axios.get('http://localhost:8000/api/garages/', {
           headers: {
             'Authorization': `Token ${token}`
           }
@@ -292,7 +261,7 @@ const GarageSelector = ({ onClose, onSelectGarage, userLocation }) => {
                               const uniqueGarageId = garage.id || garage.name; // Use a consistent identifier
                               const isExpanded = expandedTimingsGarageId === uniqueGarageId;
               
-                              return (
+                                                              return (
                                 <div 
                                   key={uniqueGarageId} 
                                   className={`border border-gray-200 rounded-lg p-4 ${
@@ -310,13 +279,12 @@ const GarageSelector = ({ onClose, onSelectGarage, userLocation }) => {
                                         <h3 className={`font-medium mb-1 ${!garage.is_active ? 'text-gray-400' : 'text-gray-700'}`}>
                                           {garage.name}
                                         </h3>
-                                        <p className={`text-sm font-medium ${!garage.is_active ? 'text-gray-400' : 'text-gray-600'}`}>
-                                          Locality: <span className="font-bold">{garage.locality}</span>
+                                        <p className={`text-sm font-bold ${!garage.is_active ? 'text-gray-400' : 'text-gray-600'}`}>
+                                          Locality: <span className="font-semibold">{garage.locality}</span>
                                         </p>
-                                        <p className={`text-sm mb-1 font-medium ${!garage.is_active ? 'text-gray-400' : 'text-gray-600'}`}>
-                                          Mechanic: <span className="font-bold">{garage.mechanic}</span>, Mobile: <span className="font-bold">{garage.mobile}</span>
+                                        <p className={`text-sm mb-1 font-bold ${!garage.is_active ? 'text-gray-400' : 'text-gray-600'}`}>
+                                          Mechanic: <span className="font-semibold">{garage.mechanic}</span>, Mobile: <span className="font-semibold">{garage.mobile}</span>
                                         </p>
-                                        {/* Removed old status message paragraph */}
                                         {!garage.is_active && (
                                           <p className="text-xs text-red-500 mt-1">
                                             Inactive Workshop
@@ -329,62 +297,63 @@ const GarageSelector = ({ onClose, onSelectGarage, userLocation }) => {
                                         )}
                                       </div>
                                       
-                                      {garage.is_active && (
-                                        <a 
-                                          href={garage.link} 
-                                          target="_blank" 
-                                          rel="noopener noreferrer"
-                                          className="flex items-center text-red-600 hover:text-red-700 ml-2 flex-shrink-0"
-                                          onClick={(e) => e.stopPropagation()} 
-                                        >
-                                          <MapPin size={20} />
-                                          <span className="ml-1">DIRECTIONS</span>
-                                        </a>
-                                      )}
-                                    </div>
+                                      <div className="flex flex-col items-end">
+                                        {garage.is_active && (
+                                          <a 
+                                            href={garage.link} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="flex items-center text-red-600 hover:text-red-700 ml-2 flex-shrink-0"
+                                            onClick={(e) => e.stopPropagation()} 
+                                          >
+                                            <MapPin size={20} />
+                                            <span className="ml-1">DIRECTIONS</span>
+                                          </a>
+                                        )}
+                                        <text className={`text-sm`}>Night Shift: <span className={garage.night_shift ? 'text-green-600' : 'text-red-600'}>{garage.night_shift ? 'Yes' : 'No'}</span></text>
+
+                                        {/* Compact timing card inside main garage card, below directions */}
+                                        {garage.is_active && (
+                                          <div className="relative mt-2 w-fit">
+                                            <div
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleTimingsExpansion(uniqueGarageId);
+                                              }}
+                                              className={`px-3 py-1.5 text-sm font-medium flex items-center justify-between cursor-pointer hover:bg-gray-50 ${status.statusColor} border border-gray-200 rounded`}
+                                            >
+                                              <span className="mr-2">{status.statusText}</span>
+                                              {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                            </div>
+                    
+                                            {isExpanded && (
+                                              <div className="absolute top-full right-0 mt-1 w-full z-10 bg-white border border-gray-200 rounded shadow-lg">
+                                                <div className="px-3 py-2 text-xs">
+                                                  <div className="space-y-0.5">
+                                                  {DAYS_OF_WEEK.map(day => {
+                                                    const dayHours = (garage.operating_hours || DEFAULT_OPERATING_HOURS)[day];
+                                                    const dayShort = DAYS_OF_WEEK_SHORT[DAYS_OF_WEEK.indexOf(day)];
+                                                    return (
+                                                      <div key={day} className="flex justify-between">
+                                                       
+                                                        {dayHours && !dayHours.is_closed ? (
+                                                          <span className="text-gray-800">{`${formatTime(dayHours.open)} - ${formatTime(dayHours.close)} (${dayShort})`}</span>
+                                                        ) : (
+                                                          <span className="text-red-500">{`Closed (${dayShort})`}</span>
+                                                        )}
+                                                      </div>
+                                                    );
+                                                  })}
+                                                </div>
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                   </div>
                                   </div>
-                                  <text className={`text-sm ${garage.night_shift? 'text-green-600': 'text-red-600'}`}>Night Shift: {garage.night_shift ? 'Yes' : 'No'}</text>
-                                  
-                                  {/* New clickable status and schedule toggle */}
-                                  {garage.is_active && (
-                                    <div
-                                      onClick={(e) => {
-                                        e.stopPropagation(); // Prevent garage selection
-                                        toggleTimingsExpansion(uniqueGarageId);
-                                      }}
-                                      className={`text-sm font-medium mt-2 flex items-center cursor-pointer ${status.statusColor}`}
-                                    >
-                                      <span>{status.statusText}</span>
-                                      {isExpanded ? <ChevronUp size={16} className="ml-1" /> : <ChevronDown size={16} className="ml-1" />}
-                                    </div>
-                                  )}
-              
-                                  {/* Removed old toggle button */}
-                                      
-                                  {garage.is_active && (
-                                    <div className="mt-2">
-                                      {isExpanded && (
-                                        <div className="mt-2 p-3 bg-gray-50 rounded text-sm">
-                                          <h4 className="font-semibold mb-1 text-gray-700">Weekly Hours:</h4>
-                                          <ul className="space-y-1">
-                                            {DAYS_OF_WEEK.map(day => {
-                                              const dayHours = (garage.operating_hours || DEFAULT_OPERATING_HOURS)[day];
-                                              return (
-                                                <li key={day} className="flex justify-between">
-                                                  <span className="text-gray-600">{day}:</span>
-                                                  {dayHours && !dayHours.is_closed ? (
-                                                    <span className="text-gray-800">{formatTime(dayHours.open)} - {formatTime(dayHours.close)}</span>
-                                                  ) : (
-                                                    <span className="text-red-500">Closed</span>
-                                                  )}
-                                                </li>
-                                              );
-                                            })}
-                                          </ul>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
+
                                 </div>
                               );
                             })

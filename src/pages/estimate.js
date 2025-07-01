@@ -2,6 +2,8 @@ import React, { forwardRef, useImperativeHandle, useState, useEffect } from 'rea
 import { PDFViewer, usePDF, Document, Page, View, Text, Image, StyleSheet } from '@react-pdf/renderer';
 import obcLogo from '../assets/images/OBC-logo.png';
 import orangecheck from '../assets/images/orange_check.png';
+import warrantyBanner from '../assets/images/warranty_banner.png';
+import shieldIcon from '../assets/images/shield_icon.png'; // Assuming you have a shield icon for trust badges
 
 // Define styles for PDF rendering
 const styles = StyleSheet.create({
@@ -31,8 +33,8 @@ const styles = StyleSheet.create({
     height: 15, // 20px * 0.75pt
   },
   check: {
-    width: 10, // 21px * 0.75pt
-    height: 10, // 21px * 0.75pt
+    width: 14, // 21px * 0.75pt
+    height: 14, // 21px * 0.75pt
   },
   title: {
     fontSize: 18,
@@ -355,8 +357,8 @@ trustBadgeTick: {
   // Warranty terms section
   warrantyTermsContainer: {
     backgroundColor: '#ffffff',
-    borderRadius: 8,
-    padding: 15,
+    borderRadius: 1,
+    padding: 0,
     marginTop: 15,
     border: '1pt solid #e2e8f0',
   },
@@ -450,7 +452,7 @@ trustBadgeTick: {
     color: '#000000', // Changed to black
   },
   warrantyDescription: {
-    fontSize: 10,
+    fontSize: 12,
     color: '#000000', // Changed to black
     lineHeight: 1.4,
   },
@@ -463,6 +465,10 @@ trustBadgeTick: {
     fontSize: 8,
     textAlign: 'center',
     marginTop: 6,
+  },
+  warrantyBanner: {
+    width: '100%',
+    marginBottom: 15,
   },
 });
 
@@ -544,7 +550,12 @@ const PDFDocument = ({ data }) => {
                 </View>
                 <View style={styles.row}>
                   <Text style={styles.label}>Date</Text>
-                  <Text style={styles.value}>{mergedData.estimatedDate || 'N/A'}</Text>
+                  <Text style={styles.value}>{new Date().toLocaleDateString('en-IN', {
+                    timeZone: 'Asia/Kolkata',
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric'
+                  })}</Text>
                 </View>
               </View>
               <View style={styles.column}>
@@ -570,7 +581,12 @@ const PDFDocument = ({ data }) => {
                 </View>
                 <View style={styles.row}>
                   <Text style={styles.label}>Time</Text>
-                  <Text style={styles.value}>{mergedData.estimatedTime || 'N/A'}</Text>
+                  <Text style={styles.value}>{new Date().toLocaleTimeString('en-IN', {
+                    timeZone: 'Asia/Kolkata',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true
+                  })}</Text>
                 </View>
               </View>
             </View>
@@ -643,12 +659,9 @@ const PDFDocument = ({ data }) => {
 
 {/* Simplified Warranty Section */}
 <View style={styles.warrantySection}>
-  {/* Red Header */}
-  <Text style={styles.redHeader}>
-    WARRANTY DETAILS
-  </Text>
   
-{/* Trust Badges */}
+  
+{/* Trust Badges
 <View style={styles.trustBadgeContainer}>
   <View style={styles.trustBadge}>
     <View style={styles.trustBadgeIcon}>
@@ -668,21 +681,21 @@ const PDFDocument = ({ data }) => {
     </View>
     <Text style={styles.trustBadgeText}>Protected</Text>
   </View>
-</View>
+</View> */}
 
             {/* Custom warranty details from data */}
              {mergedData.warrantyDetails && mergedData.warrantyDetails.length > 0 && (
-              <View style={styles.warrantyTermsContainer}>
-                <Text style={styles.warrantyTermsHeader}>
-                  {/* ADDITIONAL WARRANTY DETAILS */}
-                </Text>
+              <View style={styles.warrantyTermsContainer} wrap={false}>
+                
                  {mergedData.warranty && (
                     <View>
+                      <Image src={warrantyBanner} style={styles.warrantyBanner} />
+                      <View style={{ paddingVertical: 15, paddingHorizontal: 21 }}>
                       {typeof mergedData.warranty === 'string' && mergedData.warranty.includes('\n')
                         ? mergedData.warranty.split('\n').filter(point => point.trim()).map((point, index) => (
-                            <View key={index} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 5 }}>
-                              <Image src={orangecheck} style={{ ...styles.check, marginRight: 5, marginTop: 1.5 }} />
-                              <Text style={{ ...styles.warrantyDescription, flex: 1 }}>
+                            <View key={index} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 15,  }}>
+                              <Image src={shieldIcon} style={{ ...styles.check, marginRight: 5, marginLeft: 5, marginTop: 1.5 }} />
+                              <Text style={{ ...styles.warrantyDescription, flex: 1,  }}>
                                 {point.trim()}
                               </Text>
                             </View>
@@ -693,6 +706,7 @@ const PDFDocument = ({ data }) => {
                           </Text>
                         )
                       }
+                      </View>
                     </View>
   )}
 </View>
@@ -701,7 +715,7 @@ const PDFDocument = ({ data }) => {
             
       
             {/* Standard warranty terms */}
-            <View style={styles.warrantyTermsContainer}>
+            <View style={{ ...styles.warrantyTermsContainer, borderRadius: 5 , padding: 5 }}>
               <Text style={styles.warrantyTermsHeader}>
                 WARRANTY TERMS & CONDITIONS
               </Text>
