@@ -427,3 +427,34 @@ option:disabled {
   position: relative;
   overflow: visible;
 }
+
+
+/* Add this to prevent horizontal page scroll */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Prevent horizontal scroll on the main container */
+body, html {
+  overflow-x: hidden;
+}
+
+/* Ensure the main content doesn't cause horizontal scroll */
+.min-w-800px {
+  min-width: 100% !important;
+}
+
+@media (max-width: 768px) {
+  .min-w-800px {
+    min-width: 100% !important;
+  }
+}

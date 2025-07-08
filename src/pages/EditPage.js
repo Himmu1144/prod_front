@@ -116,8 +116,12 @@ const EditPage = () => {
   const [validationErrors, setValidationErrors] = useState({});
   const [showPopup, setShowPopup] = useState(false);
   const [discount, setDiscount] = useState(0);
+
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 790);
   const [cards, setCards] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isWx, setIsWx] = useState(true);
   const [users, setUsers] = useState([]);
   const [selectedCarIndex, setSelectedCarIndex] = useState(0);
   // Add this line near the top of your component
@@ -248,7 +252,7 @@ const handleRemoveExistingImage = (index) => {
   const [searchQuery, setSearchQuery] = useState('');
   
 
-  const services = ['Car Service', 'AC Service & Repair','Complete Car Inspection','Denting & Painting','Detailing for Luxury Cars','Brakes & Suspension','Car Battery & Electricals','Tyre & Wheel Care','Cleaning & Grooming','Clutch & Body Parts','Insurance Services & SOS-Emergency','Windshields & Lights'];
+  const services = ['Car Service', 'AC Service & Repair','Car Inspection','Denting & Painting','Car Detailing','Brakes & Suspension','Battery & Electricals','Tyre & Wheel Care','Cleaning & Grooming','Clutch & Body Parts','Insurance & SOS','Windshields & Lights'];
   const [selectedService, setSelectedService] = useState('Car Service');
 
   const [selectedGarage, setSelectedGarage] = useState({
@@ -633,6 +637,7 @@ const StatusHistoryDisplay = ({ statusHistory, statusCounterData = {} }) => {
       commissionReceived: 0, // Add this new field
       commissionPercent: 0, // Add this new field
       pendingAmount: 0, // Add this new field
+      gst: 0,
      
     },
     workshop: {
@@ -701,6 +706,21 @@ useEffect(() => {
   }
 }, [formState.customerInfo.mobileNumber, id]);
 
+useEffect(() => {
+    const checkIfMobile = () => {
+        const isMobileDevice = window.innerWidth <= 768;
+        console.log('=== MOBILE DETECTION ===');
+        console.log('Window width:', window.innerWidth);
+        console.log('Is mobile:', isMobileDevice);
+        console.log('========================');
+        setIsMobile(isMobileDevice);
+    };
+    
+    checkIfMobile(); // Check on initial load
+    window.addEventListener('resize', checkIfMobile);
+    
+    return () => window.removeEventListener('resize', checkIfMobile);
+}, []);
 
 useEffect(() => {
   const fetchCarData = async () => {
@@ -901,6 +921,7 @@ useEffect(() => {
       .then(response => {
         // Set admin status and users list
         setIsAdmin(response.data.is_admin || false);
+        setIsWx(response.data.is_wx || false);
         setUsers(response.data.users || []);
       })
       .catch(error => {
@@ -1033,6 +1054,7 @@ useEffect(() => {
               commissionDue: leadData.commission_due || 0, // Add this new field
               commissionReceived: leadData.commission_received || 0, // Add this new field
               commissionPercent: leadData.commission_percent || 0, // Add this new field
+              gst: leadData.wxgst || calculateAverageGST(leadData.products || []), // Add this new field
               batteryFeature: leadData.battery_feature || '', // Add this new field
               gstin: leadData.gstin || '', // Add this new field
               pendingAmount: leadData.pending_amount || 0, // Add this new field
@@ -1102,7 +1124,10 @@ useEffect(() => {
           if (response.data.is_admin !== undefined) {
             setIsAdmin(response.data.is_admin);
           }
-          
+          if (response.data.is_wx !== undefined) {
+            setIsWx(response.data.is_wx);
+          }
+
           if (response.data.users) {
             setUsers(response.data.users);
           }
@@ -1335,22 +1360,70 @@ useEffect(() => {
   //     });
   //   }
   // }, [isLoaded]);
+// const handleGSTHeaderClick = () => {
+//   const newTableData = formState.overview.tableData.map(row => {
+//     const quantity = row.quantity || 1;
+//     let baseTotal;
+//     if (row.pricePerItem !== undefined) {
+//       baseTotal = row.pricePerItem * quantity;
+//     } else {
+//       const prevGST = parseFloat(row.gst ?? 18);
+//       baseTotal = prevGST > 0 ? (parseFloat(row.total) / (1 + prevGST / 100)) : parseFloat(row.total);
+//     }
+//     return {
+//       ...row,
+//       gst: 0,
+//       total: Math.round(baseTotal) // Ensure integer
+//     };
+//   });
+//   setFormState(prev => ({
+//     ...prev,
+//     overview: {
+//       ...prev.overview,
+//       tableData: newTableData,
+//       total: calculateTotalAmount(newTableData),
+//       finalAmount: calculateTotalAmount(newTableData) - (parseFloat(discount) || 0)
+//     }
+//   }));
+// };
+
 const handleGSTHeaderClick = () => {
+  // First, check if all rows currently have 0% GST
+  const allRowsHaveZeroGST = formState.overview.tableData.every(row => 
+    (parseFloat(row.gst) || 0) === 0
+  );
+  
   const newTableData = formState.overview.tableData.map(row => {
     const quantity = row.quantity || 1;
     let baseTotal;
+    
+    // Calculate base price (without any GST)
     if (row.pricePerItem !== undefined) {
       baseTotal = row.pricePerItem * quantity;
     } else {
-      const prevGST = parseFloat(row.gst ?? 18);
-      baseTotal = prevGST > 0 ? (parseFloat(row.total) / (1 + prevGST / 100)) : parseFloat(row.total);
+      const currentGST = parseFloat(row.gst ?? 18);
+      baseTotal = currentGST > 0 ? (parseFloat(row.total) / (1 + currentGST / 100)) : parseFloat(row.total);
     }
-    return {
-      ...row,
-      gst: 0,
-      total: Math.round(baseTotal) // Ensure integer
-    };
+    
+    if (allRowsHaveZeroGST) {
+      // All rows are 0%, so SET to 18%
+      const totalWith18GST = Math.round(baseTotal + (baseTotal * 18 / 100));
+      return {
+        ...row,
+        gst: 18,
+        total: totalWith18GST
+      };
+    } else {
+      // Some rows have GST, so RESET to 0%
+      return {
+        ...row,
+        gst: 0,
+        total: Math.round(baseTotal)
+      };
+    }
   });
+  
+  // Update form state with new data
   setFormState(prev => ({
     ...prev,
     overview: {
@@ -1412,12 +1485,16 @@ const handleGSTChange = (index, value) => {
 
   // Calculate new total with new GST
   const totalWithGST = Math.round(baseTotal + (newGST > 0 ? (baseTotal * newGST / 100) : 0));
-
-  newTableData[index] = {
-    ...row,
-    gst: newGST,
-    total: totalWithGST
+ // Calculate new suggested GST
+ 
+ newTableData[index] = {
+   ...row,
+   gst: newGST,
+   total: totalWithGST
   };
+  
+  const suggestedGST = calculateAverageGST(newTableData);
+
 
   setFormState(prev => ({
     ...prev,
@@ -1426,6 +1503,11 @@ const handleGSTChange = (index, value) => {
       tableData: newTableData,
       total: calculateTotalAmount(newTableData),
       finalAmount: calculateTotalAmount(newTableData) - (parseFloat(discount) || 0)
+    },
+    // Update GST suggestion only if user hasn't manually changed it
+    arrivalStatus: {
+      ...prev.arrivalStatus,
+      gst: prev.arrivalStatus.gst === 0 ? suggestedGST : prev.arrivalStatus.gst
     }
   }));
 };
@@ -1856,7 +1938,7 @@ const validateForm = () => {
     { field: 'leadStatus', value: formState.arrivalStatus.leadStatus, label: 'Lead status' },
     { field: 'arrivalMode', value: formState.arrivalStatus.arrivalMode, label: 'Arrival mode' },
     { field: 'dateTime', value: formState.arrivalStatus.dateTime, label: 'Date and time' },
-    { field: 'caName', value: formState.basicInfo.caName, label: 'Technician' },
+    ...(!isMobile ? [{ field: 'caName', value: formState.basicInfo.caName, label: 'Technician' }] : []),
     { field: 'cceName', value: formState.basicInfo.cceName, label: 'CCE name' },
   ];
 
@@ -2393,7 +2475,7 @@ submissionData.overview = cleanedOverview;
         price: "Determine"
       }
     ],
-    'Complete Car Inspection': [
+    'Car Inspection': [
         {
           id: 1,
           title: "Second Hand Car Inspection",
@@ -2535,7 +2617,7 @@ submissionData.overview = cleanedOverview;
           price: "Determine"
         }
     ],
-    'Detailing for Luxury Cars': [
+    'Car Detailing': [
         {
           id: 1,
           title: "Ceramic Coating",
@@ -2779,7 +2861,7 @@ submissionData.overview = cleanedOverview;
           price: "Determine"
         }
     ],
-    'Car Battery & Electricals': [
+    'Battery & Electricals': [
         {
           id: 1,
           title: "Amaron (55 Months Warranty)",
@@ -3027,7 +3109,7 @@ submissionData.overview = cleanedOverview;
           price: "Determine"
         }
     ],
-    'Insurance Services & SOS-Emergency': [
+    'Insurance & SOS': [
       {
         id: 1,
         title: "Know Your Policy",
@@ -3470,6 +3552,9 @@ const handleAddEmptyRow = () => {
 
   setFormState(prev => {
     const newTableData = [...prev.overview.tableData, emptyRow];
+     // Calculate new average GST for suggestion
+  const suggestedGST = calculateAverageGST(newTableData);
+  
     return {
       ...prev,
       overview: {
@@ -3483,7 +3568,12 @@ const handleAddEmptyRow = () => {
           .map(row => `${row.name} to be done`)
           .filter(Boolean)
           .join('\n')
-      }
+      },
+    // Update GST field only if it's currently 0 (not manually set by user)
+    arrivalStatus: {
+      ...prev.arrivalStatus,
+      gst: prev.arrivalStatus.gst === 0 ? suggestedGST : prev.arrivalStatus.gst
+    }
     };
   });
 };
@@ -3614,8 +3704,8 @@ const statusHierarchy4 = [
 ];
 const statusHierarchy5 = [
   "test", "Converted", "At Workshop", 
- "Walkin", "Pickup", "Doorstep",  "Estimate","Payment Due" ,"Commision Due" ,"Job Card", "Completed","Assigned","Follow Up", "Dead", "Communicate To Ops", 
- "Referred To Ops" ,"Duplicate"
+ "Walkin", "Pickup", "Doorstep",  "Estimate","Payment Due" ,"Commision Due" ,"Job Card", "Completed","Assigned","Dead", "Communicate To Ops", 
+  "Duplicate", "Referred To Ops", "Follow Up"
 ];
 const statusHierarchy6 = [
   "test",  "At Workshop", "Job Card",
@@ -4155,6 +4245,17 @@ const calculateCommissionDetails = (finalAmount, commissionDue, commissionReceiv
   };
 };
 
+const calculateAverageGST = (tableData) => {
+  if (!tableData || tableData.length === 0) return 0;
+  
+  const totalGST = tableData.reduce((sum, row) => {
+    const gst = parseFloat(row.gst) || 0;
+    return sum + gst;
+  }, 0);
+  
+  return Math.round(totalGST / tableData.length);
+};
+
 // Modify the handleInputChange function for commission-related fields
 // const handleCommissionChange = (field, value) => {
 //   const finalAmount = field === 'finalAmount' 
@@ -4510,9 +4611,86 @@ const handleGenerateEstimate = async () => {
         )} */}
 
         {/* Left Sidebar - Fixed */}
-        <div className="flex h-[calc(90vh-76px)]" style={{ padding: "6px", marginBottom: "5em" }}>
-          <div className="w-1/4 bg-gray-50 p-2 top-[76px] h-[calc(90vh-76px)] overflow-y-auto">
-          <div className="dropdown-container">
+<div className="w-full">
+  <div className="w-full">
+        <div className="flex flex-col lg:flex-row h-[calc(90vh-76px)]" style={{ padding: "6px", marginBottom: "5em" }}>
+           {/* Mobile Drawer Toggle Button - Only for Mobile */}
+            {isMobile && (
+              <button
+                type="button"
+                onClick={() => setIsMobileDrawerOpen(!isMobileDrawerOpen)}
+                className="fixed top-20 left-4 z-50 bg-red-500 text-white p-2 rounded-full shadow-lg md:hidden"
+                style={{ zIndex: 1000 }}
+              >
+                <svg 
+                  className="w-5 h-5" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    strokeWidth={2} 
+                    d="M4 6h16M4 12h16M4 18h16" 
+                  />
+                </svg>
+              </button>
+            )}
+            
+            {/* Desktop Drawer Toggle Button - Only for Desktop */}
+            {/* {!isMobile && (
+              <button
+                type="button"
+                onClick={() => setIsMobileDrawerOpen(!isMobileDrawerOpen)}
+                className="fixed top-36 left-4 z-50 bg-blue-500 text-white p-2 rounded-full shadow-lg"
+                title="Toggle Drawers"
+              >
+                <svg 
+                  className="w-5 h-5" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24" 
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    strokeWidth="2" 
+                    d="M4 6h16M4 12h16m-7 6h7"
+                  ></path>
+                </svg>
+              </button>
+            )} */}
+
+            {/* Left Sidebar - Desktop always visible, Mobile as drawer */}
+            <div className={`
+              ${isMobile 
+                ? `fixed inset-y-0 left-0 z-40 transform transition-transform duration-300 ease-in-out ${
+                    isMobileDrawerOpen ? 'translate-x-0' : '-translate-x-full'
+                  } w-80 bg-gray-50`
+                : 'w-full lg:w-1/4 bg-gray-50'
+              } 
+              p-2 top-[76px] h-[calc(90vh-76px)] overflow-y-auto
+            `}>
+              
+              {/* Mobile Drawer Header */}
+              {isMobile && (
+                <div className="flex justify-between items-center p-4 border-b border-gray-200 mb-4">
+                  <h2 className="text-lg font-semibold text-gray-800">Menu</h2>
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileDrawerOpen(false)}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              )}
+
+<div className="dropdown-container">
   <Button
     onClick={() => setIsOpen(!isOpen)}
     variant="dark"
@@ -4539,7 +4717,10 @@ const handleGenerateEstimate = async () => {
                 <div 
                 className="mt-3 p-2 border rounded cursor-pointer hover:bg-gray-100 transition-colors" 
                 key={index}
-                onClick={() => navigate(`/edit/${lead.id}`)}
+                onClick={() => {
+                                  navigate(`/edit/${lead.id}`);
+                                  if (isMobile) setIsMobileDrawerOpen(false);
+                                }}
                 style={{ cursor: 'pointer' }}
                 >
 
@@ -4571,7 +4752,7 @@ const handleGenerateEstimate = async () => {
       </Card>
     </div>
   </Collapse>
-</div>
+  </div>
 
             {/* <div className="dropdown-container" style={{ marginTop: "15px" }}>
               <Button
@@ -4673,6 +4854,7 @@ const handleGenerateEstimate = async () => {
       </Card>
     </div>
   </Collapse>
+  </div>
 </div>
             {/* <div className="dropdown-container" style={{ marginTop: "15px" }}>
               <Button
@@ -4697,7 +4879,7 @@ const handleGenerateEstimate = async () => {
 
 
 
-          </div>
+          
 
 
 
@@ -4705,7 +4887,19 @@ const handleGenerateEstimate = async () => {
           {/* Middle Section - Scrollable */}
 
 
-          <div className="w-3/4 p-1 overflow-y-auto h-[calc(90vh-76px)]" >
+         {/* Overlay for mobile drawer */}
+            {isMobile && isMobileDrawerOpen && (
+              <div 
+                className="fixed inset-0 bg-black bg-opacity-50 z-30"
+                onClick={() => setIsMobileDrawerOpen(false)}
+              />
+            )}
+
+            {/* Middle Section - Adjusts width based on mobile/desktop */}
+            <div className={`
+              ${isMobile ? 'w-full' : 'w-full lg:w-3/4'} 
+              p-1 overflow-y-auto h-[calc(90vh-76px)]
+            `}>
 
 
 
@@ -4743,8 +4937,55 @@ const handleGenerateEstimate = async () => {
             <div className="p-2 border border-gray-200 w-full font-sans relative">
 
               <div className='relative' style={{ padding: "6px", border: "6px solid #f9f9fb", borderRadius: "4px" }}>
+                {isMobile && (
+  <div className="flex w-full gap-2 mb-3 text-xs">
+    {/* Section 1: Lead & Order ID */}
+    <div className="flex-1 bg-gray-100 p-2 rounded-md space-y-1">
+      <div>
+        <span className="text-gray-500 block">LEAD ID</span>
+        <span className="font-semibold text-gray-800 font-mono truncate">{formatLeadId(formState.customerInfo.mobileNumber, seqNum) || id || 'NA'}</span>
+      </div>
+      <div>
+        <span className="text-gray-500 block">ORDER ID</span>
+        <span className="font-semibold text-gray-800 font-mono">{formState.arrivalStatus.orderId || 'NA'}</span>
+      </div>
+    </div>
+
+    {/* Section 2: Amount & Vehicle */}
+    <div className="flex-1 bg-gray-100 p-2 rounded-md space-y-1">
+      <div>
+        <span className="text-gray-500 block">AMOUNT PAID</span>
+        <span className="font-semibold text-green-600">₹{formState.overview.finalAmount || 0}</span>
+      </div>
+      <div>
+        <span className="text-gray-500 block">VEHICLE</span>
+        <span className="font-semibold text-gray-800 truncate">
+          {formState.cars.length > 0 
+            ? `${formState.cars[selectedCarIndex]?.carBrand || ''} ${formState.cars[selectedCarIndex]?.carModel || ''}`
+            : 'No Car'}
+        </span>
+      </div>
+    </div>
+
+    {/* Section 3: Dates */}
+    <div className="flex-1 bg-gray-100 p-2 rounded-md space-y-1">
+      <div>
+        <span className="text-gray-500 block">CREATED</span>
+        <span className="font-semibold text-gray-800">
+          {formState.created_at ? new Date(formState.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'NA'}
+        </span>
+      </div>
+      <div>
+        <span className="text-gray-500 block">MODIFIED</span>
+        <span className="font-semibold text-gray-800">
+          {formState.updated_at ? new Date(formState.updated_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'NA'}
+        </span>
+      </div>
+    </div>
+  </div>
+)}
                 {/* Top Section */}
-                <div className="flex justify-between">
+                {!isMobile && (<div className="flex justify-between">
                   {/* Order Info Box */}
                   <div className="p-3 border border-gray-200 rounded" style={{ backgroundColor: "#DEE1E6" }}>
                     <div style={{ backgroundColor: "white", border: "1px solid black", borderRadius: "4px", padding: "10px" }}>
@@ -4795,6 +5036,7 @@ const handleGenerateEstimate = async () => {
 
 
                 </div>
+                )}
 
                 <div className='flex justify-between'>
                   {/* Add Lead Button */}
@@ -4875,29 +5117,31 @@ const handleGenerateEstimate = async () => {
     </div>
   )}
 </div> */}
-<div className="mt-2 flex items-center gap-2">
-  <select
-    value={formState.basicInfo.carType}
-    onChange={(e) => handleInputChange('basicInfo', 'carType', e.target.value)}
-    className={`px-3 py-2 text-sm font-medium border rounded-md min-w-[140px] h-10 bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-150 ${
-      !formState.basicInfo.carType ? 'border-red-300' : 'border-gray-200'
-    }`}
-    required={!isAdmin}
-  >
-    <option value="">Lead Type*</option>
-    <option value="Luxury">Luxury</option>
-    <option value="Normal">Normal</option>
-    <option value="Insurance">Insurance</option>
-    <option value="Sell/Buy">Sell/Buy</option>
-    <option value="Spares">Spares</option>
-  </select>
+{!isMobile && (
+  <div className="mt-2 flex items-center gap-2">
+    <select
+      value={formState.basicInfo.carType}
+      onChange={(e) => handleInputChange('basicInfo', 'carType', e.target.value)}
+      className={`px-3 py-2 text-sm font-medium border rounded-md min-w-[140px] h-10 bg-white hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-150 ${
+        !formState.basicInfo.carType ? 'border-red-300' : 'border-gray-200'
+      }`}
+      required={!isAdmin}
+    >
+      <option value="">Lead Type*</option>
+      <option value="Luxury">Luxury</option>
+      <option value="Normal">Normal</option>
+      <option value="Insurance">Insurance</option>
+      <option value="Sell/Buy">Sell/Buy</option>
+      <option value="Spares">Spares</option>
+    </select>
 
-  {validationErrors.carType && (
-    <div className="text-red-500 text-xs mt-1">
-      {validationErrors.carType}
-    </div>
-  )}
-</div>
+    {validationErrors.carType && (
+      <div className="text-red-500 text-xs mt-1">
+        {validationErrors.carType}
+      </div>
+    )}
+  </div>
+)}
                 </div>
 
               </div>
@@ -5029,15 +5273,38 @@ const handleGenerateEstimate = async () => {
                   />
                 </div>
 
-                <div className="flex-1">
-                  <input
-                    type="email"
-                    value={formState.customerInfo.customerEmail}
-                    onChange={(e) => handleInputChange('customerInfo', 'customerEmail', e.target.value)}
-                    className="w-full p-2 border border-gray-200 rounded bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200"
-                    placeholder="Customer Email"
-                  />
-                </div>
+                {isMobile && (
+    <div className="flex-1">
+      <select
+        value={formState.basicInfo.carType}
+        onChange={(e) => handleInputChange('basicInfo', 'carType', e.target.value)}
+        className={`w-full p-2 border rounded bg-white ${
+          !formState.basicInfo.carType ? 'border-red-300' : 'border-gray-200'
+        }`}
+        required={!isAdmin}
+      >
+        <option value="">Lead Type*</option>
+        <option value="Luxury">Luxury</option>
+        <option value="Normal">Normal</option>
+        <option value="Insurance">Insurance</option>
+        <option value="Sell/Buy">Sell/Buy</option>
+        <option value="Spares">Spares</option>
+      </select>
+    </div>
+  )}
+
+  {/* Conditionally render the email input for non-mobile views */}
+  {!isMobile && (
+    <div className="flex-1">
+      <input
+        type="email"
+        value={formState.customerInfo.customerEmail}
+        onChange={(e) => handleInputChange('customerInfo', 'customerEmail', e.target.value)}
+        className="w-full p-2 border border-gray-200 rounded bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200"
+        placeholder="Customer Email"
+      />
+    </div>
+  )}
 
               {/* Replace language barrier button with checkbox */}
 {/* <div className="flex-1">
@@ -5055,7 +5322,7 @@ const handleGenerateEstimate = async () => {
               </div>
 
               {/* Description Section */}
-              <div className="m-3 mt-2 bg-gray-50 p-4 rounded">
+              {/* <div className="m-3 mt-2 bg-gray-50 p-4 rounded">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-5 h-5 rounded-full bg-black text-white flex items-center justify-center text-xs">
                     i
@@ -5065,7 +5332,7 @@ const handleGenerateEstimate = async () => {
                 <p className="text-xs text-gray-600 m-0">
                 Please state: This call is concerning the interest you have shown in our services. Kindly include the customer's name, the car model they are interested in, and their location before beginning your pitch.
                 </p>
-              </div>
+              </div> */}
 
 
             </div>
@@ -5077,35 +5344,73 @@ const handleGenerateEstimate = async () => {
 
               {/* Location Form */}
               {/* Location Form */}
-<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-<LocationSearch 
-  ref={addressInputRef}
-  value={formState.location.address}
-  onChange={(e) => handleInputChange('location', 'address', e.target.value)}
-  onPlaceSelect={handlePlaceSelect}
-  className="p-2 border border-gray-300 rounded-md"
-  placeholder="Address*"
-  required={!isAdmin} 
-/>
-  <input
-    type="text"
-    value={formState.location.city}
-    onChange={(e) => handleInputChange('location', 'city', e.target.value)}
-    className="p-2 border border-gray-300 rounded-md"
-    placeholder="City"
-    required={!isAdmin}
-  />
-  <input
-    type="text"
-    value={formState.location.state}
-    onChange={(e) => handleInputChange('location', 'state', e.target.value)}
-    className="p-2 border border-gray-300 rounded-md"
-    placeholder="State"
-    required={!isAdmin}
-  />
-</div>
+{/* Location Form */}
+{isMobile ? (
+  <div className="flex gap-2 mb-6">
+    <div className="flex-grow">
+      <LocationSearch 
+        ref={addressInputRef}
+        value={formState.location.address}
+        onChange={(e) => handleInputChange('location', 'address', e.target.value)}
+        onPlaceSelect={handlePlaceSelect}
+        className="p-2 border border-gray-300 rounded-md w-full"
+        placeholder="Address*"
+        required={!isAdmin} 
+      />
+    </div>
+    <div style={{ width: '25%' }}>
+      <input
+        type="text"
+        value={formState.location.city}
+        onChange={(e) => handleInputChange('location', 'city', e.target.value)}
+        className="p-2 border border-gray-300 rounded-md w-full"
+        placeholder="City"
+        required={!isAdmin}
+      />
+    </div>
+    <div style={{ width: '25%' }}>
+      <input
+        type="text"
+        value={formState.location.state}
+        onChange={(e) => handleInputChange('location', 'state', e.target.value)}
+        className="p-2 border border-gray-300 rounded-md w-full"
+        placeholder="State"
+        required={!isAdmin}
+      />
+    </div>
+  </div>
+) : (
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    <LocationSearch 
+      ref={addressInputRef}
+      value={formState.location.address}
+      onChange={(e) => handleInputChange('location', 'address', e.target.value)}
+      onPlaceSelect={handlePlaceSelect}
+      className="p-2 border border-gray-300 rounded-md"
+      placeholder="Address*"
+      required={!isAdmin} 
+    />
+    <input
+      type="text"
+      value={formState.location.city}
+      onChange={(e) => handleInputChange('location', 'city', e.target.value)}
+      className="p-2 border border-gray-300 rounded-md"
+      placeholder="City"
+      required={!isAdmin}
+    />
+    <input
+      type="text"
+      value={formState.location.state}
+      onChange={(e) => handleInputChange('location', 'state', e.target.value)}
+      className="p-2 border border-gray-300 rounded-md"
+      placeholder="State"
+      required={!isAdmin}
+    />
+  </div>
+)}
 
               {/* Optional Fields */}
+              {!isMobile && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <input
                   type="text"
@@ -5129,6 +5434,7 @@ const handleGenerateEstimate = async () => {
                   placeholder="Landmark (Optional)"
                 />
               </div>
+              )}
 
               {/* Add New Car Button */}
               {/* <button 
@@ -5406,7 +5712,7 @@ const handleGenerateEstimate = async () => {
           />
                        {!shouldHideProducts()&&(
                                   <>
-                                            <div className="text-gray-700 mb-4 mt-3" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>Our Feature Services</div>
+                                            {/* <div className="text-gray-700 mb-4 mt-3" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>Our Feature Services</div> */}
                                   
                                             <div style={{ display: 'flex', flexWrap: 'wrap' }}> 
                                               {services.map((service, index) => (
@@ -5435,91 +5741,108 @@ const handleGenerateEstimate = async () => {
           {/* Add Search Bar */}
           
 {/* search div product */}
+{/* // Replace the product cards section (around lines 5740-5825) with this: */}
 <div className="w-full">
-            <div className="flex overflow-x-auto gap-4 p-4 scrollbar-hide snap-x snap-mandatory">
-              {filteredServices.map((service) => (
-  <div key={`${service.id}-${service.title}`} className="flex-none w-[calc(33.333%-1rem)] snap-center border border-gray-200 rounded-lg p-2 bg-white hover:shadow-lg transition-shadow">
-    <div className="mb-4" style={{ padding: "15px", border: "1px solid black", borderRadius: "4px", height: "200px" }}>
-      <h3 className="text-lg font-semibold mb-2">{service.title}</h3>
-      <ul className="list-none p-0 space-y-1">
+  <div className="flex overflow-x-auto gap-4 p-4 scrollbar-hide snap-x snap-mandatory">
+    {filteredServices.map((service) => (
+      <div 
+        key={`${service.id}-${service.title}`} 
+        className={`flex-none snap-center border border-gray-200 rounded-lg p-2 bg-white hover:shadow-lg transition-shadow ${
+          isMobile ? 'w-[calc(50%-0.5rem)]' : 'w-[calc(33.333%-1rem)]'
+        }`}
+      >
+        <div className="mb-4" style={{ padding: "15px", border: "1px solid black", borderRadius: "4px", height: "200px" }}>
+          <h3 className={`${isMobile ? 'text-base' : 'text-lg'} font-semibold mb-2`}>{service.title}</h3>
+          <ul className="list-none p-0 space-y-1">
+            {(service.title === "Comprehensive Service" || 
+              service.title === "Standard Service" || 
+              service.title === "Basic Service") ? (
+              <div className="description-container" style={serviceCardStyles.descriptionContainer}
+              dangerouslySetInnerHTML={{
+                __html: activeViews[service.title] === 'workshop' 
+                  ? service.workshopServices 
+                  : service.doorstepServices
+              }}
+              />
+            ) : (
+              <div className="description-container" style={serviceCardStyles.descriptionContainer}
+              dangerouslySetInnerHTML={{ __html: service.description }}
+              />
+            )}
+          </ul>
+        </div>
+
         {(service.title === "Comprehensive Service" || 
           service.title === "Standard Service" || 
           service.title === "Basic Service") ? (
-          <div className="description-container" style={serviceCardStyles.descriptionContainer}
-          dangerouslySetInnerHTML={{
-            __html: activeViews[service.title] === 'workshop' 
-              ? service.workshopServices 
-              : service.doorstepServices
-          }}
-          />
-        ) : (
-          <div className="description-container" style={serviceCardStyles.descriptionContainer}
-          dangerouslySetInnerHTML={{ __html: service.description }}
-          />
-        )}
-      </ul>
-    </div>
-
-    {(service.title === "Comprehensive Service" || 
-      service.title === "Standard Service" || 
-      service.title === "Basic Service") ? (
-      // Show Workshop/Doorstep buttons for specific services
-      <div className="flex gap-2 mb-4">
-        <button 
-          type="button" // Add this
-          onClick={() => setActiveViews(prev=>({
-            ...prev,
-            [service.title]:'workshop'
-          }))}
-          className={`flex-1 py-2 px-4 rounded transition-colors ${
-            activeViews[service.title] === 'workshop' 
-              ? 'bg-gray-800 text-white' 
-              : 'bg-gray-200 text-gray-800'
-          }`}
-        >
-          Workshop
-        </button>
-        <button 
-          type="button" // Add this
-          onClick={() => setActiveViews(prev=>({
-            ...prev,
-            [service.title]:'doorstep'
-          }))}
-          className={`flex-1 py-2 px-4 rounded transition-colors ${
-            activeViews[service.title] === 'doorstep' 
-              ? 'bg-gray-800 text-white' 
-              : 'bg-gray-200 text-gray-800'
-          }`}
-        >
-          Doorstep
-        </button>
-      </div>
-    ) : (
-      // Show View Warranty button for other services
-      <button type='button' className="w-full bg-gray-800 text-white py-2 px-4 rounded hover:bg-gray-700 mb-4">
-        View Warranty
-      </button>
-    )}
-
-    <div className="flex items-center justify-between">
-    <span className="text-gray-600">
-  Price: {
-    priceError ? "Determine" : 
-    (loadingPrices ? "Loading..." : servicePrices[`${service.id}-${service.title}`] || "Determine")
-  }
-</span>
-      <button 
-        type="button"
-        onClick={() => addServiceToTable(service)}
-        className="bg-gray-800 text-white w-8 h-8 rounded-full hover:bg-gray-700 flex items-center justify-center"
-      >
-        +
-      </button>
-    </div>
-  </div>
-))}
-            </div>
+          // Show Workshop/Doorstep buttons for specific services
+          <div className="flex gap-1 mb-4">
+            <button 
+              type="button"
+              onClick={() => setActiveViews(prev=>({
+                ...prev,
+                [service.title]:'workshop'
+              }))}
+              className={`flex-1 rounded transition-colors ${
+                isMobile ? 'py-1 px-2 text-xs' : 'py-2 px-4 text-sm'
+              } ${
+                activeViews[service.title] === 'workshop' 
+                  ? 'bg-gray-800 text-white' 
+                  : 'bg-gray-200 text-gray-800'
+              }`}
+            >
+              Workshop
+            </button>
+            <button 
+              type="button"
+              onClick={() => setActiveViews(prev=>({
+                ...prev,
+                [service.title]:'doorstep'
+              }))}
+              className={`flex-1 rounded transition-colors ${
+                isMobile ? 'py-1 px-2 text-xs' : 'py-2 px-4 text-sm'
+              } ${
+                activeViews[service.title] === 'doorstep' 
+                  ? 'bg-gray-800 text-white' 
+                  : 'bg-gray-200 text-gray-800'
+              }`}
+            >
+              Doorstep
+            </button>
           </div>
+        ) : (
+          // Show View Warranty button for other services
+          <button 
+            type='button' 
+            className={`w-full bg-gray-800 text-white rounded hover:bg-gray-700 mb-4 ${
+              isMobile ? 'py-1 px-2 text-xs' : 'py-2 px-4 text-sm'
+            }`}
+          >
+            View Warranty
+          </button>
+        )}
+
+        <div className="flex items-center justify-between">
+          <span className={`text-gray-600 ${isMobile ? 'text-xs' : 'text-sm'}`}>
+            Price: {
+              priceError ? "Determine" : 
+              (loadingPrices ? "Loading..." : servicePrices[`${service.id}-${service.title}`] || "Determine")
+            }
+          </span>
+          <button 
+  type="button"
+  onClick={() => addServiceToTable(service)}
+  className={`bg-gray-800 text-white rounded-full hover:bg-gray-700 flex items-center justify-center ${
+    isMobile ? 'w-8 h-8 text-sm' : 'w-8 h-8 text-sm'
+  }`}
+>
+  +
+</button>
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
 
            </>
             )}
@@ -5535,264 +5858,201 @@ const handleGenerateEstimate = async () => {
 
             {/* Overview section */}
             <div className="w-full p-2 rounded-lg">
-              {/* <div className="text-gray-700 mb-2" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>Overview</div> */}
-
-              {/*  Write the overview section here */}
+           
               <div className="w-full p-2 rounded-lg">
               <div className="text-gray-700 mb-2 flex justify-between items-center" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>
   <span>Work Summary*</span>
   
   <div className="flex items-center gap-2">
     <button
-      type="button"
-      onClick={handleOpenWarrantyPopup}
-      className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm"
-    >
-      Add Warranty
-    </button>
-    <button
-      type="button"
-      onClick={handleAddEmptyRow}
-      className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm"
-    >
-      Add New Row
-    </button>
+  type="button"
+  onClick={handleOpenWarrantyPopup}
+  className={`bg-red-500 text-white rounded hover:bg-red-600 ${
+    isMobile ? 'px-4 py-2 text-base' : 'px-3 py-1 text-sm'
+  }`}
+>
+  Add Warranty
+</button>
+<button
+  type="button"
+  onClick={handleAddEmptyRow}
+  className={`bg-red-500 text-white rounded hover:bg-red-600 ${
+    isMobile ? 'px-4 py-2 text-base' : 'px-3 py-1 text-sm'
+  }`}
+>
+  Add New Row
+</button>
   </div>
 </div>
           <div className="w-full mt-3">
             <table className="w-full overview-table">
-              <thead>
-              <tr className="bg-red-500 text-white">
-  <th className="p-3 text-left">Category</th>
-  <th className="p-3 text-left">Sub Category</th>
-  <th className="p-3 text-left">Workdone</th>
-  <th className="p-3 text-left">Qty</th>
-  <th className="p-3 text-left cursor-pointer" onClick={handleGSTHeaderClick}>GST</th> {/* Add this */}
-  <th className="p-3 text-left">Total</th>
-  <th className="p-3 text-left">Action</th>
-</tr>
-              </thead>
-              <tbody>
-                {formState.overview.tableData.map((row, index) => (
-                  <tr key={index} className="bg-gray-50">
-                    <td className="p-3">
-                      <input
-                        type="text"
-                        value={row.type}
-                        onChange={(e) => {
-                          const newTableData = [...formState.overview.tableData];
-                          newTableData[index].type = e.target.value;
-                          setFormState(prev => ({
-                            ...prev,
-                            overview: {
-                              ...prev.overview,
-                              tableData: newTableData
-                            }
-                          }));
-                        }}
-                        className="w-full p-1 border rounded"
-                      />
-                    </td>
-                    {/* <td className="p-3">
-                      <input
-                        type="text"
-                        value={row.name}
-                        onChange={(e) => {
-                          const newTableData = [...formState.overview.tableData];
-                          newTableData[index].name = e.target.value;
-                          setFormState(prev => ({
-                            ...prev,
-                            overview: {
-                              ...prev.overview,
-                              tableData: newTableData
-                            }
-                          }));
-                        }}
-                        className="w-full p-1 border rounded"
-                      />
-                    </td> */}
-                   <td className="p-3 relative">
-  <input
-    type="text"
-    value={row.name}
-    onChange={(e) => handleSubCategoryChange(index, e.target.value)}
-    onFocus={() => {
-      // Show suggestions if there's already text
-      if (row.name && row.name.length >= 2) {
-        const suggestions = getFilteredSuggestions(row.name);
-        setSuggestionStates(prev => ({
-          ...prev,
-          [index]: {
-            isOpen: suggestions.length > 0,
-            suggestions: suggestions
-          }
-        }));
-      }
-    }}
-    onBlur={(e) => {
-  // Check if the click target is within the suggestions dropdown
-  const suggestionDropdown = e.currentTarget.parentElement.querySelector('.absolute.z-50');
-  if (!suggestionDropdown || !suggestionDropdown.contains(e.relatedTarget)) {
-    setTimeout(() => {
-      setSuggestionStates(prev => ({
-        ...prev,
-        [index]: { ...prev[index], isOpen: false }
-      }));
-    }, 300); // Increased timeout
-  }
-}}
-    className="w-full p-1 border rounded"
-    placeholder="Type to search services..."
-  />
-  
-  {/* Suggestions Dropdown */}
-  {suggestionStates[index]?.isOpen && suggestionStates[index]?.suggestions?.length > 0 && (
-    <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-      {suggestionStates[index].suggestions.map((service, suggestionIndex) => (
-        <div
-          key={`${service.id}-${service.title}-${suggestionIndex}`}
-          className="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
-          onClick={() => handleSuggestionSelect(index, service)}
-        >
-          <div className="font-medium text-sm text-gray-800">{service.title}</div>
-          <div className="text-xs text-gray-600 mt-1">
-            Price: {
-              servicePrices[`${service.id}-${service.title}`] 
-                ? servicePrices[`${service.id}-${service.title}`]
-                : "Determine"
-            }
-          </div>
-          <div className="text-xs text-gray-500 mt-1">
-            Click to auto-fill details
-          </div>
-        </div>
-      ))}
-    </div>
-  )}
-</td>
-                    <td className="p-3">
-                    <input
-  type="text"
-  value={row.workdone}
-  onChange={(e) => {
-    const newTableData = [...formState.overview.tableData];
-    newTableData[index].workdone = e.target.value;
-    setFormState(prev => ({
-      ...prev,
-      overview: {
-        ...prev.overview,
-        tableData: newTableData
-      }
-    }));
-  }}
-  className="w-full p-1 border rounded"
-/>
-</td>
-                    {/* <td className="p-3">
-                      <input
-                        type="text"
-                        value={row.workdone}
-                        onChange={(e) => {
-                          const newTableData = [...formState.overview.tableData];
-                          newTableData[index].workdone = e.target.value;
-                          setFormState(prev => ({
-                            ...prev,
-                            overview: {
-                              ...prev.overview,
-                              tableData: newTableData
-                            }
-                          }));
-                        }}
-                        className="w-full p-1 border rounded"
-                      />
-                    </td> */}
-                    {/* <td className="p-3">
-                      <input
-                        type="checkbox"
-                        checked={row.determined}
-                        onChange={(e) => {
-                          const newTableData = [...formState.overview.tableData];
-                          newTableData[index].determined = e.target.checked;
-                          setFormState(prev => ({
-                            ...prev,
-                            overview: {
-                              ...prev.overview,
-                              tableData: newTableData
-                            }
-                          }));
-                        }}
-                        className="h-4 w-4"
-                      />
-                    </td> */}
-                    {/* <td className="p-3">
-                      <input
-                        type="number"
-                        value={row.qt}
-                        onChange={(e) => {
-                          const newTableData = [...formState.overview.tableData];
-                          newTableData[index].qt = e.target.value;
-                          setFormState(prev => ({
-                            ...prev,
-                            overview: {
-                              ...prev.overview,
-                              tableData: newTableData
-                            }
-                          }));
-                        }}
-                        className="w-16 text-center p-1 border rounded"
-                      />
-                    </td> */}
-                    <td className="p-3">
-  <input
-    type="number"
-    value={row.quantity || 1}
-    onChange={(e) => handleQuantityChange(index, e.target.value)}
-    min="1"
-    className="w-16 text-center p-1 border rounded"
-  />
-</td>
-<td className="p-3">
-  <input
-    type="number"
-    value={row.gst ?? 18}
-    min="0"
-    max="100"
-    onChange={e => handleGSTChange(index, e.target.value)}
-    className="w-16 text-center p-1 border rounded"
-  />
-</td>
-                    <td className="p-3">
-      <input
-        type="number"
-        value={row.total}
-        onChange={(e) => handleTotalChange(index, e.target.value)}
-        min="0" // 18 Feb
-        className="w-16 text-center p-1 border rounded"
-      />
-    </td>
-                    <td className="p-3">
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteRow(index)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        ×
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-{/* Inside the overview section in EditPageCopy.js, after the table */}
+  <thead>
+    <tr className="bg-red-500 text-white">
+      <th className={`p-3 text-left ${isMobile ? 'hidden' : ''}`}>Category</th>
+      <th className="p-3 text-left">Sub Category</th>
+      <th className="p-3 text-left">Workdone</th>
+      <th className="p-3 text-left">Qty</th>
+      <th className="p-3 text-left cursor-pointer" onClick={handleGSTHeaderClick}>GST</th> 
+      <th className="p-3 text-left">Total</th>
+      <th className={`p-3 text-center ${isMobile ? 'w-12' : 'text-left'}`}>
+        {isMobile ? '×' : 'Action'}
+      </th>
+    </tr>
+  </thead>
+  <tbody>
+    {formState.overview.tableData.map((row, index) => (
+      <tr key={index} className="bg-gray-50">
+        <td className={`p-3 ${isMobile ? 'hidden' : ''}`}>
+          <input
+            type="text"
+            value={row.type}
+            onChange={(e) => {
+              const newTableData = [...formState.overview.tableData];
+              newTableData[index].type = e.target.value;
+              setFormState(prev => ({
+                ...prev,
+                overview: {
+                  ...prev.overview,
+                  tableData: newTableData
+                }
+              }));
+            }}
+            className="w-full p-1 border rounded"
+          />
+        </td>
+       
+        <td className="p-3 relative">
+          <input
+            type="text"
+            value={row.name}
+            onChange={(e) => handleSubCategoryChange(index, e.target.value)}
+            onFocus={() => {
+              // Show suggestions if there's already text
+              if (row.name && row.name.length >= 2) {
+                const suggestions = getFilteredSuggestions(row.name);
+                setSuggestionStates(prev => ({
+                  ...prev,
+                  [index]: {
+                    isOpen: suggestions.length > 0,
+                    suggestions: suggestions
+                  }
+                }));
+              }
+            }}
+            onBlur={(e) => {
+              // Check if the click target is within the suggestions dropdown
+              const suggestionDropdown = e.currentTarget.parentElement.querySelector('.absolute.z-50');
+              if (!suggestionDropdown || !suggestionDropdown.contains(e.relatedTarget)) {
+                setTimeout(() => {
+                  setSuggestionStates(prev => ({
+                    ...prev,
+                    [index]: { ...prev[index], isOpen: false }
+                  }));
+                }, 300); // Increased timeout
+              }
+            }}
+            className="w-full p-1 border rounded"
+            placeholder="Type to search services..."
+          />
+
+          {suggestionStates[index]?.isOpen && suggestionStates[index]?.suggestions?.length > 0 && (
+            <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+              {suggestionStates[index].suggestions.map((service, suggestionIndex) => (
+                <div
+                  key={`${service.id}-${service.title}-${suggestionIndex}`}
+                  className="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+                  onClick={() => handleSuggestionSelect(index, service)}
+                >
+                  <div className="font-medium text-sm text-gray-800">{service.title}</div>
+                  <div className="text-xs text-gray-600 mt-1">
+                    Price: {
+                      servicePrices[`${service.id}-${service.title}`] 
+                        ? servicePrices[`${service.id}-${service.title}`]
+                        : "Determine"
+                    }
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Click to auto-fill details
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </td>
+        
+        <td className="p-3">
+          <input
+            type="text"
+            value={row.workdone}
+            onChange={(e) => {
+              const newTableData = [...formState.overview.tableData];
+              newTableData[index].workdone = e.target.value;
+              setFormState(prev => ({
+                ...prev,
+                overview: {
+                  ...prev.overview,
+                  tableData: newTableData
+                }
+              }));
+            }}
+            className="w-full p-1 border rounded"
+          />
+        </td>
+       
+        <td className="p-3">
+          <input
+            type="number"
+            value={row.quantity || 1}
+            onChange={(e) => handleQuantityChange(index, e.target.value)}
+            min="1"
+            className="w-16 text-center p-1 border rounded"
+          />
+        </td>
+        
+        <td className="p-3">
+          <input
+            type="number"
+            value={row.gst ?? 18}
+            min="0"
+            max="100"
+            onChange={e => handleGSTChange(index, e.target.value)}
+            className="w-16 text-center p-1 border rounded"
+          />
+        </td>
+        
+        <td className="p-3">
+          <input
+            type="number"
+            value={row.total}
+            onChange={(e) => handleTotalChange(index, e.target.value)}
+            min="0"
+            className="w-16 text-center p-1 border rounded"
+          />
+        </td>
+        
+        <td className={`p-3 ${isMobile ? 'text-center' : ''}`}>
+          <button
+            type="button"
+            onClick={() => handleDeleteRow(index)}
+            className={`text-red-500 hover:text-red-700 ${isMobile ? 'text-xl font-bold' : ''}`}
+          >
+            ×
+          </button>
+        </td>
+      </tr>
+    ))}
+  </tbody>
+</table>
+
 <div className="flex gap-4 mt-3">
   <div className="flex-1">
     <textarea
-      value={formState.basicInfo.caComments}
-      onChange={(e) => handleInputChange('basicInfo', 'caComments', e.target.value)}
-      placeholder="Comments For Technician*"
-      className="w-full p-3 border rounded h-30 resize-none"
-      required={!isAdmin}
-    />
+  value={formState.basicInfo.caComments}
+  onChange={(e) => handleInputChange('basicInfo', 'caComments', e.target.value)}
+  placeholder="Comments For Technician*"
+  className={`w-full p-3 border rounded h-30 resize-none ${isMobile ? 'hidden' : ''}`}
+  required={!isAdmin}
+/>
     <div className="flex-1 flex items-center justify-end gap-2">
       <Button
         variant="outline-dark"
@@ -5876,454 +6136,376 @@ const handleGenerateEstimate = async () => {
 
 
             {/* Last Arrival and Garage Section */}
+<div className="w-full p-2 rounded-lg">
+  <div className="text-gray-700 mb-2" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>Status</div>
 
-            <div className="w-full p-2 rounded-lg">
-              <div className="text-gray-700 mb-2" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>Status</div>
+  {/* Location Form - Responsive grid */}
+  <div className={`${isMobile ? 'grid grid-cols-2 gap-2 mb-3 mt-4' : 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 mt-4'}`}>
 
+    <select
+      value={formState.arrivalStatus.leadStatus}
+      onChange={(e) => handleInputChange('arrivalStatus', 'leadStatus', e.target.value)}
+      className={`p-2 border border-gray-300 rounded-md ${isMobile ? 'col-span-2' : ''}`}
+    >
+      <option value="">Lead Status</option>
+      {formState.basicInfo.carType === "Sell/Buy" ? (
+        sellBuyStatusFlow.map((status, idx) => {
+          const previousStatus = location.state?.previousStatus || null;
+          const nextStatus = getNextSellBuyStatus(previousStatus);
+          const shouldDisable = status !== nextStatus;
+          return (
+            <option key={status} value={status} disabled={shouldDisable}>
+              {status}
+            </option>
+          );
+        })
+      ) : (
+        <>
+          <option value="test" disabled={shouldDisableOption("test", location.state?.previousStatus)}>test</option>
+          <option value="Assigned" disabled={shouldDisableOption("Assigned", location.state?.previousStatus)}>Assigned</option>
+          <option value="Follow Up" disabled={shouldDisableOption("Follow Up", location.state?.previousStatus)}>Follow Up</option>
+          <option value="Dead" disabled={shouldDisableOption("Dead", location.state?.previousStatus)}>Dead</option>
+          <option value="Duplicate" disabled={shouldDisableOption("Duplicate", location.state?.previousStatus)}>Duplicate</option>
+          <option value="Communicate To Ops" disabled={shouldDisableOption("Communicate To Ops", location.state?.previousStatus)}>Communicate To Ops</option>
+          <option value="Referred To Ops" disabled={shouldDisableOption("Referred To Ops", location.state?.previousStatus)}>Referred To Ops</option>
+          <option value="Walkin" disabled={shouldDisableOption("Walkin", location.state?.previousStatus)}>Walkin</option>
+          <option value="Pickup" disabled={shouldDisableOption("Pickup", location.state?.previousStatus)}>Pickup</option>
+          <option value="Doorstep" disabled={shouldDisableOption("Doorstep", location.state?.previousStatus)}>Doorstep</option>
+          <option value="At Workshop" disabled={shouldDisableOption("At Workshop", location.state?.previousStatus)}>At Workshop</option>
+          <option value="Job Card" disabled={shouldDisableOption("Job Card", location.state?.previousStatus)}>Job Card</option>
+          <option value="Payment Due" disabled={shouldDisableOption("Payment Due", location.state?.previousStatus)}>Payment Due</option>
+          <option value="Commision Due" disabled={shouldDisableOption("Commision Due", location.state?.previousStatus)}>Commision Due</option>
+          <option value="Completed" disabled={shouldDisableOption("Completed", location.state?.previousStatus)}>Completed</option>
+        </>
+      )}
+    </select>
 
+    <select
+      value={formState.arrivalStatus.arrivalMode}
+      onChange={(e) => handleInputChange('arrivalStatus', 'arrivalMode', e.target.value)}
+      className="p-2 border border-gray-300 rounded-md"
+      required={!isAdmin}
+    >
+      <option value="">Arrival Mode*</option>
+      <option value="Walkin">Walkin</option>
+      <option value="Pickup">Pickup</option>
+      <option value="Doorstep">Doorstep</option>
+    </select>
 
-              {/* Location Form */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 mt-4">
+    <select
+      value={formState.arrivalStatus.disposition}
+      onChange={(e) => handleInputChange('arrivalStatus', 'disposition', e.target.value)}
+      className="p-2 border border-gray-300 rounded-md"
+    >
+      <option value="">Select Disposition</option>
+      <option value="Settled By Local Workshop">Settled By Local Workshop</option>
+      <option value="Client Will Visit workshop">Client Will Visit workshop</option>
+      <option value="Pickup Needed">Pickup Needed</option>
+      <option value="Doorstep Needed">Doorstep Needed</option>
+      <option value="Not Interested">Not Interested</option>
+      <option value="Wrong Number">Wrong Number</option>
+      <option value="Out of Service Area">Out of Service Area</option>
+      <option value="Invalid Lead">Invalid Lead</option>
+      <option value="Marketing Leads">Marketing Leads</option>
+      <option value="Workshop Tie-ups">Workshop Tie-ups</option>
+      <option value="Price Issue">Price Issue</option>
+      <option value="Not Answering">Not Answering</option>
+      <option value="Workshop Not Responding">Workshop Not Responding</option>
+      <option value="Workshop Not Available">Workshop Not Available</option>
+      <option value="Language Barrier">Language Barrier</option>
+      <option value="Test Leads">Test Leads</option>
+      <option value="Others">Others</option>
+    </select>
 
-              {/* // Replace the wasJobCard condition with this */}
-{/* <select
-  value={formState.arrivalStatus.leadStatus}
-  onChange={(e) => handleInputChange('arrivalStatus', 'leadStatus', e.target.value)}
-  className="p-2 border border-gray-300 rounded-md"
->
-  <option value="">Lead Status</option>
-  <option value="test" disabled={shouldDisableOption("test", location.state?.previousStatus)}>test</option>
-  <option value="Assigned" disabled={shouldDisableOption("Assigned", location.state?.previousStatus)}>Assigned</option>
-  <option value="Follow Up" disabled={shouldDisableOption("Follow Up", location.state?.previousStatus)}>Follow Up</option>
-  <option value="Dead" disabled={shouldDisableOption("Dead", location.state?.previousStatus)}>Dead</option>
-  <option value="Duplicate" disabled={shouldDisableOption("Duplicate", location.state?.previousStatus)}>Duplicate</option>
-  <option value="Communicate To Ops" disabled={shouldDisableOption("Communicate To Ops", location.state?.previousStatus)}>Communicate To Ops</option>
-  <option value="Referred To Ops" disabled={shouldDisableOption("Referred To Ops", location.state?.previousStatus)}>Referred To Ops</option>
-  
-  <option value="Walkin" disabled={shouldDisableOption("Walkin", location.state?.previousStatus)}>Walkin</option>
-  <option value="Pickup" disabled={shouldDisableOption("Pickup", location.state?.previousStatus)}>Pickup</option>
-  <option value="Doorstep" disabled={shouldDisableOption("Doorstep", location.state?.previousStatus)}>Doorstep</option>
-  <option value="At Workshop" disabled={shouldDisableOption("At Workshop", location.state?.previousStatus)}>At Workshop</option>
-  <option value="Job Card" disabled={shouldDisableOption("Job Card", location.state?.previousStatus)}>Job Card</option>
-  <option value="Estimate" disabled={shouldDisableOption("Estimate", location.state?.previousStatus)}>Estimate</option>
+    <input
+      type="text"
+      onFocus={(e) => e.target.type = 'datetime-local'}
+      onBlur={(e) => {
+        if (!e.target.value) {
+          e.target.type = 'text'
+        }
+      }}
+      value={formState.arrivalStatus.dateTime}
+      onChange={(e) => handleInputChange('arrivalStatus', 'dateTime', e.target.value)}
+      placeholder="Date and Time*"
+      className={`p-2 border border-gray-300 rounded-md ${isMobile ? 'col-span-2' : 'w-full'}`}
+      required={!isAdmin}
+    />
+  </div>
 
-  <option value="Completed" disabled={shouldDisableOption("Completed", location.state?.previousStatus)}>Completed</option>
-
-</select> */}
- 
-<select
-  value={formState.arrivalStatus.leadStatus}
-  onChange={(e) => handleInputChange('arrivalStatus', 'leadStatus', e.target.value)}
-  className="p-2 border border-gray-300 rounded-md"
->
-  <option value="">Lead Status</option>
-  {formState.basicInfo.carType === "Sell/Buy" ? (
-    // Show all Sell/Buy statuses, but only enable the next allowed one
-    sellBuyStatusFlow.map((status, idx) => {
-      const previousStatus = location.state?.previousStatus || null;
-      const nextStatus = getNextSellBuyStatus(previousStatus);
-      const shouldDisable = status !== nextStatus;
-      return (
-        <option key={status} value={status} disabled={shouldDisable}>
-          {status}
-        </option>
-      );
-    })
-  ) :  (
-    <>
-  <option value="test" disabled={shouldDisableOption("test", location.state?.previousStatus)}>test</option>
-  <option value="Assigned" disabled={shouldDisableOption("Assigned", location.state?.previousStatus)}>Assigned</option>
-  <option value="Follow Up" disabled={shouldDisableOption("Follow Up", location.state?.previousStatus)}>Follow Up</option>
-  <option value="Dead" disabled={shouldDisableOption("Dead", location.state?.previousStatus)}>Dead</option>
-  <option value="Duplicate" disabled={shouldDisableOption("Duplicate", location.state?.previousStatus)}>Duplicate</option>
-  <option value="Communicate To Ops" disabled={shouldDisableOption("Communicate To Ops", location.state?.previousStatus)}>Communicate To Ops</option>
-  <option value="Referred To Ops" disabled={shouldDisableOption("Referred To Ops", location.state?.previousStatus)}>Referred To Ops</option>
-  <option value="Walkin" disabled={shouldDisableOption("Walkin", location.state?.previousStatus)}>Walkin</option>
-  <option value="Pickup" disabled={shouldDisableOption("Pickup", location.state?.previousStatus)}>Pickup</option>
-  <option value="Doorstep" disabled={shouldDisableOption("Doorstep", location.state?.previousStatus)}>Doorstep</option>
-  <option value="At Workshop" disabled={shouldDisableOption("At Workshop", location.state?.previousStatus)}>At Workshop</option>
-  <option value="Job Card" disabled={shouldDisableOption("Job Card", location.state?.previousStatus)}>Job Card</option>
-  {/* <option value="Estimate" disabled={shouldDisableOption("Estimate", location.state?.previousStatus)}>Estimate</option> */}
-  <option value="Payment Due" disabled={shouldDisableOption("Payment Due", location.state?.previousStatus)}>Payment Due</option>
-  <option value="Commision Due" disabled={shouldDisableOption("Commision Due", location.state?.previousStatus)}>Commision Due</option>
-  <option value="Completed" disabled={shouldDisableOption("Completed", location.state?.previousStatus)}>Completed</option>
-</>  )}
-</select> 
-
-
-{/* 
-<select
-  value={formState.arrivalStatus.leadStatus}
-  onChange={(e) => handleInputChange('arrivalStatus', 'leadStatus', e.target.value)}
-  className="p-2 border border-gray-300 rounded-md"
->
-<option value="">Lead Status</option>
-<option value="test">test</option>
-<option value="Assigned">Assigned</option>
-<option value="Follow Up">Follow Up</option>
-<option value="Dead">Dead</option>
-<option value="Duplicate">Duplicate</option>
-<option value="Communicate To Ops">Communicate To Ops</option>
-<option value="Referred To Ops">Referred To Ops</option>
-<option value="Walkin">Walkin</option>
-<option value="Pickup">Pickup</option>
-<option value="Doorstep">Doorstep</option>
-<option value="At Workshop">At Workshop</option>
-<option value="Job Card">Job Card</option>
-<option value="Estimate">Estimate</option>
-<option value="Payment Due">Payment Due</option>
-<option value="Commision Due">Commision Due</option>
-<option value="Completed">Completed</option>
-
-</select> */}
-
-
-<select
-                    value={formState.arrivalStatus.arrivalMode}
-                    onChange={(e) => handleInputChange('arrivalStatus', 'arrivalMode', e.target.value)}
-                    className="p-2 border border-gray-300 rounded-md"
-                    required={!isAdmin}
-                  >
-                    <option value="">Arrival Mode*</option>
-                    <option value="Walkin">Walkin</option>
-                    <option value="Pickup">Pickup</option>
-                    <option value="Doorstep">Doorstep</option>
-                  </select>
-                  <select
-  value={formState.arrivalStatus.disposition}
-  onChange={(e) => handleInputChange('arrivalStatus', 'disposition', e.target.value)}
-  className="p-2 border border-gray-300 rounded-md"
->
-<option value="">Select Disposition</option>
-  <option value="Settled By Local Workshop">Settled By Local Workshop</option>
-  <option value="Client Will Visit workshop">Client Will Visit workshop</option>
-  <option value="Pickup Needed">Pickup Needed</option>
-  <option value="Doorstep Needed">Doorstep Needed</option>
-  <option value="Not Interested">Not Interested</option>
-  <option value="Wrong Number">Wrong Number</option>
-  <option value="Out of Service Area">Out of Service Area</option>
-  <option value="Invalid Lead">Invalid Lead</option>
-  <option value="Marketing Leads">Marketing Leads</option>
-  <option value="Workshop Tie-ups">Workshop Tie-ups</option>
-  <option value="Price Issue">Price Issue</option>
-  <option value="Not Answering">Not Answering</option>
-  <option value="Workshop Not Responding">Workshop Not Responding</option>
-  <option value="Workshop Not Available">Workshop Not Available</option>
-  <option value="Language Barrier">Language Barrier</option>
-  <option value="Test Leads">Test Leads</option>
-  <option value="Others">Others</option>
-</select>
-                <input
-                  type="text"
-                  onFocus={(e) => e.target.type = 'datetime-local'}
-                  onBlur={(e) => {
-                    if (!e.target.value) {
-                      e.target.type = 'text'
-                    }
-                  }}
-                  value={formState.arrivalStatus.dateTime}
-                  onChange={(e) => handleInputChange('arrivalStatus', 'dateTime', e.target.value)}
-                  placeholder="Date and Time*"
-                  className="p-2 border border-gray-300 rounded-md w-full"
-                  required={!isAdmin}
-                />
-
-
-
-    {/* New fields that appear when Job Card is selected */}
-    {formState.arrivalStatus.leadStatus === 'Job Card' && (
-      <>
-        <input
-          type="text"
-          value={formState.arrivalStatus.batteryFeature}
-          onChange={(e) => handleInputChange('arrivalStatus', 'batteryFeature', e.target.value)}
-          placeholder="Battery Feature"
-          className="p-2 border border-gray-300 rounded-md w-full"
-          required
-        />
-        <input
-          type="text"
-          value={formState.arrivalStatus.fuelStatus}
-          onChange={(e) => handleInputChange('arrivalStatus', 'fuelStatus', e.target.value)}
-          placeholder="Fuel Status (Ex. 50%)"
-          className="p-2 border border-gray-300 rounded-md w-full"
-          required
-        />
-        
-
-<textarea
-  value={formState.arrivalStatus.inventory}
-  onChange={(e) => handleInputChange('arrivalStatus', 'inventory', e.target.value)}
-  placeholder="Inventory (one per line)
-  - Item 1
-  - Item 2
-  "
-  className="p-2 border border-gray-300 rounded-md w-full"
-  rows={4}
-  style={{ resize: 'vertical' }}
-/>
-{/* <textarea
-  value={formState.arrivalStatus.carDocumentDetails}
-  onChange={(e) => handleInputChange('arrivalStatus', 'carDocumentDetails', e.target.value)}
-  placeholder="Document Details (one per line)
-  - Item 1
-  - Item 2
-  "
-  className="p-2 border border-gray-300 rounded-md w-full"
-  rows={4}
-  style={{ resize: 'vertical' }}
-/>
-<textarea
-  value={formState.arrivalStatus.otherCheckList}
-  onChange={(e) => handleInputChange('arrivalStatus', 'otherCheckList', e.target.value)}
-  placeholder="Other's Check List (one per line)
-  - Item 1
-  - Item 2
-  "
-  className="p-2 border border-gray-300 rounded-md w-full"
-  rows={4}
-  style={{ resize: 'vertical' }}
-/> */}
-
-       <input
-          type="text"
-          value={formState.arrivalStatus.speedometerRd}
-          onChange={(e) => handleInputChange('arrivalStatus', 'speedometerRd', e.target.value)}
-          placeholder="Odometer"
-          className="p-2 border border-gray-300 rounded-md w-full"
-          required
-          
-        />
-       <input
-          type="text"
-          value={formState.arrivalStatus.additionalWork}
-          onChange={(e) => handleInputChange('arrivalStatus', 'additionalWork', e.target.value)}
-          placeholder="Additional Work"
-          className="p-2 border border-gray-300 rounded-md w-full"
-          
-        />
-        
-      </>
-    )}
-
-{(formState.arrivalStatus.leadStatus === 'Payment Due' || formState.arrivalStatus.leadStatus === 'Commision Due' || formState.arrivalStatus.leadStatus === 'Completed') && (
-  <>
-    <div className="relative border border-gray-300 rounded-md bg-white group">
+  {/* Job Card specific fields */}
+  {formState.arrivalStatus.leadStatus === 'Job Card' && (
+    <div className={`${isMobile ? 'grid grid-cols-2 gap-2 mb-3' : 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-3'}`}>
       <input
         type="text"
-        value={formState.arrivalStatus.finalAmount === 0 ? '0' : (formState.arrivalStatus.finalAmount || '')}
-        onChange={(e) => handleCommissionChange('finalAmount', e.target.value)}
-        className="w-full p-2 border-0 focus:outline-none rounded-md peer"
-        disabled={location.state?.previousStatus === "Completed"}
+        value={formState.arrivalStatus.batteryFeature}
+        onChange={(e) => handleInputChange('arrivalStatus', 'batteryFeature', e.target.value)}
+        placeholder="Battery Feature"
+        className="p-2 border border-gray-300 rounded-md w-full"
         required
-        id="finalAmount"
       />
-      <label 
-        htmlFor="finalAmount" 
-        className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
-      >
-        Final Amount
-      </label>
-    </div>
-   
-
-    
-  </> 
-)}
-
-
-
-{(formState.arrivalStatus.leadStatus === 'Payment Due') && (
-  <>
-<div className="relative border border-gray-300 rounded-md bg-white group">
       <input
         type="text"
-        value={formState.arrivalStatus.pendingAmount === 0 ? '0' : (formState.arrivalStatus.pendingAmount || '')}
-        onChange={(e) => handleInputChange('arrivalStatus', 'pendingAmount', e.target.value)}
-        className="w-full p-2 border-0 focus:outline-none rounded-md peer"
-        // disabled={location.state?.previousStatus === "Completed"}
+        value={formState.arrivalStatus.fuelStatus}
+        onChange={(e) => handleInputChange('arrivalStatus', 'fuelStatus', e.target.value)}
+        placeholder="Fuel Status (Ex. 50%)"
+        className="p-2 border border-gray-300 rounded-md w-full"
         required
-        id="pendingAmount"
       />
-      <label 
-        htmlFor="finalAmount" 
-        className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
-      >
-        Pending Amount
-      </label>
+
+      <textarea
+        value={formState.arrivalStatus.inventory}
+        onChange={(e) => handleInputChange('arrivalStatus', 'inventory', e.target.value)}
+        placeholder="Inventory (one per line)
+- Item 1
+- Item 2"
+        className={`p-2 border border-gray-300 rounded-md w-full ${isMobile ? 'col-span-2' : ''}`}
+        rows={4}
+        style={{ resize: 'vertical' }}
+      />
+
+      <input
+        type="text"
+        value={formState.arrivalStatus.speedometerRd}
+        onChange={(e) => handleInputChange('arrivalStatus', 'speedometerRd', e.target.value)}
+        placeholder="Odometer"
+        className="p-2 border border-gray-300 rounded-md w-full"
+        required
+      />
+      <input
+        type="text"
+        value={formState.arrivalStatus.additionalWork}
+        onChange={(e) => handleInputChange('arrivalStatus', 'additionalWork', e.target.value)}
+        placeholder="Additional Work"
+        className="p-2 border border-gray-300 rounded-md w-full"
+      />
     </div>
-  
-    </> 
   )}
 
-    {/* Add this code after the existing lead status conditional renders */}
-
-{(formState.arrivalStatus.leadStatus === 'Commision Due' || formState.arrivalStatus.leadStatus === 'Completed') && (
-  <>
- <div className="relative border border-gray-300 rounded-md bg-white group">
-      <input
-        type="text" 
-        value={formState.arrivalStatus.commissionDue === 0 ? '0' : formState.arrivalStatus.commissionDue}
-        onChange={(e) => handleCommissionChange('commissionDue', e.target.value)}
-        className="w-full p-2 border-0 focus:outline-none rounded-md peer"
-        disabled={location.state?.previousStatus === "Completed"}
-        required
-        id="commissionDue"
-      />
-      <label 
-        htmlFor="commissionDue" 
-        className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
-      >
-        Commision Due
-      </label>
-    </div>
-
-    <div className="relative border border-gray-300 rounded-md bg-white group">
-      <input
-        type="text" 
-        value={formState.arrivalStatus.commissionReceived === 0 ? '0' : formState.arrivalStatus.commissionReceived}
-        onChange={(e) => handleCommissionChange('commissionReceived', e.target.value)}
-        className="w-full p-2 border-0 focus:outline-none rounded-md peer"
-        disabled={location.state?.previousStatus === "Completed"}
-        required
-        id="commissionReceived"
-      />
-      <label 
-        htmlFor="commissionReceived" 
-        className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
-      >
-        Commission Received
-      </label>
-    </div>
-
-
-
-<div className="relative">
-  <input
-    type="text"
-    value={formState.arrivalStatus.commissionPercent === 0 ? '0' : formState.arrivalStatus.commissionPercent}
-    onChange={(e) => handleCommissionChange('commissionPercent', e.target.value)}
-    placeholder="Commission Percent"
-    className="p-2 pr-7 border border-gray-300 rounded-md w-full"
-    disabled={location.state?.previousStatus === "Completed"}
-    required
-  />
-  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
-    %
-  </div>
-</div>
-  </>
-)}
-
-{formState.arrivalStatus.leadStatus === "Job Card" && (
-  <div className="mt-4 p-3 border border-gray-200 rounded-md">
-    <h3 className="text-md font-medium mb-3">Vehicle Images</h3>
-    
-    {/* Image upload section - no changes needed here */}
-    <div className="mb-4">
-      <label 
-        htmlFor="imageUpload" 
-        className="flex justify-center items-center p-4 border-2 border-dashed border-gray-300 rounded-md cursor-pointer hover:bg-gray-50"
-      >
-         <div className="text-center">
-          <svg className="mx-auto h-10 w-10 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <p className="mt-1 text-sm text-gray-600">
-            Click to upload images or drag and drop
-          </p>
-          <p className="mt-1 text-xs text-gray-500">
-            PNG, JPG
-          </p>
-        </div>
-        <input 
-          type="file" 
-          id="imageUpload" 
-          multiple 
-          accept="image/*" 
-          onChange={handleImageChange} 
-          className="hidden"
+  {/* Payment/Commission fields */}
+  {(formState.arrivalStatus.leadStatus === 'Payment Due' || formState.arrivalStatus.leadStatus === 'Commision Due' || formState.arrivalStatus.leadStatus === 'Completed') && (
+    <div className={`${isMobile ? 'grid grid-cols-1 gap-2 mb-3' : 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-3'}`}>
+      <div className="relative border border-gray-300 rounded-md bg-white group">
+        <input
+          type="text"
+          value={formState.arrivalStatus.finalAmount === 0 ? '0' : (formState.arrivalStatus.finalAmount || '')}
+          onChange={(e) => handleCommissionChange('finalAmount', e.target.value)}
+          className="w-full p-2 border-0 focus:outline-none rounded-md peer"
+          disabled={location.state?.previousStatus === "Completed"}
+          required
+          id="finalAmount"
         />
-      </label>
+        <label 
+          htmlFor="finalAmount" 
+          className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+        >
+          Final Amount
+        </label>
+      </div>
     </div>
-    
-    {/* Display existing images with X button */}
-    {existingImageUrls.length > 0 && (
+  )}
+
+  {/* Payment Due specific field */}
+  {(formState.arrivalStatus.leadStatus === 'Payment Due') && (
+    <div className={`${isMobile ? 'grid grid-cols-1 gap-2 mb-3' : 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-3'}`}>
+      <div className="relative border border-gray-300 rounded-md bg-white group">
+        <input
+          type="text"
+          value={formState.arrivalStatus.pendingAmount === 0 ? '0' : (formState.arrivalStatus.pendingAmount || '')}
+          onChange={(e) => handleInputChange('arrivalStatus', 'pendingAmount', e.target.value)}
+          className="w-full p-2 border-0 focus:outline-none rounded-md peer"
+          required
+          id="pendingAmount"
+        />
+        <label 
+          htmlFor="finalAmount" 
+          className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+        >
+          Pending Amount
+        </label>
+      </div>
+    </div>
+  )}
+
+  {/* Commission Due specific fields */}
+  {(formState.arrivalStatus.leadStatus === 'Commision Due' || formState.arrivalStatus.leadStatus === 'Completed') && (
+    <div className={`${isMobile ? 'grid grid-cols-2 gap-2 mb-3' : 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-3'}`}>
+      <div className="relative border border-gray-300 rounded-md bg-white group">
+        <input
+          type="text" 
+          value={formState.arrivalStatus.commissionDue === 0 ? '0' : formState.arrivalStatus.commissionDue}
+          onChange={(e) => handleCommissionChange('commissionDue', e.target.value)}
+          className="w-full p-2 border-0 focus:outline-none rounded-md peer"
+          disabled={location.state?.previousStatus === "Completed"}
+          required
+          id="commissionDue"
+        />
+        <label 
+          htmlFor="commissionDue" 
+          className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+        >
+          Commision Due
+        </label>
+      </div>
+
+      <div className="relative border border-gray-300 rounded-md bg-white group">
+        <input
+          type="text" 
+          value={formState.arrivalStatus.commissionReceived === 0 ? '0' : formState.arrivalStatus.commissionReceived}
+          onChange={(e) => handleCommissionChange('commissionReceived', e.target.value)}
+          className="w-full p-2 border-0 focus:outline-none rounded-md peer"
+          disabled={location.state?.previousStatus === "Completed"}
+          required
+          id="commissionReceived"
+        />
+        <label 
+          htmlFor="commissionReceived" 
+          className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+        >
+          Commission Received
+        </label>
+      </div>
+
+      <div className="relative">
+        <input
+          type="text"
+          value={formState.arrivalStatus.commissionPercent === 0 ? '0' : formState.arrivalStatus.commissionPercent}
+          onChange={(e) => handleCommissionChange('commissionPercent', e.target.value)}
+          placeholder="Commission Percent"
+          className="p-2 pr-7 border border-gray-300 rounded-md w-full"
+          disabled={location.state?.previousStatus === "Completed"}
+          required
+        />
+        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
+          %
+        </div>
+      </div>
+
+      <div className={`relative border border-gray-300 rounded-md bg-white group ${isMobile ? 'col-span-2' : ''}`}>
+        <input
+          type="number"
+          min="0"
+          max="100"
+          step="0.01"
+          value={formState.arrivalStatus.gst === 0 ? '' : (formState.arrivalStatus.gst || '')}
+          onChange={(e) => {
+            const value = e.target.value;
+            if (value === '' || (!isNaN(value) && parseFloat(value) >= 0 && parseFloat(value) <= 100)) {
+              handleInputChange('arrivalStatus', 'gst', value);
+            }
+          }}
+          onKeyPress={(e) => {
+            if (!/[0-9.]/.test(e.key) && !['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+              e.preventDefault();
+            }
+          }}
+          className="w-full p-2 pr-7 border-0 focus:outline-none rounded-md peer placeholder-transparent"
+          disabled={location.state?.previousStatus === "Completed"}
+          required
+          id="gstField"
+          placeholder=" "
+        />
+        <label 
+          htmlFor="gstField" 
+          className="absolute text-gray-500 duration-300 transform scale-75 -translate-y-4 top-2 z-10 origin-[0] bg-white px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:scale-75 peer-focus:-translate-y-4 peer-focus:top-2 left-1"
+        >
+          GST % (Suggested: {calculateAverageGST(formState.overview.tableData)}%)
+        </label>
+        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
+          %
+        </div>
+      </div>
+    </div>
+  )}
+
+  {/* Vehicle Images section for Job Card */}
+  {formState.arrivalStatus.leadStatus === "Job Card" && (
+    <div className="mt-4 p-3 border border-gray-200 rounded-md">
+      <h3 className="text-md font-medium mb-3">Vehicle Images</h3>
+      
       <div className="mb-4">
-        <div className="text-sm font-medium mb-2">Saved Images ({existingImageUrls.length})</div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-          {existingImageUrls.map((imageUrl, index) => (
-            <div key={`existing-${index}`} className="relative group">
-              <img
-                src={imageUrl}
-                alt={`Saved ${index}`}
-                className="h-24 w-24 object-cover rounded-md border border-gray-200"
-              />
-              <button
-                type="button"
-                onClick={() => handleRemoveExistingImage(index)}
-                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-100 hover:bg-red-600 transition-opacity"
-                aria-label="Remove image"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          ))}
-        </div>
+        <label 
+          htmlFor="imageUpload" 
+          className="flex justify-center items-center p-4 border-2 border-dashed border-gray-300 rounded-md cursor-pointer hover:bg-gray-50"
+        >
+          <div className="text-center">
+            <svg className="mx-auto h-10 w-10 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+              <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <p className="mt-1 text-sm text-gray-600">
+              Click to upload images or drag and drop
+            </p>
+            <p className="mt-1 text-xs text-gray-500">
+              PNG, JPG
+            </p>
+          </div>
+          <input 
+            type="file" 
+            id="imageUpload" 
+            multiple 
+            accept="image/*" 
+            onChange={handleImageChange} 
+            className="hidden"
+          />
+        </label>
       </div>
-    )}
-
-    
-    {/* Display newly selected images with X button */}
-    {selectedImages.length > 0 && (
-      <div>
-        <div className="text-sm font-medium mb-2">New Images ({selectedImages.length})</div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-          {selectedImages.map((image, index) => (
-            <div key={`new-${index}`} className="relative group">
-              <img
-                src={URL.createObjectURL(image)}
-                alt={`Preview ${index}`}
-                className="h-24 w-24 object-cover rounded-md border border-gray-200"
-              />
-              <button
-                type="button"
-                onClick={() => handleRemoveImage(index)}
-                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-100 hover:bg-red-600 transition-opacity"
-                aria-label="Remove image"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-              <p className="text-xs mt-1 truncate">{image.name}</p>
-            </div>
-          ))}
+      
+      {existingImageUrls.length > 0 && (
+        <div className="mb-4">
+          <div className="text-sm font-medium mb-2">Saved Images ({existingImageUrls.length})</div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {existingImageUrls.map((imageUrl, index) => (
+              <div key={`existing-${index}`} className="relative group">
+                <img
+                  src={imageUrl}
+                  alt={`Saved ${index}`}
+                  className="h-24 w-24 object-cover rounded-md border border-gray-200"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleRemoveExistingImage(index)}
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-100 hover:bg-red-600 transition-opacity"
+                  aria-label="Remove image"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
-    )}
-  </div>
-)}
+      )}
 
-
-
-{/* 
-{formState.arrivalStatus.leadStatus === 'Completed' && (
-  <div className="mt-4 p-3 flex gap-4">
-    <div className="flex-1">
-      <input
-        type="number"
-        value={formState.arrivalStatus.finalAmount}
-        onChange={(e) => handleInputChange('arrivalStatus', 'finalAmount', e.target.value)}
-        placeholder="Final Amount"
-        className="w-full p-2 border border-gray-300 rounded-md"
-        required
-      />
+      {selectedImages.length > 0 && (
+        <div>
+          <div className="text-sm font-medium mb-2">New Images ({selectedImages.length})</div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {selectedImages.map((image, index) => (
+              <div key={`new-${index}`} className="relative group">
+                <img
+                  src={URL.createObjectURL(image)}
+                  alt={`Preview ${index}`}
+                  className="h-24 w-24 object-cover rounded-md border border-gray-200"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleRemoveImage(index)}
+                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-100 hover:bg-red-600 transition-opacity"
+                  aria-label="Remove image"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+                <p className="text-xs mt-1 truncate">{image.name}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
-  </div>
-)} */}
+  )}
 
 {/* {formState.arrivalStatus.leadStatus === 'Completed' && (
   <div className="mt-4 p-3 flex gap-4">
@@ -6341,7 +6523,7 @@ const handleGenerateEstimate = async () => {
 )} */}
               </div>
 
-            </div>
+            {/* </div> */}
 
 
 
@@ -6398,57 +6580,54 @@ const handleGenerateEstimate = async () => {
 
                         {/* Dropdown Sections */}
                 <Row className="mb-4">
-                  <Col md={6}>
-                    <div className="bg-light p-3 rounded">
-                      <div className="text-muted mb-2">Technician*</div>
-                      <Form.Select
-  value={formState.basicInfo.caName}
-  onChange={(e) => handleInputChange('basicInfo', 'caName', e.target.value)}
-  className="bg-light"
-  required={!isAdmin}
->
-<option value="">Select Technician</option>
-  <option value="Anjali">Anjali</option>
-  <option value="Loknath">Loknath</option>
-  <option value="Abhishek">Abhishek</option>
-  <option value="Sahil">Sahil</option>
-  <option value="Gokul">Gokul</option>
-</Form.Select>
-                    </div>
-                  </Col>
-
-                  <Col md={6}>
-                    <div className="bg-light p-3 rounded">
-                      <div className="text-muted mb-2">CCE*</div>
-                      {/* <Form.Control
-  value={formState.basicInfo.cceName || user?.username}
-  onChange={(e) => handleInputChange('basicInfo', 'cceName', e.target.value)}
-  className="bg-light"
-  disabled
-/> */}
-
-{isAdmin ? (
-  <Form.Select
-    value={formState.basicInfo.cceName}
-    onChange={(e) => handleInputChange('basicInfo', 'cceName', e.target.value)}
-    className="bg-light"
-  >
-    <option value="">Select CCE</option>
-    {users.map(user => (
-      <option key={user.id} value={user.username}>{user.username}</option>
-    ))}
-  </Form.Select>
-) : (
-  <Form.Control
-    value={formState.basicInfo.cceName || user?.username}
-    onChange={(e) => handleInputChange('basicInfo', 'cceName', e.target.value)}
-    className="bg-light"
-    disabled
-  />
-)}
-                    </div>
-                  </Col>
-                </Row>
+  {!isMobile && (
+    <Col md={6}>
+      <div className="bg-light p-3 rounded">
+        <div className="text-muted mb-2">Technician*</div>
+        <Form.Select
+          value={formState.basicInfo.caName}
+          onChange={(e) => handleInputChange('basicInfo', 'caName', e.target.value)}
+          className="bg-light"
+          required={!isAdmin}
+        >
+          <option value="">Select Technician</option>
+          <option value="Anjali">Anjali</option>
+          <option value="Loknath">Loknath</option>
+          <option value="Abhishek">Abhishek</option>
+          <option value="Sahil">Sahil</option>
+          <option value="Gokul">Gokul</option>
+        </Form.Select>
+      </div>
+    </Col>
+  )}
+  
+  {!isMobile && (
+    <Col md={6}>
+      <div className="bg-light p-3 rounded">
+        <div className="text-muted mb-2">CCE*</div>
+        {isAdmin ? (
+          <Form.Select
+            value={formState.basicInfo.cceName}
+            onChange={(e) => handleInputChange('basicInfo', 'cceName', e.target.value)}
+            className="bg-light"
+          >
+            <option value="">Select CCE</option>
+            {users.map(user => (
+              <option key={user.id} value={user.username}>{user.username}</option>
+            ))}
+          </Form.Select>
+        ) : (
+          <Form.Control
+            value={formState.basicInfo.cceName || user?.username}
+            onChange={(e) => handleInputChange('basicInfo', 'cceName', e.target.value)}
+            className="bg-light"
+            disabled
+          />
+        )}
+      </div>
+    </Col>
+  )}
+</Row>
 
                 {/* Comments Section */}
                 <Form.Group>
@@ -6456,7 +6635,7 @@ const handleGenerateEstimate = async () => {
                     as="textarea"
                     value={formState.basicInfo.cceComments}
                     onChange={(e) => handleInputChange('basicInfo', 'cceComments', e.target.value)}
-                    placeholder="Comments From CCE*"
+                    placeholder={`Comments From ${formState.basicInfo.cceName || user?.username || 'CCE'}*`}
                     required={!isAdmin}
                     style={{ height: '120px', resize: 'none' }}
                   />
@@ -6470,7 +6649,7 @@ const handleGenerateEstimate = async () => {
             <div className="fixed bottom-0 right-0  w-full border-t shadow-lg p-3 flex justify-end gap-3" style={{background:"#F3F4F6"}}>
            
 
-            {!id && (
+            {!id && !isWx && (
                       <div className="flex items-center">
                       <label className="flex items-center cursor-pointer">
                         <input
@@ -6500,6 +6679,7 @@ const handleGenerateEstimate = async () => {
                           }}
                           className="w-4 h-4 text-red-500 border-gray-300 rounded focus:ring-red-500 mr-2"
                         />
+
                         <span className="text-gray-700 font-medium">From workshop?</span>
                       </label>
                     </div>
@@ -6798,6 +6978,9 @@ Generate Bill
       />
     )}
         </div>
+        </div>
+        </div>
+        {/* this elephantxxxx */}
         {/* 5. Add JobCard component at the bottom of the return statement, before closing form tag */}
         {/* Update the JobCard component */}
 {showJobCard && (
@@ -7019,6 +7202,7 @@ Generate Bill
         customerGSTIN: '',
         commissionReceived: formState.arrivalStatus.commissionReceived || 0,
         commissionDue: formState.arrivalStatus.commissionDue || 0,
+        wxgst:formState.arrivalStatus.gst || 0,
         workshopDetailName: formState.gstDetail.wx_name || formState.workshop.name,
         workshopDetailAddress: formState.gstDetail.wx_address || formState.workshop.locality,
         workshopDetailGSTIN: formState.gstDetail.wx_gstin || 'N/A',

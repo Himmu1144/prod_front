@@ -33,7 +33,8 @@ const HomePage = () => {
     const [alertMessage, setAlertMessage] = useState('');
     const [userStatus, setUserStatus] = useState('Active');
     const [statusTime, setStatusTime] = useState(null);
-
+    // const [isMobile, setIsMobile] = useState(false);
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
     const handleStatusChange = (newStatus, timestamp) => {
         setUserStatus(newStatus);
         setStatusTime(timestamp);
@@ -218,7 +219,13 @@ const handleClick2Call = async (receiverNo) => {
     const fetchLeads = async () => {
         try {
             setIsLoading(true);
-            const response = await axios.get(`https://admin.onlybigcars.com/?page=1`, {
+            const pageSize = isMobile ? 20 : 5; // 20 for mobile, 5 for desktop
+            console.log('=== FRONTEND DEBUG ===');
+            console.log('Is mobile:', isMobile);
+            console.log('Page size:', pageSize);
+            console.log('======================');
+        
+            const response = await axios.get(`https://admin.onlybigcars.com/?page=1&page_size=${pageSize}`, {
                 headers: { 'Authorization': `Token ${token}` }
             });
             setLeads(response.data.leads);
@@ -258,27 +265,29 @@ const handleClick2Call = async (receiverNo) => {
     
         try {
             setIsLoading(true);
-            const nextPage = currentPage + 1;
+             const nextPage = currentPage + 1;
+            const pageSize = isMobile ? 20 : 5; // Add this line
             let response;
     
-            if (currentView === 'filter') {
-                response = await axios.post(
-                    'https://admin.onlybigcars.com/api/leads/filter/',
-                    { ...savedFilterParams, page: nextPage },
-                    { headers: { 'Authorization': `Token ${token}` } }
-                );
-            } else if (currentView === 'search') {
-                response = await axios.get(
-                    `https://admin.onlybigcars.com/api/leads/search/?query=${savedSearchQuery}&page=${nextPage}`,
-                    { headers: { 'Authorization': `Token ${token}` } }
-                );
-            } else {
-                response = await axios.get(
-                    `https://admin.onlybigcars.com/?page=${nextPage}`,
-                    { headers: { 'Authorization': `Token ${token}` } }
-                );
-            }
-    
+         
+
+        if (currentView === 'filter') {
+            response = await axios.post(
+                'https://admin.onlybigcars.com/api/leads/filter/',
+                { ...savedFilterParams, page: nextPage, page_size: pageSize }, // Add page_size here
+                { headers: { 'Authorization': `Token ${token}` } }
+            );
+        } else if (currentView === 'search') {
+            response = await axios.get(
+                `https://admin.onlybigcars.com/api/leads/search/?query=${savedSearchQuery}&page=${nextPage}&page_size=${pageSize}`, // Add page_size here
+                { headers: { 'Authorization': `Token ${token}` } }
+            );
+        } else {
+            response = await axios.get(
+                `https://admin.onlybigcars.com/?page=${nextPage}&page_size=${pageSize}`, // Add page_size here
+                { headers: { 'Authorization': `Token ${token}` } }
+            );
+        }
             // Append new leads, filtering out duplicates
             setLeads(prev => {
                 const newLeads = response.data.leads.filter(newLead =>
@@ -324,11 +333,12 @@ const handleClick2Call = async (receiverNo) => {
         e.preventDefault();
         setSearchMessage('');
         try {
-            const response = await axios.get(
-                `https://admin.onlybigcars.com/api/leads/search/?query=${searchQuery}&page=1`,
-                { headers: { 'Authorization': `Token ${token}` } }
-            );
-          
+            const pageSize = isMobile ? 20 : 5; // Add this line
+        
+        const response = await axios.get(
+            `https://admin.onlybigcars.com/api/leads/search/?query=${searchQuery}&page=1&page_size=${pageSize}`, // Add page_size here
+            { headers: { 'Authorization': `Token ${token}` } }
+        );
             // Update state
             setLeads(response.data.leads);
             setTotalPages(response.data.total_pages);
@@ -483,12 +493,15 @@ const handleDateRangeChange = (range) => {
         setTotalPages(1);
         setIsLoading(true); // Add loading state here
         try {
-             const filterPayload = {
+             const pageSize = isMobile ? 20 : 5; // Add this line
+        
+        const filterPayload = {
             ...filterFormData,
             dateRange: {
                 ...filterFormData.dateRange,
-                dateField: filterFormData.dateField // <-- Add this line
-            }
+                dateField: filterFormData.dateField
+            },
+            page_size: pageSize // Add this line
         };
             const response = await axios.post(
                 'https://admin.onlybigcars.com/api/leads/filter/',
@@ -671,6 +684,23 @@ formatColumns('Date:', lead.arrival_time ?
     };
     // http://34.131.86.189
 
+    // Add this useEffect near the top of your HomePage component
+useEffect(() => {
+    const checkIfMobile = () => {
+        const isMobileDevice = window.innerWidth <= 768;
+        console.log('=== MOBILE DETECTION ===');
+        console.log('Window width:', window.innerWidth);
+        console.log('Is mobile:', isMobileDevice);
+        console.log('========================');
+        setIsMobile(isMobileDevice);
+    };
+    
+    checkIfMobile(); // Check on initial load
+    window.addEventListener('resize', checkIfMobile);
+    
+    return () => window.removeEventListener('resize', checkIfMobile);
+}, []);
+
     useEffect(() => {
         console.log('Here we are - ')
         // Fetch welcome message and users
@@ -704,6 +734,18 @@ formatColumns('Date:', lead.arrival_time ?
     useEffect(() => {
         fetchLeads();
     }, [token]);
+
+
+//     useEffect(() => {
+//     const checkIfMobile = () => {
+//         setIsMobile(window.innerWidth <= 768); // 768px is common mobile breakpoint
+//     };
+    
+//     checkIfMobile(); // Check on initial load
+//     window.addEventListener('resize', checkIfMobile); // Check on window resize
+    
+//     return () => window.removeEventListener('resize', checkIfMobile);
+// }, []);
 
     useEffect(() => {
         if (location.state?.message) {
@@ -1113,7 +1155,7 @@ const excelData = response.data.leads.map(lead => ({
             <div className="bg-gray-50 p-6 rounded-lg mb-8">
                 {/* <p>All Lead</p> */}
                 <form onSubmit={handleFilterSubmit} className="space-y-4">
-                    <div className="grid grid-cols-5 gap-4">
+                    <div className={`grid ${isMobile ? 'grid-cols-3' : 'grid-cols-1 lg:grid-cols-5'} gap-4`}>
                         {/* First Row */}
                         {/* <select
                             name="user"
@@ -1186,6 +1228,17 @@ const excelData = response.data.leads.map(lead => ({
 
     />
 </div>
+ <select
+                            name="arrivalMode"
+                            value={filterFormData.arrivalMode}
+                            onChange={handleFilterChange}
+                            className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                        >
+                            <option value="">Arrival Mode</option>
+                            <option value="Walkin">Walkin</option>
+                            <option value="Pickup">Pickup</option>
+                            <option value="Doorstep">Doorstep</option>
+                        </select>
 
 
                         {/* <select
@@ -1211,19 +1264,9 @@ const excelData = response.data.leads.map(lead => ({
                             <option value="option3">Payment Failed</option>
                         </select> */}
 
-                        <select
-                            name="arrivalMode"
-                            value={filterFormData.arrivalMode}
-                            onChange={handleFilterChange}
-                            className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                        >
-                            <option value="">Arrival Mode</option>
-                            <option value="Walkin">Walkin</option>
-                            <option value="Pickup">Pickup</option>
-                            <option value="Doorstep">Doorstep</option>
-                        </select>
+                       
 
-                        <div className="flex-1 w-[85%]">
+                        <div className="flex-1 w-[100%]">
     <div className="bg-white rounded-md shadow-sm border border-gray-300 h-[42px] flex items-center">
         <div className="grid grid-cols-2 divide-x w-full">
             <div className="px-2 text-center">
@@ -1258,9 +1301,9 @@ const excelData = response.data.leads.map(lead => ({
                                 <span className="text-gray-700">Language Barrier</span>
                             </label>
                         </div> */}
-                    </div>
+                    {/* </div> */}
 
-                    <div className="grid grid-cols-5 gap-4">
+                    {/* <div className={`grid ${isMobile ? 'grid-cols-3' : 'grid-cols-1 lg:grid-cols-5'} gap-4`}> */}
                         {/* Second Row */}
                         {isAdmin ? (
                         <select
@@ -1529,7 +1572,7 @@ const excelData = response.data.leads.map(lead => ({
                              <button
                                                             onClick={exportToExcel}
                                                             disabled={isExporting}
-                                                            className={`px-2 py-2 ${isExporting ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'} text-white rounded-md flex items-center justify-center`}
+                                                            className={`px-4 py-2 ${isExporting ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'} text-white rounded-md flex items-center justify-center`}
                                                         >
                                                             {isExporting ? (
                                                                 <>
@@ -1543,6 +1586,9 @@ const excelData = response.data.leads.map(lead => ({
                                                                 </>
                                                             )}
                                                         </button>
+                                                        
+                                                        
+   
                         </div>
                     </div>
                 </form>
@@ -1663,6 +1709,7 @@ const excelData = response.data.leads.map(lead => ({
     </div>
 </div>
 )}
+
                 <div className="flex items-center justify-center flex-1">
                     <div className="relative w-96"> {/* Fixed width for search field */}
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
@@ -1683,42 +1730,50 @@ const excelData = response.data.leads.map(lead => ({
                 </div>
 
                 <div className="flex gap-2">
-                    <Link to="/analytics" className="px-4 py-2 border-2 border-green-500 text-green-500 rounded-md hover:bg-green-500 hover:text-white transition-colors duration-300 flex items-center">
-                        <svg className="w-5 h-5 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M8 13V17M16 11V17M12 7V17M7.8 21H16.2C17.8802 21 18.7202 21 19.362 20.673C19.9265 20.3854 20.3854 19.9265 20.673 19.362C21 18.7202 21 17.8802 21 16.2V7.8C21 6.11984 21 5.27976 20.673 4.63803C20.3854 4.07354 19.9265 3.6146 19.362 3.32698C18.7202 3 17.8802 3 16.2 3H7.8C6.11984 3 5.27976 3 4.63803 3.32698C4.07354 3.6146 3.6146 4.07354 3.32698 4.63803C3 5.27976 3 6.11984 3 7.8V16.2C3 17.8802 3 18.7202 3.32698 19.362C3.6146 19.9265 4.07354 20.3854 4.63803 20.673C5.27976 21 6.11984 21 7.8 21Z" 
-                                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                        
-                    </Link>
+                    {!isMobile && (
+                        <Link to="/analytics" className="px-4 py-2 border-2 border-green-500 text-green-500 rounded-md hover:bg-green-500 hover:text-white transition-colors duration-300 flex items-center">
+                            <svg className="w-5 h-5 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M8 13V17M16 11V17M12 7V17M7.8 21H16.2C17.8802 21 18.7202 21 19.362 20.673C19.9265 20.3854 20.3854 19.9265 20.673 19.362C21 18.7202 21 17.8802 21 16.2V7.8C21 6.11984 21 5.27976 20.673 4.63803C20.3854 4.07354 19.9265 3.6146 19.362 3.32698C18.7202 3 17.8802 3 16.2 3H7.8C6.11984 3 5.27976 3 4.63803 3.32698C4.07354 3.6146 3.6146 4.07354 3.32698 4.63803C3 5.27976 3 6.11984 3 7.8V16.2C3 17.8802 3 18.7202 3.32698 19.362C3.6146 19.9265 4.07354 20.3854 4.63803 20.673C5.27976 21 6.11984 21 7.8 21Z" 
+                                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                        </Link>
+                    )}
                     <button onClick={() => navigate('/edit', { state: { seqNum: seqNum } })} className="px-4 py-2 border-2 border-red-500 text-red-500 rounded-md hover:bg-red-500 hover:text-white transition-colors duration-300">
                         Add Lead
                     </button>
                 </div>
             </div>
-
+{isMobile && (
+    <div className="flex justify-center items-center mb-2 px-4">
+        <span className="text-gray-600 text-sm">
+            Page {currentPage} of {totalPages} ({totalLeads} total leads)
+        </span>
+    </div>
+)}
             <div className='flex justify-center'>
                 <div className="mt-4" style={{ width: '96%', marginBottom: '0.5em' }}>
                     <div className="overflow-x-hidden"> {/* Prevent horizontal scrollbar */}
                         <div
-                            ref={scrollContainerRef}
-                            className="table-scroll-container"
-                            style={{ 
-                                maxHeight: '400px',
-                                overflowY: 'scroll',
-                                scrollbarGutter: 'stable'
-                            }}
-                        >
+    ref={scrollContainerRef}
+    className="table-scroll-container"
+    style={{ 
+        maxHeight: isMobile ? 'calc(100vh)' : '400px', // Auto height for mobile
+        minHeight: isMobile ? '500px' : 'auto', // Minimum height for mobile
+        overflowY: 'scroll',
+        scrollbarGutter: 'stable'
+    }}
+>
                             <table className="w-full border-collapse">
                                 <thead className="bg-red-500 text-white sticky-header">
                                     <tr>
                                         <th className="p-3 text-left">Lead Id | Type | Location</th>
                                         <th className="p-3 text-left">Name | Vehicle</th>
                                         <th className="p-3 text-left">Number | Source</th>
-                                        <th className="p-3 text-left">Order ID | Reg. Number</th>
+                                        {!isMobile &&<th className="p-3 text-left">Order ID | Reg. Number</th>}
                                         <th className="p-3 text-left">Status</th>
-                                        <th className="p-3 text-left">CCE | CA</th>
+                                         {!isMobile && <th className="p-3 text-left">CCE | CA</th>}
                                         <th className="p-3 text-left">Date/Time</th>
-                                        <th className="p-3 text-left">Created | Modified At</th>
+                                        {!isMobile &&<th className="p-3 text-left">Created | Modified At</th>}
                                         <th className="p-3 text-left">Edit/Copy</th>
                                     </tr>
                                 </thead>
@@ -1770,12 +1825,12 @@ const excelData = response.data.leads.map(lead => ({
                                                     {lead.source}
                                                 </div>
                                             </td>
-                                            <td className="p-2">
+                                            {!isMobile &&<td className="p-2">
                                                 <div className="h-12 overflow-hidden group-hover:h-auto transition-all duration-200">
                                                     {lead.orderId}<br />
                                                     {lead.regNumber}
                                                 </div>
-                                            </td>
+                                            </td>}
                                             {/* <td className="p-2">
                                                 <div className="h-12 overflow-hidden group-hover:h-auto transition-all duration-200">
                                                 <span className={lead.status === "Assigned" ? "font-bold text-grey-600" : ""}>
@@ -1807,12 +1862,14 @@ const excelData = response.data.leads.map(lead => ({
         </button> */}
     </div>
 </td>
-                                            <td className="p-2">
-                                                <div className="h-12 overflow-hidden group-hover:h-auto transition-all duration-200">
-                                                    {lead.cceName}<br />
-                                                    {lead.caName}
-                                                </div>
-                                            </td>
+                                             {!isMobile && (
+                                                <td className="p-2">
+                                                    <div className="h-12 overflow-hidden group-hover:h-auto transition-all duration-200">
+                                                        {lead.cceName}<br />
+                                                        {lead.caName}
+                                                    </div>
+                                                </td>
+                                            )}
                                             <td className="p-2">
                                                 <div className="h-12 overflow-hidden group-hover:h-auto transition-all duration-200">
                                                     {lead.arrival_time ? new Date(lead.arrival_time).toLocaleString('en-IN', {
@@ -1825,7 +1882,7 @@ const excelData = response.data.leads.map(lead => ({
                                                     }) : 'Not Set'}
                                                 </div>
                                             </td>
-                                            <td className="p-2">
+                                            {!isMobile &&<td className="p-2">
                                                 <div className="h-12 overflow-hidden group-hover:h-auto transition-all duration-200">
                                                     {lead.created_at ? new Date(lead.created_at).toLocaleString('en-IN', {
                                                         day: '2-digit',
@@ -1845,7 +1902,7 @@ const excelData = response.data.leads.map(lead => ({
                                                         hour12: true
                                                     }) : 'NA'}
                                                 </div>
-                                            </td>
+                                            </td>}
                                             <td className="p-2">
                                                 <div className="flex flex-col gap-2">
                                                     <div className="flex gap-2">
@@ -1884,22 +1941,24 @@ const excelData = response.data.leads.map(lead => ({
                                                             })}
                                                         /> */}
                                                         {/* Phone icon replacing the Plus button */}
-            <svg 
-              xmlns="http://www.w3.org/2000/svg"
-              width="16" 
-              height="16" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-              className="cursor-pointer hover:text-green-500 transition-colors duration-200"
-              onClick={() => handleClick2Call(lead.number)}
-              title="Click to call"
-            >
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-            </svg>
+             {!isMobile && (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="cursor-pointer hover:text-green-500 transition-colors duration-200"
+                onClick={() => handleClick2Call(lead.number)}
+                title="Click to call"
+              >
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+              </svg>
+            )}
                                                         
                                                     </div>
                                                 </div>
@@ -1915,11 +1974,13 @@ const excelData = response.data.leads.map(lead => ({
                             </div>
                         )}
                     </div>
+                    {!isMobile && (
                     <div className="flex justify-center items-center mb-2">
                         <span className="text-gray-600">
                             Page {currentPage} of {totalPages} ({totalLeads} total leads)
                         </span>
                     </div>
+)}
                 </div>
             </div>
             {/* <footer className="bg-gray-50">

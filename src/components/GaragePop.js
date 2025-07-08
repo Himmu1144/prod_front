@@ -65,7 +65,7 @@ const getGarageStatus = (garageOperatingHours) => {
   // Case 1: Today is explicitly marked as closed (e.g., Sunday is_closed: true)
   if (!todayHours || todayHours.is_closed) {
     return {
-      statusText: `Closed (${todayShort})`,
+      statusText: `${todayShort}: Closed`,
       statusColor: 'text-red-500',
       isCurrentlyOpen: false,
     };
@@ -94,7 +94,7 @@ const getGarageStatus = (garageOperatingHours) => {
   if (currentTime >= openTime && currentTime < closeTime) {
     return {
       // Requirement: Show today's full opening hours with a single day abbreviation
-      statusText: `${formattedTodayOpen} - ${formattedTodayClose} (${todayShort})`,
+      statusText: `${todayShort}: ${formattedTodayOpen} - ${formattedTodayClose}`,
       statusColor: 'text-green-600',
       isCurrentlyOpen: true,
     };
@@ -114,7 +114,7 @@ const getGarageStatus = (garageOperatingHours) => {
     else { // currentTime >= closeTime
       // Requirement: Just show that it's closed for the day.
       return {
-        statusText: `Closed (${todayShort})`,
+        statusText: `${todayShort}: Closed`,
         statusColor: 'text-red-500',
         isCurrentlyOpen: false,
       };
@@ -275,12 +275,16 @@ const GarageSelector = ({ onClose, onSelectGarage, userLocation }) => {
                                     onClick={() => garage.is_active && handleGarageSelect(garage)}
                                   >
                                     <div className="flex justify-between items-start">
-                                      <div>
+                                      {/* Left section - 70% width */}
+                                      <div className="w-[70%] pr-4">
                                         <h3 className={`font-medium mb-1 ${!garage.is_active ? 'text-gray-400' : 'text-gray-700'}`}>
                                           {garage.name}
                                         </h3>
                                         <p className={`text-sm font-bold ${!garage.is_active ? 'text-gray-400' : 'text-gray-600'}`}>
                                           Locality: <span className="font-semibold">{garage.locality}</span>
+                                          <span className="ml-3 px-1.5 py-1 text-xs font-medium rounded-sm border bg-white text-black border-gray-200">
+                                            Night Shift: <span className={garage.night_shift ? 'text-green-600' : 'text-red-600'}>{garage.night_shift ? 'Yes' : 'No'}</span>
+                                          </span>
                                         </p>
                                         <p className={`text-sm mb-1 font-bold ${!garage.is_active ? 'text-gray-400' : 'text-gray-600'}`}>
                                           Mechanic: <span className="font-semibold">{garage.mechanic}</span>, Mobile: <span className="font-semibold">{garage.mobile}</span>
@@ -297,33 +301,33 @@ const GarageSelector = ({ onClose, onSelectGarage, userLocation }) => {
                                         )}
                                       </div>
                                       
-                                      <div className="flex flex-col items-end">
+                                      {/* Right section - 30% width */}
+                                      <div className="w-[30%] flex flex-col items-end">
                                         {garage.is_active && (
                                           <a 
                                             href={garage.link} 
                                             target="_blank" 
                                             rel="noopener noreferrer"
-                                            className="flex items-center text-red-600 hover:text-red-700 ml-2 flex-shrink-0"
+                                            className="w-full px-3 py-1.5 text-sm font-medium flex items-center justify-center cursor-pointer hover:bg-gray-50 text-red-600 hover:text-red-700 border border-gray-200 rounded mb-2"
                                             onClick={(e) => e.stopPropagation()} 
                                           >
-                                            <MapPin size={20} />
-                                            <span className="ml-1">DIRECTIONS</span>
+                                            <MapPin size={14} className="mr-1" />
+                                            <span>DIRECTIONS</span>
                                           </a>
                                         )}
-                                        <text className={`text-sm`}>Night Shift: <span className={garage.night_shift ? 'text-green-600' : 'text-red-600'}>{garage.night_shift ? 'Yes' : 'No'}</span></text>
 
                                         {/* Compact timing card inside main garage card, below directions */}
                                         {garage.is_active && (
-                                          <div className="relative mt-2 w-fit">
+                                          <div className="relative w-full">
                                             <div
                                               onClick={(e) => {
                                                 e.stopPropagation();
                                                 toggleTimingsExpansion(uniqueGarageId);
                                               }}
-                                              className={`px-3 py-1.5 text-sm font-medium flex items-center justify-between cursor-pointer hover:bg-gray-50 ${status.statusColor} border border-gray-200 rounded`}
+                                              className={`px-3 py-1.5 text-sm font-medium flex items-center justify-between cursor-pointer hover:bg-gray-50 ${status.statusColor} border border-gray-200 rounded w-full`}
                                             >
-                                              <span className="mr-2">{status.statusText}</span>
-                                              {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                              <span className="mr-2 truncate">{status.statusText}</span>
+                                              {isExpanded ? <ChevronUp size={14} className="flex-shrink-0" /> : <ChevronDown size={14} className="flex-shrink-0" />}
                                             </div>
                     
                                             {isExpanded && (
@@ -337,9 +341,9 @@ const GarageSelector = ({ onClose, onSelectGarage, userLocation }) => {
                                                       <div key={day} className="flex justify-between">
                                                        
                                                         {dayHours && !dayHours.is_closed ? (
-                                                          <span className="text-gray-800">{`${formatTime(dayHours.open)} - ${formatTime(dayHours.close)} (${dayShort})`}</span>
+                                                          <span className="text-gray-800">{`${dayShort}: ${formatTime(dayHours.open)}-${formatTime(dayHours.close)}`}</span>
                                                         ) : (
-                                                          <span className="text-red-500">{`Closed (${dayShort})`}</span>
+                                                          <span className="text-red-500">{`${dayShort}: Closed`}</span>
                                                         )}
                                                       </div>
                                                     );

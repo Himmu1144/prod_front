@@ -239,6 +239,7 @@ const PDFDocument = ({ data }) => {
     gstin: '',
     commissionReceived: 0,
     commissionDue: 0,
+    wxgst: 0, // Added from billhh.js
     workshopDetailName: '',
     workshopDetailAddress: '',
     workshopDetailGSTIN: '',
@@ -552,29 +553,24 @@ const PDFDocument = ({ data }) => {
                     return Math.round(beforeGST);
                   })()}
                 </Text>
-                <Text style={styles.tableCell}>
-                  {/* GST: average GST percent from workDetail */}
-                  {(() => {
-                    const arr = mergedData.workDetail || [];
-                    if (!arr.length) return '';
-                    const avgGST = arr.reduce((sum, w) => sum + (parseFloat(w.gst) || 0), 0) / arr.length;
-                    return isNaN(avgGST) ? '' : `${Math.round(avgGST)}%`;
-                  })()}
-                </Text>
-                <Text style={styles.tableCellLast}>
-                  {/* Final Amount = Before GST Amt + (Before GST Amt * avg GST %) */}
-                  {(() => {
-                    const beforeGST =
-                      (parseFloat(mergedData.commissionReceived) || 0) +
-                      (parseFloat(mergedData.commissionDue) || 0);
-                    const arr = mergedData.workDetail || [];
-                    const avgGST = arr.length
-                      ? arr.reduce((sum, w) => sum + (parseFloat(w.gst) || 0), 0) / arr.length
-                      : 0;
-                    const finalAmount = beforeGST + (beforeGST * avgGST / 100);
-                    return beforeGST > 0 ? Math.round(finalAmount) : '';
-                  })()}
-                </Text>
+               <Text style={styles.tableCell}>
+  {/* GST: use wxgst directly */}
+  {(() => {
+    const gst = mergedData.wxgst || 0;
+    return gst > 0 ? `${Math.round(gst)}%` : '';
+  })()}
+</Text>
+<Text style={styles.tableCellLast}>
+  {/* Final Amount = Before GST Amt + (Before GST Amt * wxgst %) */}
+  {(() => {
+    const beforeGST =
+      (parseFloat(mergedData.commissionReceived) || 0) +
+      (parseFloat(mergedData.commissionDue) || 0);
+    const gst = mergedData.wxgst || 0;
+    const finalAmount = beforeGST + (beforeGST * gst / 100);
+    return beforeGST > 0 ? Math.round(finalAmount) : '';
+  })()}
+</Text>
               </View>
             </View>
           </View>
@@ -674,6 +670,7 @@ const WxBill = forwardRef(({ data }, ref) => {
     gstin: '',
     commissionReceived: 0,
     commissionDue: 0,
+    wxgst: 0, // Added from billhh.js 
     workshopDetailName: '',
     workshopDetailAddress: '',
     workshopDetailGSTIN: '',

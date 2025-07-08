@@ -8,8 +8,8 @@ import { AuthContext } from '../context/AuthContext';
 import './header.css';
 
 // Import car images
-import loknath from '../assets/images/loknath.jpg'; // Adjust path as needed
-import anjali from '../assets/images/anjali.jpg'; // Adjust path as needed
+import blueCarImg from '../assets/images/blue-car.png'; // Adjust path as needed
+import yellowCarImg from '../assets/images/yellow-car.png'; // Adjust path as needed
 
 const Header = () => {
     const { token, user } = useContext(AuthContext);    
@@ -53,22 +53,6 @@ const Header = () => {
         }
     };
 
-    // const handleStatusChange = async (newStatus) => {
-    //     try {
-    //         const response = await axios.post(
-    //             'https://admin.onlybigcars.com/api/update-status/',
-    //             { status: newStatus },
-    //             { headers: { 'Authorization': `Token ${token}` }}
-    //         );
-            
-    //         setStatus(newStatus);
-    //         setStatusTime(new Date(response.data.timestamp));
-    //         fetchUserStatus(); // Refresh status history
-    //     } catch (error) {
-    //         console.error('Error updating status:', error);
-    //     }
-    // };
-
     const handleStatusChange = async (newStatus) => {
         try {
             const response = await axios.post(
@@ -77,44 +61,24 @@ const Header = () => {
                 { headers: { 'Authorization': `Token ${token}` }}
             );
             
-            // Check if response message is 'invalid_count'
-            if (response.data.count === 'invalid_count') {
-                alert(response.data.message);
-            } else {
-                // Refresh the page instead of showing alert
-                window.location.reload();
-            }
+            setStatus(newStatus);
+            setStatusTime(new Date(response.data.timestamp));
+            fetchUserStatus(); // Refresh status history
         } catch (error) {
             console.error('Error updating status:', error);
-            
-            // Handle errors
-            if (error.response && error.response.data) {
-                if (error.response.data.message) {
-                    alert(error.response.data.message);
-                } else {
-                    alert('Failed to update status');
-                }
-            }
         }
     };
+
     // Determine which icon to show based on username
-const renderProfileIcon = () => {
-    const lowerUsername = username.toLowerCase();
-    const imageStyle = {
-        width: '100%',
-        height: '100%',
-        objectFit: 'cover',
-        borderRadius: '50%'
+    const renderProfileIcon = () => {
+        if (username === 'shreyans') {
+            return <img src={blueCarImg} alt="blue Car" style={{ width: '24px', height: '24px' }} />;
+        } else if (username === 'shreya') {
+            return <img src={yellowCarImg} alt="Yellow Car" style={{ width: '24px', height: '24px' }} />;
+        } else {
+            return <FaUser />;
+        }
     };
-    
-    if (lowerUsername === 'loknath') {
-        return <img src={loknath} alt="loknath" style={imageStyle} />;
-    } else if (lowerUsername === 'anjali') {
-        return <img src={anjali} alt="anjali" style={imageStyle} />;
-    } else {
-        return <FaUser />;
-    }
-};
 
     return (
         <>
@@ -128,68 +92,61 @@ const renderProfileIcon = () => {
                             alt="OnlyBigCars"
                         />
                     </Navbar.Brand>
-                    <Navbar.Toggle aria-controls="navbarScroll" />
-                    <Navbar.Collapse id="navbarScroll">
-                        <Nav
-                            className="me-auto my-2 my-lg-0"
-                            style={{ maxHeight: '100px' }}
-                            navbarScroll
-                        >  
-                        </Nav>
-
-                        <Dropdown className="drop-down-container">
-                            <Dropdown.Toggle 
-                                variant={status === 'Active' ? 'danger' : 'warning'} 
-                                id="dropdown-basic" 
-                                className='dropdown-btn'
-                            >
-                                {status} 
-                            </Dropdown.Toggle>
-
-                            <Dropdown.Menu>
-                                <Dropdown.Item 
-                                    onClick={() => handleStatusChange('Active')}
-                                    active={status === 'Active'}
-                                >
-                                    Active
-                                </Dropdown.Item>
-                                <Dropdown.Item 
-                                    onClick={() => handleStatusChange('Break')}
-                                    active={status === 'Break'}
-                                >
-                                    Break
-                                </Dropdown.Item>
-                                <Dropdown.Item 
-                                    onClick={() => handleStatusChange('Lunch')}
-                                    active={status === 'Lunch'}
-                                >
-                                    Lunch
-                                </Dropdown.Item>
-                                <Dropdown.Item 
-                                    onClick={() => handleStatusChange('Training')}
-                                    active={status === 'Training'}
-                                >
-                                    Training
-                                </Dropdown.Item>
-                                <Dropdown.Item 
-                                    onClick={() => handleStatusChange('Meeting')}
-                                    active={status === 'Meeting'}
-                                >
-                                    Meeting
-                                </Dropdown.Item>
-                            </Dropdown.Menu>
-                        </Dropdown>
-
                     
-                        <Button 
-                            variant="outline-danger" 
-                            className="ms-2 rounded-circle profile-btn"
-                            style={{width: '40px', height: '40px', padding: '6px'}}
-                            onClick={() => setShowProfileMenu(true)}
+                    <Nav className="me-auto"></Nav>
+
+                    <Dropdown className="drop-down-container">
+                        <Dropdown.Toggle 
+                            variant={status === 'Active' ? 'danger' : 'warning'} 
+                            id="dropdown-basic" 
+                            className='dropdown-btn'
                         >
-                            {renderProfileIcon()}
-                        </Button>
-                    </Navbar.Collapse>
+                            {status} 
+                        </Dropdown.Toggle>
+
+                        <Dropdown.Menu>
+                            <Dropdown.Item 
+                                onClick={() => handleStatusChange('Active')}
+                                active={status === 'Active'}
+                            >
+                                Active
+                            </Dropdown.Item>
+                            <Dropdown.Item 
+                                onClick={() => handleStatusChange('Break')}
+                                active={status === 'Break'}
+                            >
+                                Break
+                            </Dropdown.Item>
+                            <Dropdown.Item 
+                                onClick={() => handleStatusChange('Lunch')}
+                                active={status === 'Lunch'}
+                            >
+                                Lunch
+                            </Dropdown.Item>
+                            <Dropdown.Item 
+                                onClick={() => handleStatusChange('Training')}
+                                active={status === 'Training'}
+                            >
+                                Training
+                            </Dropdown.Item>
+                            <Dropdown.Item 
+                                onClick={() => handleStatusChange('Meeting')}
+                                active={status === 'Meeting'}
+                            >
+                                Meeting
+                            </Dropdown.Item>
+                        </Dropdown.Menu>
+                    </Dropdown>
+
+                
+                    <Button 
+                        variant="outline-danger" 
+                        className="ms-2 rounded-circle profile-btn"
+                        style={{width: '40px', height: '40px', padding: '6px'}}
+                        onClick={() => setShowProfileMenu(true)}
+                    >
+                        {renderProfileIcon()}
+                    </Button>
                 </Container>
             </Navbar>
 
