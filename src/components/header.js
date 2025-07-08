@@ -7,9 +7,8 @@ import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import './header.css';
 
-// Import car images
-import blueCarImg from '../assets/images/blue-car.png'; // Adjust path as needed
-import yellowCarImg from '../assets/images/yellow-car.png'; // Adjust path as needed
+import loknath from '../assets/images/loknath.jpg'; // Adjust path as needed
+import anjali from '../assets/images/anjali.jpg';
 
 const Header = () => {
     const { token, user } = useContext(AuthContext);    
