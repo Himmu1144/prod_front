@@ -71,10 +71,18 @@ const Header = () => {
 
     // Determine which icon to show based on username
     const renderProfileIcon = () => {
-        if (username === 'shreyans') {
-            return <img src={blueCarImg} alt="blue Car" style={{ width: '24px', height: '24px' }} />;
-        } else if (username === 'shreya') {
-            return <img src={yellowCarImg} alt="Yellow Car" style={{ width: '24px', height: '24px' }} />;
+        const lowerUsername = username.toLowerCase();
+        const imageStyle = {
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            borderRadius: '50%'
+        };
+        
+        if (lowerUsername === 'loknath') {
+            return <img src={loknath} alt="loknath" style={imageStyle} />;
+        } else if (lowerUsername === 'anjali') {
+            return <img src={anjali} alt="anjali" style={imageStyle} />;
         } else {
             return <FaUser />;
         }
