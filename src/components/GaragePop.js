@@ -105,7 +105,7 @@ const getGarageStatus = (garageOperatingHours) => {
     if (currentTime < openTime) {
       // Requirement: Show the opening times for the day even if it's currently closed.
       return {
-        statusText: `${formattedTodayOpen} - ${formattedTodayClose} (${todayShort})`,
+        statusText: `${todayShort}: ${formattedTodayOpen} - ${formattedTodayClose}`,
         statusColor: 'text-red-500', // Red because it's not actually open yet
         isCurrentlyOpen: false,
       };
@@ -264,10 +264,10 @@ const GarageSelector = ({ onClose, onSelectGarage, userLocation }) => {
                                                               return (
                                 <div 
                                   key={uniqueGarageId} 
-                                  className={`border border-gray-200 rounded-lg p-4 ${
+                                  className={`bg-white border border-gray-200 shadow-lg rounded-lg p-4 ${
                                     garage.is_active 
                                     ? 'hover:bg-gray-50' 
-                                    : 'opacity-60 cursor-not-allowed bg-gray-50'
+                                    : 'opacity-60 cursor-not-allowed bg-gray-100'
                                   }`}
                                 >
                                   <div 

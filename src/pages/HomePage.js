@@ -23,6 +23,10 @@ const HomePage = () => {
     const [garageSearchQuery, setGarageSearchQuery] = useState('');
     const [isGarageDropdownOpen, setIsGarageDropdownOpen] = useState(false);
     const [newCallNotification, setNewCallNotification] = useState(null);
+    const [cities, setCities] = useState([]);
+    const [locationSearchQuery, setLocationSearchQuery] = useState('');
+    const [isLocationDropdownOpen, setIsLocationDropdownOpen] = useState(false);
+    
 
     // Add new state
     const [welcomeData, setWelcomeData] = useState('');
@@ -34,6 +38,8 @@ const HomePage = () => {
     const [userStatus, setUserStatus] = useState('Active');
     const [statusTime, setStatusTime] = useState(null);
     // const [isMobile, setIsMobile] = useState(false);
+    const [selectedLeads, setSelectedLeads] = useState([]);
+        const [selectedCce, setSelectedCce] = useState('');
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
     const handleStatusChange = (newStatus, timestamp) => {
         setUserStatus(newStatus);
@@ -120,6 +126,60 @@ const [filterFormData, setFilterFormData] = useState(() => {
     const [totalCommissionExceptOwn, setTotalCommissionExceptOwn] = useState(0);
     const [showStatsContainer, setShowStatsContainer] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
+
+
+    
+        const handleSelectLead = (leadId) => {
+            setSelectedLeads(prev =>
+                prev.includes(leadId)
+                    ? prev.filter(id => id !== leadId)
+                    : [...prev, leadId]
+            );
+        };
+    
+        const handleSelectAllLeads = (e) => {
+            if (e.target.checked) {
+                const allLeadIds = leads.map(lead => lead.id);
+                setSelectedLeads(allLeadIds);
+            } else {
+                setSelectedLeads([]);
+            }
+        };
+    
+        const handleBulkCceUpdate = async () => {
+            if (selectedLeads.length === 0 || !selectedCce) {
+                setAlertMessage('Please select at least one lead and a CCE.');
+                setShowSuccessAlert(true);
+                setTimeout(() => setShowSuccessAlert(false), 3000);
+                return;
+            }
+    
+            try {
+                const response = await axios.post(
+                    'https://admin.onlybigcars.com/api/leads/bulk-update-cce/',
+                    {
+                        lead_ids: selectedLeads,
+                        cce_username: selectedCce
+                    },
+                    { headers: { 'Authorization': `Token ${token}` } }
+                );
+                console.log(response.data);
+    
+                setAlertMessage(response.data.message);
+                setShowSuccessAlert(true);
+                setSelectedLeads([]);
+                setSelectedCce('');
+                fetchLeads(); // Refresh leads to show changes
+                setTimeout(() => setShowSuccessAlert(false), 3000);
+    
+            } catch (error) {
+                console.error('Error updating CCE:', error);
+                setAlertMessage('Failed to update CCE. ' + (error.response?.data?.error || ''));
+                setShowSuccessAlert(true);
+                setTimeout(() => setShowSuccessAlert(false), 3000);
+            }
+        };
+    
 
     // const fetchLeads = async () => {
     //     try {
@@ -376,6 +436,44 @@ const handleGarageChange = (garageName) => {
             garage: updatedGarages
         };
     });
+};
+   
+
+
+const handleLocationChange = (cityName) => {
+    setFilterFormData(prev => {
+        const updatedLocations = prev.location.includes(cityName)
+            ? prev.location.filter(c => c !== cityName)
+            : [...prev.location, cityName];
+        
+        return {
+            ...prev,
+            location: updatedLocations
+        };
+    });
+};
+
+// Add this function after handleGarageChange
+const toggleAllLocations = () => {
+    const filteredCities = cities.filter(city =>
+        city.toLowerCase().includes(locationSearchQuery.toLowerCase())
+    );
+
+    const allSelected = filteredCities.every(city =>
+        filterFormData.location.includes(city)
+    );
+
+    if (allSelected) {
+        setFilterFormData(prev => ({
+            ...prev,
+            location: prev.location.filter(loc => !filteredCities.includes(loc))
+        }));
+    } else {
+        setFilterFormData(prev => ({
+            ...prev,
+            location: [...new Set([...prev.location, ...filteredCities])]
+        }));
+    }
 };
     
 
@@ -715,6 +813,7 @@ useEffect(() => {
                 // Add this line to set user stats
                 setUserStats(response.data.user_stats || {});
                 setGarages(response.data.garages); // Store garages data
+                setCities(response.data.cities || []);
                 setIsAdmin(response.data.is_admin || false); // Add this line
                 // If not admin, set the user field in filterFormData
             if (!response.data.is_admin && response.data.current_username) {
@@ -1191,7 +1290,25 @@ const excelData = response.data.leads.map(lead => ({
   />
 )}
 
-                        <select
+                        
+
+                        <div className="flex items-center space-x-4">
+                        <DateRangeSelector 
+        ref={dateRangeSelectorRef} 
+        onDateRangeChange={handleDateRangeChange} 
+        dateField={filterFormData.dateField}
+        onDateFieldChange={(value) => {
+            setFilterFormData(prev => ({
+                ...prev,
+                dateField: value
+            }));
+        }}
+        className="w-full" // Add this class to ensure it takes full width
+
+    />
+</div>
+
+<select
                             name="source"
                             value={filterFormData.source}
                             onChange={handleFilterChange}
@@ -1212,22 +1329,6 @@ const excelData = response.data.leads.map(lead => ({
                             <option value="Test">Test</option>
 
                         </select>
-
-                        <div className="flex items-center space-x-4">
-                        <DateRangeSelector 
-        ref={dateRangeSelectorRef} 
-        onDateRangeChange={handleDateRangeChange} 
-        dateField={filterFormData.dateField}
-        onDateFieldChange={(value) => {
-            setFilterFormData(prev => ({
-                ...prev,
-                dateField: value
-            }));
-        }}
-        className="w-full" // Add this class to ensure it takes full width
-
-    />
-</div>
  <select
                             name="arrivalMode"
                             value={filterFormData.arrivalMode}
@@ -1386,7 +1487,7 @@ const excelData = response.data.leads.map(lead => ({
     )}
   </select>
 )}
-                        <select
+                        {/* <select
                             name="location"
                             value={filterFormData.location}
                             onChange={handleFilterChange}
@@ -1394,20 +1495,8 @@ const excelData = response.data.leads.map(lead => ({
                         >
                             <option value="">Location</option>
                             <option value="Gurugram">Gurugram</option> <option value="Delhi">Delhi</option> <option value="Faridabad">Faridabad</option> <option value="Kanpur">Kanpur</option> <option value="Dehradun">Dehradun</option> <option value="Chandigarh">Chandigarh</option> <option value="Bangalore">Bangalore</option> <option value="Jaipur">Jaipur</option> <option value="Lucknow">Lucknow</option> <option value="Chennai">Chennai</option> <option value="Kolkata">Kolkata</option> <option value="Mumbai">Mumbai</option> <option value="Hyderabad">Hyderabad</option> <option value="Pune">Pune</option> <option value="Ahmedabad">Ahmedabad</option>
-                        </select>
-                        <select
-                            name="luxuryNormal"
-                            value={filterFormData.luxuryNormal}
-                            onChange={handleFilterChange}
-                            className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                        >
-                            <option value="">Luxury/Normal</option>
-                            <option value="Luxury">Luxury</option>
-                            <option value="Normal">Normal</option>
-                            <option value="Insurance">Insurance</option>
-                            <option value="Sell/Buy">Sell/Buy</option> {/* <-- Add this */}
-                            <option value="Spares">Spares</option>  
-                        </select>
+                        </select> */}
+                        
                         {/* <input
                             type="date"
                             name="dateCreated"
@@ -1418,6 +1507,69 @@ const excelData = response.data.leads.map(lead => ({
                         /> */}
                        {/* Replace the existing garage select element with this */}
 {/* Replace the existing garage select element with this */}
+
+<div className="relative w-full">
+                            <div 
+                                className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent cursor-pointer flex justify-between items-center h-[42px]"
+                                onClick={() => setIsLocationDropdownOpen(!isLocationDropdownOpen)}
+                            >
+                                <span className="text-gray-700">
+                                    {filterFormData.location.length ? `${filterFormData.location.length} cities selected` : 'Select Cities'}
+                                </span>
+                                <svg className="h-4 w-4 text-black-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={isLocationDropdownOpen ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"} />
+                                </svg>
+                            </div>
+
+                            {isLocationDropdownOpen && (
+                                <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+                                    <div className="sticky top-0 bg-white p-2 border-b border-gray-200">
+                                        <input
+                                            type="text"
+                                            value={locationSearchQuery}
+                                            onChange={(e) => setLocationSearchQuery(e.target.value)}
+                                            placeholder="Search cities..."
+                                            className="w-full p-2 text-sm border border-gray-300 rounded"
+                                            onClick={(e) => e.stopPropagation()}
+                                            autoFocus
+                                        />
+                                    </div>
+                                    <div className="px-3 py-2 border-b border-gray-200">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); toggleAllLocations(); }}
+                                            className="w-full py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium"
+                                        >
+                                            {cities.filter(c => c.toLowerCase().includes(locationSearchQuery.toLowerCase())).every(c => filterFormData.location.includes(c))
+                                                ? "Unselect All"
+                                                : "Select All"
+                                            }
+                                        </button>
+                                    </div>
+                                    {cities
+                                        .filter(city => city.toLowerCase().includes(locationSearchQuery.toLowerCase()))
+                                        .map(city => (
+                                            <div
+                                                key={city}
+                                                className="flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                                                onClick={(e) => { e.stopPropagation(); handleLocationChange(city); }}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    id={`city-${city}`}
+                                                    checked={filterFormData.location.includes(city)}
+                                                    onChange={() => handleLocationChange(city)}
+                                                    className="mr-2"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                />
+                                                <label htmlFor={`city-${city}`} className="w-full cursor-pointer">
+                                                    {city}
+                                                </label>
+                                            </div>
+                                        ))}
+                                </div>
+                            )}
+                        </div>
+
 <div className="relative w-full">
     <div 
         className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent cursor-pointer flex justify-between items-center"
@@ -1527,6 +1679,20 @@ const excelData = response.data.leads.map(lead => ({
         </div>
     )}
 </div>
+
+<select
+                            name="luxuryNormal"
+                            value={filterFormData.luxuryNormal}
+                            onChange={handleFilterChange}
+                            className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                        >
+                            <option value="">Luxury/Normal</option>
+                            <option value="Luxury">Luxury</option>
+                            <option value="Normal">Normal</option>
+                            <option value="Insurance">Insurance</option>
+                            <option value="Sell/Buy">Sell/Buy</option> {/* <-- Add this */}
+                            <option value="Spares">Spares</option>  
+                        </select>
                         {/* // Add this before the reset/submit buttons div */}
 {/* <div className="col-span-5 mb-4">
     <div className="bg-white rounded-lg shadow-sm border border-gray-200">
@@ -1738,8 +1904,8 @@ const excelData = response.data.leads.map(lead => ({
                             </svg>
                         </Link>
                     )}
-                    <button onClick={() => navigate('/edit', { state: { seqNum: seqNum } })} className="px-4 py-2 border-2 border-red-500 text-red-500 rounded-md hover:bg-red-500 hover:text-white transition-colors duration-300">
-                        Add Lead
+                    <button onClick={() => navigate('/edit', { state: { seqNum: seqNum } })} className="px-4 py-2 border-2  border-red-500 text-red-500 rounded-md hover:bg-red-500 hover:text-white transition-colors duration-300 font-bold">
+                        <span className='font-bold'>Add Lead</span>
                     </button>
                 </div>
             </div>
@@ -1750,6 +1916,30 @@ const excelData = response.data.leads.map(lead => ({
         </span>
     </div>
 )}
+    
+    {isAdmin && selectedLeads.length > 0 && (
+                <div className="flex items-center justify-center gap-4 my-4 p-4 bg-gray-100 rounded-lg shadow">
+                    <span className="font-medium text-gray-700">{selectedLeads.length} leads selected.</span>
+                    <select
+                        value={selectedCce}
+                        onChange={(e) => setSelectedCce(e.target.value)}
+                        className="p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-red-500"
+                    >
+                        <option value="">Assign to CCE...</option>
+                        {users.map(user => (
+                            <option key={user.id} value={user.username}>{user.username}</option>
+                        ))}
+                    </select>
+                    <button
+                        onClick={handleBulkCceUpdate}
+                        className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
+                    >
+                        Update CCE
+                    </button>
+                </div>
+            )}
+
+    
             <div className='flex justify-center'>
                 <div className="mt-4" style={{ width: '96%', marginBottom: '0.5em' }}>
                     <div className="overflow-x-hidden"> {/* Prevent horizontal scrollbar */}
@@ -1774,7 +1964,8 @@ const excelData = response.data.leads.map(lead => ({
                                          {!isMobile && <th className="p-3 text-left">CCE | CA</th>}
                                         <th className="p-3 text-left">Date/Time</th>
                                         {!isMobile &&<th className="p-3 text-left">Created | Modified At</th>}
-                                        <th className="p-3 text-left">Edit/Copy</th>
+                                        {/* <th className="p-3 text-left">Edit/Copy</th> */}
+                                        <th className="p-3 text-left">{isMobile ? 'Action' : 'Edit/Copy'}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1795,10 +1986,18 @@ const excelData = response.data.leads.map(lead => ({
         transition-all duration-200 ease-in-out
     `}
 >
+{/* <tr 
+    key={`${lead.id}-${index}`} 
+    className={`
+        border-b hover:bg-gray-50 group 
+        ${(lead.status === "Assigned" || (isMobile && lead.status === "Referred To Ops")) ? "bg-gray-100 border-l-2 border-l-red-500" : ""}
+        transition-all duration-200 ease-in-out
+    `}
+> */}
                                             {/* 14-2 */}
                                             <td className="p-2">
                                                 <div className="relative">
-                                                    <div className="h-12 group-hover:hidden">
+                                                    <div className={`${isMobile ? 'h-20' : 'h-12'} group-hover:hidden`}>
                                                         {truncateLeadId(lead.id)}<br />
                                                         {lead.type}
                                                         
@@ -1814,13 +2013,13 @@ const excelData = response.data.leads.map(lead => ({
                                             </td>
                                             
                                             <td className="p-2">
-                                                <div className="h-12 overflow-hidden group-hover:h-auto transition-all duration-200">
+                                                <div className={`${isMobile ? 'h-20' : 'h-12'} overflow-hidden group-hover:h-auto transition-all duration-200`}>
                                                     {lead.name}<br />
                                                     {lead.vehicle}
                                                 </div>
                                             </td>
                                             <td className="p-2">
-                                                <div className="h-12 overflow-hidden group-hover:h-auto transition-all duration-200">
+                                                <div className={`${isMobile ? 'h-20' : 'h-12'} overflow-hidden group-hover:h-auto transition-all duration-200`}>
                                                     {lead.number}<br />
                                                     {lead.source}
                                                 </div>
@@ -1838,9 +2037,14 @@ const excelData = response.data.leads.map(lead => ({
                                                     </span>
                                                 </div>
                                             </td> */}
-   <td className="p-2 text-center">
+   {/* <td className="p-2 text-center">
     <div className="flex flex-col items-center gap-2">
         <span className={`${lead.status === "Assigned" ? "font-bold text-red-500" : "text-gray-600"}`}>
+            {lead.status}
+        </span> */}
+        <td className="p-2 text-center">
+    <div className="flex flex-col items-center gap-2">
+        <span className={`${(lead.status === "Assigned" || (isMobile && lead.status === "Referred To Ops")) ? "font-bold text-red-500" : "text-gray-600"}`}>
             {lead.status}
         </span>
         
@@ -1903,29 +2107,51 @@ const excelData = response.data.leads.map(lead => ({
                                                     }) : 'NA'}
                                                 </div>
                                             </td>}
-                                            <td className="p-2">
-                                                <div className="flex flex-col gap-2">
-                                                    <div className="flex gap-2">
-                                                        {/* <Edit
-                                                            size={16}
-                                                            className="cursor-pointer hover:text-red-500 transition-colors duration-200"
-                                                            onClick={() => navigate(`/edit/${lead.id}`)}
-                                                        /> */}
-                                                        <Edit
-  size={16}
-  className="cursor-pointer hover:text-red-500 transition-colors duration-200"
-  onClick={() => navigate(`/edit/${lead.id}`, {
-    state: { 
-      previousStatus: lead.status // Pass the current status to EditPage
-    }
-  })}
-/>
-{/* 18 feb start */}
-<Copy 
-  size={16} 
-  className="cursor-pointer hover:text-red-500 transition-colors" 
-  onClick={() => handleCopyClick(lead)}
-/>
+                                           <td className="p-2">
+    <div className="flex flex-col gap-1">
+        <div className={`flex gap-1 ${isMobile ? 'flex-col' : ''}`}>
+            {/* Edit Button */}
+            {isMobile ? (
+                <button
+                    className="flex items-center justify-center gap-1 px-2 py-2 bg-black text-white rounded text-xs hover:bg-gray-800 transition-colors duration-200 min-h-[36px] w-full"
+                    onClick={() => navigate(`/edit/${lead.id}`, {
+                        state: { 
+                            previousStatus: lead.status
+                        }
+                    })}
+                >
+                    <Edit size={12} />
+                    <span>Edit</span>
+                </button>
+            ) : (
+                <Edit
+                    size={16}
+                    className="cursor-pointer hover:text-red-500 transition-colors duration-200"
+                    onClick={() => navigate(`/edit/${lead.id}`, {
+                        state: { 
+                            previousStatus: lead.status
+                        }
+                    })}
+                />
+            )}
+
+            {/* Copy Button */}
+            {isMobile ? (
+                <button
+                    className="flex items-center justify-center gap-1 px-2 py-2 bg-white text-black border border-gray-300 rounded text-xs hover:bg-gray-50 transition-colors duration-200 min-h-[36px] w-full"
+                    onClick={() => handleCopyClick(lead)}
+                >
+                    <Copy size={12} />
+                    <span>Copy</span>
+                </button>
+            ) : (
+                <Copy 
+                    size={16} 
+                    className="cursor-pointer hover:text-red-500 transition-colors" 
+                    onClick={() => handleCopyClick(lead)}
+                />
+            )}
+     
 {/* 18 feb end */}
                                                         {/* <Plus
                                                             size={16}
@@ -1941,7 +2167,7 @@ const excelData = response.data.leads.map(lead => ({
                                                             })}
                                                         /> */}
                                                         {/* Phone icon replacing the Plus button */}
-             {!isMobile && (
+             {!isMobile && !isAdmin && (
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="16"
@@ -1958,6 +2184,16 @@ const excelData = response.data.leads.map(lead => ({
               >
                 <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
               </svg>
+            )}
+            {!isMobile && isAdmin && (
+                <input
+                    type="checkbox"
+                    checked={selectedLeads.includes(lead.id)}
+                    onChange={() => handleSelectLead(lead.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="form-checkbox h-4 w-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500 cursor-pointer"
+                    title="Select for bulk update"
+                />
             )}
                                                         
                                                     </div>

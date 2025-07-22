@@ -4,7 +4,7 @@ import { Alert } from 'react-bootstrap';
 import './editpage.css';
 import React, { useState, useEffect, useRef, useContext, useMemo, useCallback } from 'react';
 import { Card, Button, Collapse, Form, Row, Col } from 'react-bootstrap';
-import { FaMapMarkerAlt, FaPencilAlt , FaEdit, FaTimes} from 'react-icons/fa';
+import { FaMapMarkerAlt, FaPencilAlt , FaEdit, FaTimes, FaWhatsapp} from 'react-icons/fa';
 import AddNewCar from './addcar';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -73,6 +73,10 @@ const initialFormState = {
     jobCardNumber: '',
     estimatedDeliveryTime: '',
     orderId: 'NA', // Add this new field
+    paidAmount: '',
+    modeOfPayment: '',
+    paymentImages: [],
+    commissionImages: [],
     
   },
   workshop: {
@@ -80,7 +84,12 @@ const initialFormState = {
     mechanic: '',
     locality: '',
     mobile: '',
-    status: 'Open'
+    status: 'Open',
+    gst_address: '',
+    gst_number: '',
+    gst_state: '',
+    gst_workshop_name: '',
+
   },
   basicInfo: {
     carType: '',
@@ -132,6 +141,21 @@ const EditPage = () => {
   const [existingImageUrls, setExistingImageUrls] = useState([]);
   const [imageTooltipText, setImageTooltipText] = useState('');
   const [isUploadingImages, setIsUploadingImages] = useState(false);
+
+  // ADD THESE NEW LINES RIGHT AFTER:
+  const [selectedPaymentImages, setSelectedPaymentImages] = useState([]);
+  const [existingPaymentImageUrls, setExistingPaymentImageUrls] = useState([]);
+  const [selectedCommissionImages, setSelectedCommissionImages] = useState([]);
+  const [existingCommissionImageUrls, setExistingCommissionImageUrls] = useState([]);
+  const [paymentImageTooltipText, setPaymentImageTooltipText] = useState('');
+  const [commissionImageTooltipText, setCommissionImageTooltipText] = useState('');
+
+  // Add these state variables after your existing state declarations
+  const [showGSTPopup, setShowGSTPopup] = useState(false);
+  const [gstData, setGstData] = useState(null);
+  const [isProcessingGST, setIsProcessingGST] = useState(false);
+  const [gstError, setGstError] = useState(null);
+
   const [showDesignerPopup, setShowDesignerPopup] = useState(false);
   const [gstDetails, setGstDetails] = useState({
     customer_name: '',
@@ -163,6 +187,18 @@ const [warrantyDetails, setWarrantyDetails] = useState({
   warranty: '',
 });
 const [isRephrasing, setIsRephrasing] = useState(false);
+const [imageToPreview, setImageToPreview]=useState(null);
+const [gstTimer, setGstTimer] = useState(0);
+const [maxGstTime] = useState(120); // 2 minutes in seconds
+
+
+// Add these state variables after your existing state declarations (around line 151)
+const [editableGstData, setEditableGstData] = useState(null);
+const [gstChanges, setGstChanges] = useState({});
+
+// Add these with your other state declarations
+// const [isSubmitInProgress, setIsSubmitInProgress] = useState(false);
+// const submitTimeoutRef = useRef(null);
   
 
 // Add this with other state declarations around line 90-100
@@ -249,6 +285,85 @@ const handleRemoveExistingImage = (index) => {
   setExistingImageUrls(updatedExistingImages);
 };
 
+
+// Find the existing functions and add these RIGHT AFTER them:
+
+// Payment Image Handlers
+const handlePaymentImageChange = (e) => {
+  const files = Array.from(e.target.files);
+  
+  const validFiles = files.filter(file => {
+    const isValidType = file.type.startsWith('image/');
+    const isValidSize = file.size <= 5 * 1024 * 1024; // 5MB max size
+    
+    if (!isValidType) {
+      setPaymentImageTooltipText('Only image files are allowed');
+      setTimeout(() => setPaymentImageTooltipText(''), 3000);
+      return false;
+    }
+    
+    if (!isValidSize) {
+      setPaymentImageTooltipText('Images must be under 5MB each');
+      setTimeout(() => setPaymentImageTooltipText(''), 3000);
+      return false;
+    }
+    
+    return true;
+  });
+  
+  setSelectedPaymentImages(prev => [...prev, ...validFiles]);
+};
+
+const handleRemovePaymentImage = (index) => {
+  const updatedImages = [...selectedPaymentImages];
+  updatedImages.splice(index, 1);
+  setSelectedPaymentImages(updatedImages);
+};
+
+const handleRemoveExistingPaymentImage = (index) => {
+  const updatedExistingImages = [...existingPaymentImageUrls];
+  updatedExistingImages.splice(index, 1);
+  setExistingPaymentImageUrls(updatedExistingImages);
+};
+
+// Commission Image Handlers
+const handleCommissionImageChange = (e) => {
+  const files = Array.from(e.target.files);
+  
+  const validFiles = files.filter(file => {
+    const isValidType = file.type.startsWith('image/');
+    const isValidSize = file.size <= 5 * 1024 * 1024; // 5MB max size
+    
+    if (!isValidType) {
+      setCommissionImageTooltipText('Only image files are allowed');
+      setTimeout(() => setCommissionImageTooltipText(''), 3000);
+      return false;
+    }
+    
+    if (!isValidSize) {
+      setCommissionImageTooltipText('Images must be under 5MB each');
+      setTimeout(() => setCommissionImageTooltipText(''), 3000);
+      return false;
+    }
+    
+    return true;
+  });
+  
+  setSelectedCommissionImages(prev => [...prev, ...validFiles]);
+};
+
+const handleRemoveCommissionImage = (index) => {
+  const updatedImages = [...selectedCommissionImages];
+  updatedImages.splice(index, 1);
+  setSelectedCommissionImages(updatedImages);
+};
+
+const handleRemoveExistingCommissionImage = (index) => {
+  const updatedExistingImages = [...existingCommissionImageUrls];
+  updatedExistingImages.splice(index, 1);
+  setExistingCommissionImageUrls(updatedExistingImages);
+};
+
   const [searchQuery, setSearchQuery] = useState('');
   
 
@@ -256,7 +371,7 @@ const handleRemoveExistingImage = (index) => {
   const [selectedService, setSelectedService] = useState('Car Service');
 
   const [selectedGarage, setSelectedGarage] = useState({
-    name: 'Onlybigcars - Own Agra Mathura Road',
+    name: 'Onlybigcars - Own Mathura Road',
     mechanic: 'Sahil',
     locality: 'Locality: 98V7+C38, Faridabad, Haryana',
     link:'https://g.co/kgs/X7g95w8',
@@ -350,6 +465,35 @@ const handleSaveGstDetails = () => {
   }
   
   return false;
+};
+
+
+// Add this helper function in your EditPage component
+const hasStatusInHistory = (statusToCheck) => {
+  try {
+    const statusHistory = formState.arrivalStatus.status_history;
+    
+    // If statusHistory isn't an array or is empty, return false
+    if (!Array.isArray(statusHistory) || statusHistory.length === 0) {
+      return false;
+    }
+    
+    // Check if the status exists in the history
+    return statusHistory.some(entry => {
+      // Handle different data structures
+      if (entry && typeof entry === 'object' && entry.status) {
+        return entry.status.toLowerCase().trim() === statusToCheck.toLowerCase().trim();
+      }
+      // If entry is just a string
+      if (typeof entry === 'string') {
+        return entry.toLowerCase().trim() === statusToCheck.toLowerCase().trim();
+      }
+      return false;
+    });
+  } catch (error) {
+    console.log('Error checking status history:', error);
+    return false;
+  }
 };
 
   // 18 feb start
@@ -633,11 +777,16 @@ const StatusHistoryDisplay = ({ statusHistory, statusCounterData = {} }) => {
       status_history: [], // 18 feb
       finalAmount: 0,
       orderId: 'NA', // Add this new field
+      paidAmount: '',
+      modeOfPayment: '',
+      commissionModeOfPayment: '',
       commissionDue: 0, // Add this new field
       commissionReceived: 0, // Add this new field
       commissionPercent: 0, // Add this new field
       pendingAmount: 0, // Add this new field
       gst: 0,
+      paymentImages: [],
+      commissionImages: [],
      
     },
     workshop: {
@@ -645,7 +794,11 @@ const StatusHistoryDisplay = ({ statusHistory, statusCounterData = {} }) => {
       mechanic: selectedGarage.mechanic,
       locality: selectedGarage.locality,
       mobile: selectedGarage.mobile,
-      status: 'Open', // or any default value
+      status: 'Open', // or any default value,
+      gst_address: '',
+      gst_number: '',
+      gst_state: '',
+      gst_workshop_name: '',
     },
     basicInfo: {
       carType : '',
@@ -964,6 +1117,16 @@ useEffect(() => {
           console.log("Loaded existing images:", leadData.images);
         }
         
+        if (leadData.payment_images && Array.isArray(leadData.payment_images)) {
+  setExistingPaymentImageUrls(leadData.payment_images);
+  console.log("Loaded existing payment images:", leadData.payment_images);
+}
+
+// Load commission images  
+if (leadData.commission_images && Array.isArray(leadData.commission_images)) {
+  setExistingCommissionImageUrls(leadData.commission_images);
+  console.log("Loaded existing commission images:", leadData.commission_images);
+}
           
           const customerResponse = await axios.get(
             `https://admin.onlybigcars.com/api/customers/${leadData.number}/`,
@@ -1058,12 +1221,16 @@ useEffect(() => {
               batteryFeature: leadData.battery_feature || '', // Add this new field
               gstin: leadData.gstin || '', // Add this new field
               pendingAmount: leadData.pending_amount || 0, // Add this new field
+              paidAmount: leadData.paid_amount || 0,
+              modeOfPayment: leadData.mode_of_payment || '',
+              commissionModeOfPayment: leadData.commission_mode_of_payment || '',
               additionalWork: leadData.additional_work || '',
               fuelStatus: leadData.fuel_status || '', // Add this new field 
               speedometerRd: leadData.speedometer_rd || '', // Add this new field
               inventory: leadData.inventory || [],
               orderId: leadData.orderId || 'NA', // Add this new field
-              
+              paymentImages: leadData.payment_images || [],
+              commissionImages: leadData.commission_images || [],
             
               
             },
@@ -1072,6 +1239,11 @@ useEffect(() => {
               locality: leadData.workshop_details?.locality || '',
               status: leadData.workshop_details?.status || '',
               mobile: leadData.workshop_details?.mobile || '',
+              mechanic: leadData.workshop_details?.mechanic || '',
+              gst_address: leadData.workshop_details?.gst_address || '',
+              gst_number: leadData.workshop_details?.gst_number || '',
+              gst_state: leadData.workshop_details?.gst_state || '',
+              gst_workshop_name: leadData.workshop_details?.gst_workshop_name || '',
             },
             basicInfo: {
               ...formState.basicInfo,//14-2
@@ -1196,18 +1368,42 @@ setFormState(prev => {
     
     // For workshop details, similar approach
     wx_name: 
-      (leadData.gstDetail?.wx_name) || 
+      (leadData.workshop_details?.gst_workshop_name) || 
+      (leadData.gstDetail?.wx_name) ||
       prev.workshop.name || '',
       
     wx_address: 
+      (leadData.workshop_details?.gst_workshop_address) ||
       (leadData.gstDetail?.wx_address) || 
       prev.workshop.locality || '',
       
     wx_gstin: 
+      (leadData.workshop_details?.gst_number) ||
       (leadData.gstDetail?.wx_gstin) || '',
       
     wx_state: 
+      (leadData.workshop_details?.gst_state) ||
       (leadData.gstDetail?.wx_state) || ''
+
+    // wx_name: 
+    //   (leadData.gstDetail?.wx_name) ||
+    //   (leadData.workshop_details?.gst_workshop_name) || 
+    //   prev.workshop.name || '',
+      
+    // wx_address: 
+    //   (leadData.gstDetail?.wx_address) || 
+    //   (leadData.workshop_details?.gst_workshop_address) ||
+    //   prev.workshop.locality || '',
+      
+    // wx_gstin: 
+    //   (leadData.gstDetail?.wx_gstin) || 
+    //   (leadData.workshop_details?.gst_number) ||
+    //   '',
+      
+    // wx_state: 
+    //   (leadData.gstDetail?.wx_state) || 
+    //   (leadData.workshop_details?.gst_state) ||
+    //   ''
   };
 
   return {
@@ -1342,6 +1538,40 @@ useEffect(() => {
   statusCounterData.job_card_count, 
   statusCounterData.payment_due_count
 ]);
+
+useEffect(() => {
+  let interval;
+  if (isProcessingGST && gstTimer < maxGstTime) {
+    interval = setInterval(() => {
+      setGstTimer(prev => prev + 1);
+    }, 1000);
+  } else if (!isProcessingGST) {
+    setGstTimer(0);
+  }
+  
+  return () => {
+    if (interval) {
+      clearInterval(interval);
+    }
+  };
+}, [isProcessingGST, gstTimer, maxGstTime]);
+
+
+// Cleanup timeout on component unmount
+// useEffect(() => {
+//   return () => {
+//     if (submitTimeoutRef.current) {
+//       clearTimeout(submitTimeoutRef.current);
+//     }
+//   };
+// }, []);
+
+// Format timer display
+const formatTime = (seconds) => {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
 
   // useEffect(() => {
   //   if (isLoaded && addressInputRef.current) {
@@ -1923,6 +2153,40 @@ const handleSubCategoryChange = (rowIndex, value) => {
     setShowAddCarModal(false);
     setEditingCar(null);
   };
+
+const validatePaymentScreenshot = () => {
+  // Only validate if status is Payment Due and payment mode is not Cash
+  if (formState.arrivalStatus.leadStatus === 'Completed' && 
+      formState.arrivalStatus.modeOfPayment && 
+      formState.arrivalStatus.modeOfPayment !== 'Cash') {
+    
+    // Check if there are any payment screenshots (existing or new)
+    const hasExistingImages = existingPaymentImageUrls && existingPaymentImageUrls.length > 0;
+    const hasNewImages = selectedPaymentImages && selectedPaymentImages.length > 0;
+    
+    return hasExistingImages || hasNewImages;
+  }
+  
+  return true; // Always valid if Cash payment or not Payment Due status
+};
+
+const validateCommissionScreenshot = () => {
+  // Only validate if status is Commission Due and commission payment mode is not Cash
+  if (formState.arrivalStatus.leadStatus === 'Completed' && 
+      formState.arrivalStatus.commissionModeOfPayment && 
+      formState.arrivalStatus.commissionModeOfPayment !== 'Cash') {
+    
+    // Check if there are any commission screenshots (existing or new)
+    const hasExistingImages = existingCommissionImageUrls && existingCommissionImageUrls.length > 0;
+    const hasNewImages = selectedCommissionImages && selectedCommissionImages.length > 0;
+    
+    return hasExistingImages || hasNewImages;
+  }
+  
+  return true; // Always valid if Cash payment or not Commission Due status
+};
+
+
   // Add this function before the handleSubmit function
 const validateForm = () => {
   const errors = {};
@@ -1963,6 +2227,16 @@ const validateForm = () => {
     if(formState.basicInfo.cceComments.length < 30) { 
       errors.cceComments = 'CCE Comments should be at least 30 characters long';
     }
+
+    // Payment screenshot validation
+    if (!validatePaymentScreenshot()) {
+      errors.paymentScreenshot = 'Payment screenshot is required for non-Cash payments';
+    }
+
+    // Commission screenshot validation
+    if (!validateCommissionScreenshot()) {
+      errors.commissionScreenshot = 'Commission screenshot is required for non-Cash commission payments';
+    }
     
     // Table rows validation
     if (!formState.overview.tableData || formState.overview.tableData.length === 0) {
@@ -1993,18 +2267,31 @@ const validateForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-  //  Check if the previous status is "Completed"
-  if (location.state?.previousStatus === "Completed") {
-    setShowPopup(true);
-    return;
-  }
+  //   if (isSubmitInProgress || isSubmitting) {
+  //   console.log('Submission already in progress, ignoring...');
+  //   return;
+  // }
+  
+  // setIsSubmitInProgress(true);
+  // setIsSubmitting(true);
+  
+  // // Clear any existing timeout
+  // if (submitTimeoutRef.current) {
+  //   clearTimeout(submitTimeoutRef.current);
+  // }
+
+
+
 
   // Set the current car index
   setSelectedCarIndex(currentCarIndex);
 
     setIsSubmitting(true);
-    
+          // Prevent multiple submissions
+
     const errors = validateForm();
+
+    
 
 
 
@@ -2070,6 +2357,12 @@ const validateForm = () => {
       setIsSubmitting(false);
     }
   
+
+      //  Check if the previous status is "Completed"
+  if (location.state?.previousStatus === "Completed") {
+    setShowPopup(true);
+    return;
+  }
 
     // Check if reminder should be shown BEFORE proceeding with save
   const shouldShowReminder = checkAndShowReminder();
@@ -2213,11 +2506,13 @@ submissionData.overview = cleanedOverview;
   const formData = new FormData();
 
   // Create a copy of submissionData to include existing images
-  const formDataWithImages = {
-    ...submissionData,  // <-- Use submissionData instead of formState
-    // Add the existing images to the data being sent
-    existingImages: existingImageUrls
-  };
+const formDataWithImages = {
+  ...submissionData,
+  // Add the existing images to the data being sent
+  existingImages: existingImageUrls,
+  existingPaymentImages: existingPaymentImageUrls,
+  existingCommissionImages: existingCommissionImageUrls
+};
   
   // Add form data as JSON (including existingImages)
   formData.append('data', JSON.stringify(formDataWithImages));
@@ -2229,6 +2524,19 @@ submissionData.overview = cleanedOverview;
      formData.append('images', image);
    });
  }
+
+ if (selectedPaymentImages.length > 0) {
+  selectedPaymentImages.forEach(image => {
+    formData.append('payment_images', image);
+  });
+}
+
+// Add new commission images if any
+if (selectedCommissionImages.length > 0) {
+  selectedCommissionImages.forEach(image => {
+    formData.append('commission_images', image);
+  });
+}
 
 
         const url = id 
@@ -2266,7 +2574,11 @@ submissionData.overview = cleanedOverview;
     } catch (error) {
         setError(error.response?.data?.message || 'Something went wrong!');
     } finally {
-        setIsSubmitting(false);
+        // submitTimeoutRef.current = setTimeout(() => {
+      // setIsSubmitting(false);
+      // setIsSubmitInProgress(false);
+      // }, 500);
+      setIsSubmitting(false);
     }
 };
 
@@ -3634,6 +3946,259 @@ const handleRephraseWarranty = async () => {
 };
 
 
+// const handleGetGST = async () => {
+//   // Extract workdone data from table
+//   const workdoneData = formState.overview.tableData.map(row => row.workdone);
+  
+//   // Filter out empty entries
+//   const validWorkdone = workdoneData.filter(workdone => workdone && workdone.trim() !== '');
+  
+//   if (validWorkdone.length === 0) {
+//     toast.error('No work items found to process');
+//     return;
+//   }
+
+//   setShowGSTPopup(true);
+//   setIsProcessingGST(true);
+//   setGstError(null);
+  
+//   try {
+//     const response = await axios.post(
+//       'https://admin.onlybigcars.com/api/process-gst/',
+//       { workdone_data: validWorkdone },
+//       {
+//         headers: {
+//           'Authorization': `Token ${token}`,
+//           'Content-Type': 'application/json'
+//         }
+//       }
+//     );
+    
+//     setGstData(response.data);
+//   } catch (error) {
+//     console.error('Error processing GST:', error);
+//     setGstError(error.response?.data?.error || 'Failed to process GST data');
+//   } finally {
+//     setIsProcessingGST(false);
+//   }
+// };
+
+// Add these functions after your existing helper functions (around line 4500)
+
+// Helper function to get GST value (either changed or original)
+const getGSTValue = (rowIndex, serviceIndex, originalValue) => {
+  const key = `${rowIndex}-${serviceIndex}`;
+  return gstChanges[key] !== undefined ? gstChanges[key] : originalValue;
+};
+
+// Helper function to handle GST changes in popup
+const handleGSTChangeInPopup = (rowIndex, serviceIndex, newValue) => {
+  const key = `${rowIndex}-${serviceIndex}`;
+  setGstChanges(prev => ({
+    ...prev,
+    [key]: newValue
+  }));
+};
+
+// Helper function to calculate dynamic average GST
+const calculateDynamicAverageGST = (serviceDetail, rowIndex) => {
+  const totalGST = serviceDetail.services.reduce((sum, service, serviceIndex) => {
+    return sum + getGSTValue(rowIndex, serviceIndex, service.gst_percentage);
+  }, 0);
+  
+  const average = serviceDetail.services.length > 0 ? totalGST / serviceDetail.services.length : 0;
+  return Math.round(average * 10) / 10; // Round to 1 decimal place
+};
+
+
+// // Update the handleGetGST function to reset timer
+// const handleGetGST = async () => {
+//   // Extract workdone data from table
+//   const workdoneData = formState.overview.tableData.map(row => row.workdone);
+  
+//   // Filter out empty entries
+//   const validWorkdone = workdoneData.filter(workdone => workdone && workdone.trim() !== '');
+  
+//   if (validWorkdone.length === 0) {
+//     toast.error('No work items found to process');
+//     return;
+//   }
+
+//   setShowGSTPopup(true);
+//   setIsProcessingGST(true);
+//   setGstError(null);
+//   setGstTimer(0); // Reset timer
+  
+//   try {
+//     const response = await axios.post(
+//       'https://admin.onlybigcars.com/api/process-gst/',
+//       { workdone_data: validWorkdone },
+//       {
+//         headers: {
+//           'Authorization': `Token ${token}`,
+//           'Content-Type': 'application/json'
+//         }
+//       }
+//     );
+    
+//     setGstData(response.data);
+//   } catch (error) {
+//     console.error('Error processing GST:', error);
+//     setGstError(error.response?.data?.error || 'Failed to process GST data');
+//   } finally {
+//     setIsProcessingGST(false);
+//   }
+// };
+
+// const handleApplyGST = () => {
+//   if (!gstData || !gstData.service_details) {
+//     toast.error('No GST data available to apply');
+//     return;
+//   }
+
+//   const newTableData = [...formState.overview.tableData];
+  
+//   // Apply average GST to each row
+//   gstData.service_details.forEach((serviceDetail, index) => {
+//     if (index < newTableData.length) {
+//       newTableData[index].gst = serviceDetail.average_gst_percentage;
+//     }
+//   });
+
+//   // Update form state
+//   setFormState(prev => ({
+//     ...prev,
+//     overview: {
+//       ...prev.overview,
+//       tableData: newTableData,
+//       total: calculateTotalAmount(newTableData),
+//       finalAmount: calculateTotalAmount(newTableData) - (parseFloat(discount) || 0)
+//     }
+//   }));
+
+//   toast.success('GST rates applied successfully!');
+//   setShowGSTPopup(false);
+// };
+
+
+// Replace the existing handleGetGST function (around line 3905) with this updated version:
+const handleGetGST = async () => {
+  // Extract workdone data from table
+  const workdoneData = formState.overview.tableData.map(row => row.workdone);
+  
+  // Filter out empty entries
+  const validWorkdone = workdoneData.filter(workdone => workdone && workdone.trim() !== '');
+  
+  if (validWorkdone.length === 0) {
+    toast.error('No work items found to process');
+    return;
+  }
+
+  setShowGSTPopup(true);
+  setIsProcessingGST(true);
+  setGstError(null);
+  setGstTimer(0);
+  setEditableGstData(null);
+  setGstChanges({});
+  
+  try {
+    const response = await axios.post(
+      'https://admin.onlybigcars.com/api/process-gst/',
+      { workdone_data: validWorkdone },
+      {
+        headers: {
+          'Authorization': `Token ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    
+    setEditableGstData(response.data);
+    setGstData(response.data);
+  } catch (error) {
+    console.error('Error processing GST:', error);
+    setGstError(error.response?.data?.error || 'Failed to process GST data');
+  } finally {
+    setIsProcessingGST(false);
+  }
+};
+
+// Replace the existing handleApplyGST function (around line 3930) with this enhanced version:
+const handleApplyGST = () => {
+  if (!editableGstData || !editableGstData.service_details) {
+    toast.error('No GST data available to apply');
+    return;
+  }
+
+  const newTableData = [...formState.overview.tableData];
+  
+  // Step 1: Reset all GST values to 0 and calculate base totals
+  const resetTableData = newTableData.map(row => {
+    const currentGST = parseFloat(row.gst) || 0;
+    const currentTotal = parseFloat(row.total) || 0;
+    const quantity = parseInt(row.quantity) || 1;
+    
+    // Calculate base total (removing old GST)
+    let baseTotal;
+    if (currentGST > 0) {
+      // Remove GST from current total: baseTotal = currentTotal / (1 + GST/100)
+      baseTotal = currentTotal / (1 + currentGST / 100);
+    } else {
+      baseTotal = currentTotal;
+    }
+    
+    // Update price per item based on base total
+    const pricePerItem = baseTotal / quantity;
+    
+    return {
+      ...row,
+      gst: 0,
+      total: Math.round(baseTotal),
+      pricePerItem: pricePerItem
+    };
+  });
+  
+  // Step 2: Apply new GST values and recalculate totals
+  const finalTableData = resetTableData.map((row, index) => {
+    if (index < editableGstData.service_details.length) {
+      const serviceDetail = editableGstData.service_details[index];
+      
+      // Calculate new average GST considering user changes
+      const newAverageGST = calculateDynamicAverageGST(serviceDetail, index);
+      
+      const baseTotal = parseFloat(row.total) || 0;
+      const newTotalWithGST = baseTotal + (baseTotal * newAverageGST / 100);
+      
+      return {
+        ...row,
+        gst: newAverageGST,
+        total: Math.round(newTotalWithGST)
+      };
+    }
+    return row;
+  });
+
+  // Step 3: Update form state with recalculated totals
+  const newTotalAmount = calculateTotalAmount(finalTableData);
+  const currentDiscount = parseFloat(discount) || 0;
+  
+  setFormState(prev => ({
+    ...prev,
+    overview: {
+      ...prev.overview,
+      tableData: finalTableData,
+      total: newTotalAmount,
+      finalAmount: newTotalAmount - currentDiscount
+    }
+  }));
+
+  // Close popup and reset state
+  setShowGSTPopup(false);
+  setEditableGstData(null);
+  setGstChanges({});
+  
+  toast.success('GST values applied successfully!');
+};
 
   // First add this CSS at the top of your file or in your CSS file
 const serviceCardStyles = {
@@ -3677,6 +4242,61 @@ const serviceCardStyles = {
   
 //   return false;
 // };
+
+// Function to handle additional work input changes
+const handleAdditionalWorkChange = (value) => {
+  // Update the field value
+  handleInputChange('arrivalStatus', 'additionalWork', value);
+  
+  // Get suggestions and update suggestion state
+  const suggestions = getFilteredSuggestions(value);
+  setSuggestionStates(prev => ({
+    ...prev,
+    'additionalWork': {
+      isOpen: suggestions.length > 0,
+      suggestions: suggestions
+    }
+  }));
+};
+
+// Function to handle suggestion selection for additional work
+const handleAdditionalWorkSuggestionSelect = (service) => {
+  // Close suggestions
+  setSuggestionStates(prev => ({
+    ...prev,
+    'additionalWork': { isOpen: false, suggestions: [] }
+  }));
+  
+  // Extract service description (same logic as subcategory)
+  const getServiceDescription = () => {
+    if (service.title === "Comprehensive Service" || 
+        service.title === "Standard Service" || 
+        service.title === "Basic Service") {
+      const serviceList = activeViews[service.title] === 'workshop' 
+        ? service.workshopServices 
+        : service.doorstepServices;
+      
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(serviceList, 'text/html');
+      const items = doc.querySelectorAll('li');
+      return Array.from(items)
+        .map(item => item.textContent.trim())
+        .join(', ');
+    } else {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(service.description, 'text/html');
+      const items = doc.querySelectorAll('li');
+      return Array.from(items)
+        .map(item => item.textContent.trim())
+        .join(', ');
+    }
+  };
+  
+  // Fill the additional work field with the service description
+  const description = getServiceDescription();
+  handleInputChange('arrivalStatus', 'additionalWork', description);
+};
+
 const statusHierarchy = [
   "test","Assigned", "Follow Up", "Dead", "Communicate To Ops", 
  "Referred To Ops", "Converted", "At Workshop", 
@@ -4562,6 +5182,91 @@ const handleCommissionChange = (field, value) => {
     }
   }
 };
+// Replace the handlePaymentFieldChange function around line 5082:
+
+const handlePaymentFieldChange = (field, value) => {
+  // Convert empty string to 0, otherwise parse the number
+  const numValue = value === '' ? 0 : parseFloat(value) || 0;
+  
+  setFormState(prev => {
+    const currentFinalAmount = parseFloat(prev.arrivalStatus.finalAmount) || 0;
+    let newPendingAmount = parseFloat(prev.arrivalStatus.pendingAmount) || 0;
+    let newPaidAmount = parseFloat(prev.arrivalStatus.paidAmount) || 0;
+    
+    // Update the specific field that changed
+    if (field === 'finalAmount') {
+      const currentPending = parseFloat(prev.arrivalStatus.pendingAmount) || 0;
+      const currentPaid = parseFloat(prev.arrivalStatus.paidAmount) || 0;
+      
+      // If both pending and paid are empty/zero, don't auto-calculate
+      if (currentPending === 0 && currentPaid === 0) {
+        return {
+          ...prev,
+          arrivalStatus: {
+            ...prev.arrivalStatus,
+            finalAmount: numValue
+          }
+        };
+      }
+      
+      // If one field has value, calculate the other
+      if (currentPending > 0 && currentPaid === 0) {
+        newPaidAmount = Math.max(0, numValue - currentPending);
+        newPendingAmount = currentPending;
+      } else if (currentPaid > 0 && currentPending === 0) {
+        newPendingAmount = Math.max(0, numValue - currentPaid);
+        newPaidAmount = currentPaid;
+      }
+      
+      return {
+        ...prev,
+        arrivalStatus: {
+          ...prev.arrivalStatus,
+          finalAmount: numValue,
+          pendingAmount: newPendingAmount,
+          paidAmount: newPaidAmount
+        }
+      };
+    }
+    
+    if (field === 'pendingAmount') {
+      newPendingAmount = numValue;
+      newPaidAmount = Math.max(0, currentFinalAmount - numValue);
+    }
+    
+    if (field === 'paidAmount') {
+      newPaidAmount = numValue;
+      newPendingAmount = Math.max(0, currentFinalAmount - numValue);
+    }
+    
+    return {
+      ...prev,
+      arrivalStatus: {
+        ...prev.arrivalStatus,
+        [field]: numValue,
+        ...(field !== 'finalAmount' && {
+          pendingAmount: field === 'pendingAmount' ? newPendingAmount : newPaidAmount === numValue ? newPendingAmount : prev.arrivalStatus.pendingAmount,
+          paidAmount: field === 'paidAmount' ? newPaidAmount : newPendingAmount === numValue ? newPaidAmount : prev.arrivalStatus.paidAmount
+        })
+      }
+    };
+  });
+};
+
+// Add validation function to check if sum exceeds final amount
+const getPaymentValidation = () => {
+  const finalAmount = parseFloat(formState.arrivalStatus.finalAmount) || 0;
+  const pendingAmount = parseFloat(formState.arrivalStatus.pendingAmount) || 0;
+  const paidAmount = parseFloat(formState.arrivalStatus.paidAmount) || 0;
+  const sum = pendingAmount + paidAmount;
+  
+  const isInvalid = sum > finalAmount && finalAmount > 0;
+  
+  return {
+    isInvalid,
+    message: isInvalid ? `Sum (${sum}) exceeds final amount (${finalAmount})` : null
+  };
+};
 
 const selectedCarBrand = formState.cars[selectedCarIndex]?.carBrand || '';
 const selectedCarModel = formState.cars[selectedCarIndex]?.carModel || '';
@@ -4623,7 +5328,7 @@ const handleGenerateEstimate = async () => {
                 style={{ zIndex: 1000 }}
               >
                 <svg 
-                  className="w-5 h-5" 
+                  className="w-7 h-7" 
                   fill="none" 
                   stroke="currentColor" 
                   viewBox="0 0 24 24"
@@ -5235,6 +5940,7 @@ const handleGenerateEstimate = async () => {
                   />
                 </div>
                 
+                {!isMobile && (
                 <div className="flex-1">
                   <select
                     value={formState.customerInfo.source}
@@ -5260,18 +5966,35 @@ const handleGenerateEstimate = async () => {
                     <option value="Test">Test</option>
                   </select>
                 </div>
+                )}
               </div>
 
               <div className="p-3 flex gap-4">
-                <div className="flex-1">
-                  <input
-                    type="tel"
-                    value={formState.customerInfo.whatsappNumber}
-                    onChange={(e) => handleInputChange('customerInfo', 'whatsappNumber', e.target.value)}
-                    className="w-full p-2 border border-gray-200 rounded bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200"
-                    placeholder="Whatsapp Number"
-                  />
-                </div>
+                              <div className="flex-1">
+                                 <div className="relative flex">
+                                  <input
+                                    type="tel"
+                                    value={formState.customerInfo.whatsappNumber}
+                                    onChange={(e) => handleInputChange('customerInfo', 'whatsappNumber', e.target.value)}
+                                    className="flex-1 p-2 border rounded-l border-r-0 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                                    placeholder="Whatsapp Number"
+                                    pattern="[0-9]{10}"
+                                    maxLength={10}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (formState.customerInfo.whatsappNumber) {
+                                        window.open(`https://wa.me/+91${formState.customerInfo.whatsappNumber}`, '_blank');
+                                      }
+                                    }}
+                                    className="flex items-center justify-center px-3 bg-green-500 hover:bg-green-600 text-white rounded-r border border-green-500 shadow-sm hover:shadow-md active:scale-95 transition-all duration-150"
+                                    title="Open WhatsApp Chat"
+                                  >
+                                    <FaWhatsapp className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
 
                 {isMobile && (
     <div className="flex-1">
@@ -5292,6 +6015,35 @@ const handleGenerateEstimate = async () => {
       </select>
     </div>
   )}
+
+  {isMobile && (
+    <div className="flex-1">
+      <select
+        value={formState.customerInfo.source}
+        onChange={(e) => handleInputChange('customerInfo', 'source', e.target.value)}
+        disabled={formState.customerInfo.source === 'Website'}
+        className={`w-full p-2 border border-gray-200 rounded bg-white focus:outline-none focus:ring-2 focus:ring-gray-200 font-medium text-gray-700 ${
+          formState.customerInfo.source === 'Website' ? 'cursor-not-allowed opacity-60' : 'hover:bg-gray-50'
+        }`}
+        required
+      >
+        <option value="">Source*</option>
+        <option value="inbound">inbound</option>
+        <option value="outbound">outbound</option>
+        <option value="Website">Website</option>
+        <option value="Google Ads">Google Ads</option>
+        <option value="Whatsapp">Whatsapp</option>
+        <option value="Instagram">Instagram</option>
+        <option value="Facebook">Facebook</option>
+        <option value="Reference">Reference</option>
+        <option value="Repeat">Repeat</option>
+        <option value="B2B">B2B</option>
+        <option value="SMS">SMS</option>
+        <option value="Test">Test</option>
+      </select>
+    </div>
+  )}
+
 
   {/* Conditionally render the email input for non-mobile views */}
   {!isMobile && (
@@ -5340,7 +6092,7 @@ const handleGenerateEstimate = async () => {
 
             <div className="w-full p-2 rounded-lg">
               {/* Location Header */}
-              <div className="text-gray-700 mb-4 mt-3" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>Location</div>
+              <div className="text-white bg-gray-800 font-bold text-lg mb-4 mt-3 p-3 rounded-md">Location & Car Details</div>
 
               {/* Location Form */}
               {/* Location Form */}
@@ -5702,7 +6454,7 @@ const handleGenerateEstimate = async () => {
 
        
             <div className="w-full p-2 rounded-lg">
-                      <div className="text-gray-700 mb-4 mt-1" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>Our Feature Services</div>
+                      <div className="text-white bg-gray-800 font-bold text-lg mb-4 mt-1 p-3 rounded-md">Our Featured Services & Products</div>
             <input
             type="text"
             placeholder="Search services..."
@@ -5736,7 +6488,7 @@ const handleGenerateEstimate = async () => {
                                   )}
                         {!shouldHideProducts()&&(
             <>
-                      <div className="text-gray-700 mb-2 mt-3" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>Our Products</div>
+                      {/* <div className="text-gray-700 mb-2 mt-3" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>Our Products</div> */}
           
           {/* Add Search Bar */}
           
@@ -5784,7 +6536,7 @@ const handleGenerateEstimate = async () => {
                 [service.title]:'workshop'
               }))}
               className={`flex-1 rounded transition-colors ${
-                isMobile ? 'py-1 px-2 text-xs' : 'py-2 px-4 text-sm'
+                isMobile ? 'py-2 px-2 text-xs' : 'py-3 px-4 text-sm'
               } ${
                 activeViews[service.title] === 'workshop' 
                   ? 'bg-gray-800 text-white' 
@@ -5800,7 +6552,7 @@ const handleGenerateEstimate = async () => {
                 [service.title]:'doorstep'
               }))}
               className={`flex-1 rounded transition-colors ${
-                isMobile ? 'py-1 px-2 text-xs' : 'py-2 px-4 text-sm'
+                isMobile ? 'py-2 px-2 text-xs' : 'py-3 px-4 text-sm'
               } ${
                 activeViews[service.title] === 'doorstep' 
                   ? 'bg-gray-800 text-white' 
@@ -5833,7 +6585,7 @@ const handleGenerateEstimate = async () => {
   type="button"
   onClick={() => addServiceToTable(service)}
   className={`bg-gray-800 text-white rounded-full hover:bg-gray-700 flex items-center justify-center ${
-    isMobile ? 'w-8 h-8 text-sm' : 'w-8 h-8 text-sm'
+    isMobile ? 'w-8 h-8 text-xl' : 'w-8 h-8 text-lg'
   }`}
 >
   +
@@ -5860,7 +6612,7 @@ const handleGenerateEstimate = async () => {
             <div className="w-full p-2 rounded-lg">
            
               <div className="w-full p-2 rounded-lg">
-              <div className="text-gray-700 mb-2 flex justify-between items-center" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>
+              {/* <div className="text-gray-700 mb-2 flex justify-between items-center" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>
   <span>Work Summary*</span>
   
   <div className="flex items-center gap-2">
@@ -5883,6 +6635,42 @@ const handleGenerateEstimate = async () => {
   Add New Row
 </button>
   </div>
+</div> */}
+
+<div className="text-white bg-gray-800 font-bold text-lg mb-2 flex justify-between items-center p-3 rounded-md">
+  <span>Work Summary*</span>
+  
+  <div className="flex items-center gap-2">
+    <button
+      type="button"
+      onClick={handleOpenWarrantyPopup}
+      className={`bg-red-500 text-white rounded hover:bg-red-600 ${
+        isMobile ? 'px-4 py-2 text-base' : 'px-3 py-1 text-sm'
+      }`}
+    >
+      Add Warranty
+    </button>
+    
+    <button
+      type="button"
+      onClick={handleGetGST}
+      className={`bg-red-500 text-white rounded hover:bg-blue-600 ${
+        isMobile ? 'px-4 py-2 text-base' : 'px-3 py-1 text-sm'
+      }`}
+    >
+      Get GST
+    </button>
+    
+    <button
+      type="button"
+      onClick={handleAddEmptyRow}
+      className={`bg-red-500 text-white rounded hover:bg-red-600 ${
+        isMobile ? 'px-4 py-2 text-base' : 'px-3 py-1 text-sm'
+      }`}
+    >
+      Add New Row
+    </button>
+  </div>
 </div>
           <div className="w-full mt-3">
             <table className="w-full overview-table">
@@ -5894,7 +6682,7 @@ const handleGenerateEstimate = async () => {
       <th className="p-3 text-left">Qty</th>
       <th className="p-3 text-left cursor-pointer" onClick={handleGSTHeaderClick}>GST</th> 
       <th className="p-3 text-left">Total</th>
-      <th className={`p-3 text-center ${isMobile ? 'w-12' : 'text-left'}`}>
+      <th className={`p-3 text-center ${isMobile ? 'w-12 text-2xl font-bold' : 'text-left'}`}>
         {isMobile ? '×' : 'Action'}
       </th>
     </tr>
@@ -6137,17 +6925,18 @@ const handleGenerateEstimate = async () => {
 
             {/* Last Arrival and Garage Section */}
 <div className="w-full p-2 rounded-lg">
-  <div className="text-gray-700 mb-2" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>Status</div>
+<div className="text-white bg-gray-800 font-bold text-lg mb-2 p-3 rounded-md">Status*</div>
+
 
   {/* Location Form - Responsive grid */}
-  <div className={`${isMobile ? 'grid grid-cols-2 gap-2 mb-3 mt-4' : 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-3 mt-4'}`}>
+  <div className={`${isMobile ? 'grid grid-cols-2 gap-2 mb-3 mt-4' : 'grid grid-cols-1 md:grid-cols-2 gap-4 mb-3 mt-4'}`}>
 
     <select
       value={formState.arrivalStatus.leadStatus}
       onChange={(e) => handleInputChange('arrivalStatus', 'leadStatus', e.target.value)}
-      className={`p-2 border border-gray-300 rounded-md ${isMobile ? 'col-span-2' : ''}`}
+      className={`p-2 border border-gray-300 rounded-md w-full`}
     >
-      <option value="">Lead Status</option>
+      <option value="">Lead Status*</option>
       {formState.basicInfo.carType === "Sell/Buy" ? (
         sellBuyStatusFlow.map((status, idx) => {
           const previousStatus = location.state?.previousStatus || null;
@@ -6165,8 +6954,8 @@ const handleGenerateEstimate = async () => {
           <option value="Assigned" disabled={shouldDisableOption("Assigned", location.state?.previousStatus)}>Assigned</option>
           <option value="Follow Up" disabled={shouldDisableOption("Follow Up", location.state?.previousStatus)}>Follow Up</option>
           <option value="Dead" disabled={shouldDisableOption("Dead", location.state?.previousStatus)}>Dead</option>
-          <option value="Duplicate" disabled={shouldDisableOption("Duplicate", location.state?.previousStatus)}>Duplicate</option>
-          <option value="Communicate To Ops" disabled={shouldDisableOption("Communicate To Ops", location.state?.previousStatus)}>Communicate To Ops</option>
+          {!isMobile && <option value="Duplicate" disabled={shouldDisableOption("Duplicate", location.state?.previousStatus)}>Duplicate</option>}
+          {!isMobile && <option value="Communicate To Ops" disabled={shouldDisableOption("Communicate To Ops", location.state?.previousStatus)}>Communicate To Ops</option>}
           <option value="Referred To Ops" disabled={shouldDisableOption("Referred To Ops", location.state?.previousStatus)}>Referred To Ops</option>
           <option value="Walkin" disabled={shouldDisableOption("Walkin", location.state?.previousStatus)}>Walkin</option>
           <option value="Pickup" disabled={shouldDisableOption("Pickup", location.state?.previousStatus)}>Pickup</option>
@@ -6180,6 +6969,22 @@ const handleGenerateEstimate = async () => {
       )}
     </select>
 
+    <input
+      type="text"
+      onFocus={(e) => e.target.type = 'datetime-local'}
+      onBlur={(e) => {
+        if (!e.target.value) {
+          e.target.type = 'text'
+        }
+      }}
+      value={formState.arrivalStatus.dateTime}
+      onChange={(e) => handleInputChange('arrivalStatus', 'dateTime', e.target.value)}
+      placeholder="Date and Time*"
+      className={`p-2 border border-gray-300 rounded-md w-full`}
+      required={!isAdmin}
+    />
+{(!isMobile || !['Job Card', 'Payment Due', 'Commision Due', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
+      <>
     <select
       value={formState.arrivalStatus.arrivalMode}
       onChange={(e) => handleInputChange('arrivalStatus', 'arrivalMode', e.target.value)}
@@ -6216,26 +7021,15 @@ const handleGenerateEstimate = async () => {
       <option value="Test Leads">Test Leads</option>
       <option value="Others">Others</option>
     </select>
-
-    <input
-      type="text"
-      onFocus={(e) => e.target.type = 'datetime-local'}
-      onBlur={(e) => {
-        if (!e.target.value) {
-          e.target.type = 'text'
-        }
-      }}
-      value={formState.arrivalStatus.dateTime}
-      onChange={(e) => handleInputChange('arrivalStatus', 'dateTime', e.target.value)}
-      placeholder="Date and Time*"
-      className={`p-2 border border-gray-300 rounded-md ${isMobile ? 'col-span-2' : 'w-full'}`}
-      required={!isAdmin}
-    />
+</>
+    )}
+ 
+   
   </div>
 
   {/* Job Card specific fields */}
   {formState.arrivalStatus.leadStatus === 'Job Card' && (
-    <div className={`${isMobile ? 'grid grid-cols-2 gap-2 mb-3' : 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-3'}`}>
+    <div className={`${isMobile ? 'flex flex-wrap gap-2 mb-3' : 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-3'}`}>
       <input
         type="text"
         value={formState.arrivalStatus.batteryFeature}
@@ -6253,14 +7047,48 @@ const handleGenerateEstimate = async () => {
         required
       />
 
-      <textarea
-        value={formState.arrivalStatus.inventory}
-        onChange={(e) => handleInputChange('arrivalStatus', 'inventory', e.target.value)}
-        placeholder="Inventory (one per line)
-- Item 1
-- Item 2"
-        className={`p-2 border border-gray-300 rounded-md w-full ${isMobile ? 'col-span-2' : ''}`}
-        rows={4}
+
+
+      {/* New layout for Inventory, Odometer, and Additional Work on mobile */}
+      {isMobile ? (
+        <div className="flex w-full gap-2">
+          <div className="w-1/2">
+            <textarea
+              value={formState.arrivalStatus.inventory}
+              onChange={(e) => handleInputChange('arrivalStatus', 'inventory', e.target.value)}
+              placeholder="Inventory (one per line)&#10;- Item 1&#10;- Item 2"
+              className="p-2 border border-gray-300 rounded-md w-full h-full"
+              rows={3}
+              style={{ resize: 'vertical' }}
+            />
+          </div>
+          <div className="w-1/2 flex flex-col gap-2">
+            <input
+              type="text"
+              value={formState.arrivalStatus.speedometerRd}
+              onChange={(e) => handleInputChange('arrivalStatus', 'speedometerRd', e.target.value)}
+              placeholder="Odometer"
+              className="p-2 border border-gray-300 rounded-md w-full"
+              required
+            />
+            <input
+              type="text"
+              value={formState.arrivalStatus.additionalWork}
+              onChange={(e) => handleInputChange('arrivalStatus', 'additionalWork', e.target.value)}
+              placeholder="Additional Work"
+              className="p-2 border border-gray-300 rounded-md w-full"
+            />
+          </div>
+        </div>
+      ) : (
+        // Desktop layout remains the same (grid-based)
+        <>
+          <textarea
+            value={formState.arrivalStatus.inventory}
+            onChange={(e) => handleInputChange('arrivalStatus', 'inventory', e.target.value)}
+            placeholder="Inventory (one per line)&#10;- Item 1&#10;- Item 2"
+            className="p-2 border border-gray-300 rounded-md w-full"
+            rows={4}
         style={{ resize: 'vertical' }}
       />
 
@@ -6272,63 +7100,201 @@ const handleGenerateEstimate = async () => {
         className="p-2 border border-gray-300 rounded-md w-full"
         required
       />
-      <input
-        type="text"
-        value={formState.arrivalStatus.additionalWork}
-        onChange={(e) => handleInputChange('arrivalStatus', 'additionalWork', e.target.value)}
-        placeholder="Additional Work"
-        className="p-2 border border-gray-300 rounded-md w-full"
-      />
-    </div>
-  )}
+      <div className="relative">
+  <input
+    type="text"
+    value={formState.arrivalStatus.additionalWork}
+    onChange={(e) => handleAdditionalWorkChange(e.target.value)}
+    onFocus={() => {
+      // Show suggestions if there's already text
+      if (formState.arrivalStatus.additionalWork && formState.arrivalStatus.additionalWork.length >= 2) {
+        const suggestions = getFilteredSuggestions(formState.arrivalStatus.additionalWork);
+        setSuggestionStates(prev => ({
+          ...prev,
+          'additionalWork': {
+            isOpen: suggestions.length > 0,
+            suggestions: suggestions
+          }
+        }));
+      }
+    }}
+    onBlur={(e) => {
+      // Check if click is within dropdown before closing
+      const suggestionDropdown = e.currentTarget.parentElement.querySelector('.absolute.z-50');
+      if (!suggestionDropdown || !suggestionDropdown.contains(e.relatedTarget)) {
+        setTimeout(() => {
+          setSuggestionStates(prev => ({
+            ...prev,
+            'additionalWork': { ...prev['additionalWork'], isOpen: false }
+          }));
+        }, 300);
+      }
+    }}
+    placeholder="Additional Work - Type to search services..."
+    className="p-2 border border-gray-300 rounded-md w-full"
+  />
 
-  {/* Payment/Commission fields */}
-  {(formState.arrivalStatus.leadStatus === 'Payment Due' || formState.arrivalStatus.leadStatus === 'Commision Due' || formState.arrivalStatus.leadStatus === 'Completed') && (
-    <div className={`${isMobile ? 'grid grid-cols-1 gap-2 mb-3' : 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-3'}`}>
-      <div className="relative border border-gray-300 rounded-md bg-white group">
-        <input
-          type="text"
-          value={formState.arrivalStatus.finalAmount === 0 ? '0' : (formState.arrivalStatus.finalAmount || '')}
-          onChange={(e) => handleCommissionChange('finalAmount', e.target.value)}
-          className="w-full p-2 border-0 focus:outline-none rounded-md peer"
-          disabled={location.state?.previousStatus === "Completed"}
-          required
-          id="finalAmount"
-        />
-        <label 
-          htmlFor="finalAmount" 
-          className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+  {suggestionStates['additionalWork']?.isOpen && suggestionStates['additionalWork']?.suggestions?.length > 0 && (
+    <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+      {suggestionStates['additionalWork'].suggestions.map((service, suggestionIndex) => (
+        <div
+          key={`${service.id}-${service.title}-${suggestionIndex}`}
+          className="p-3 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0"
+          onClick={() => handleAdditionalWorkSuggestionSelect(service)}
         >
-          Final Amount
-        </label>
-      </div>
+          <div className="font-medium text-sm text-gray-800">{service.title}</div>
+          <div className="text-xs text-gray-600 mt-1">
+            Price: {servicePrices[`${service.id}-${service.title}`] || "Determine"}
+          </div>
+          <div className="text-xs text-gray-500 mt-1">
+            Click to auto-fill description
+          </div>
+        </div>
+      ))}
     </div>
   )}
+</div>
+   </>
+      )}
+    </div>
+  )}
+{/* Payment Due specific field */}
+{/* // Around line 7000-7040, replace the Payment Due section with: */}
+{/* // Around line 7000-7100, replace the Payment Due section with: */}
 
-  {/* Payment Due specific field */}
-  {(formState.arrivalStatus.leadStatus === 'Payment Due') && (
-    <div className={`${isMobile ? 'grid grid-cols-1 gap-2 mb-3' : 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-3'}`}>
-      <div className="relative border border-gray-300 rounded-md bg-white group">
-        <input
-          type="text"
-          value={formState.arrivalStatus.pendingAmount === 0 ? '0' : (formState.arrivalStatus.pendingAmount || '')}
-          onChange={(e) => handleInputChange('arrivalStatus', 'pendingAmount', e.target.value)}
-          className="w-full p-2 border-0 focus:outline-none rounded-md peer"
-          required
-          id="pendingAmount"
-        />
-        <label 
-          htmlFor="finalAmount" 
-          className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
-        >
-          Pending Amount
-        </label>
-      </div>
+{(formState.arrivalStatus.leadStatus === 'Payment Due' || formState.arrivalStatus.leadStatus === 'Commision Due') && (
+  <div className={`${isMobile ? 'grid grid-cols-1 gap-2 mb-3' : 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-3'}`}>
+    {(() => {
+      const validation = getPaymentValidation();
+      return (
+        
+          <div className="relative border border-gray-300 rounded-md bg-white group">
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={formState.arrivalStatus.finalAmount ?? ''}
+              onChange={(e) => handlePaymentFieldChange('finalAmount', e.target.value)}
+              className={`w-full p-2 border-0 focus:outline-none rounded-md peer ${
+                validation.isInvalid ? 'bg-red-50 text-red-700' : ''
+              }`}
+              required
+              id="finalAmount"
+              placeholder=" "
+            />
+            <label 
+              htmlFor="finalAmount" 
+              className={`absolute duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1 ${
+                validation.isInvalid ? 'text-red-600' : 'text-gray-500'
+              }`}
+            >
+              Final Amount
+            </label>
+          </div>
+           );
+    })()}
+  </div>
+)}
+
+{formState.arrivalStatus.leadStatus === 'Payment Due' && (
+  <div className={`${isMobile ? 'grid grid-cols-1 gap-2 mb-3' : 'grid grid-cols-1 md:grid-cols-2 gap-4 mb-3'}`}>
+    {(() => {
+      const validation = getPaymentValidation();
+      return (
+        <>
+          <div className="relative border border-gray-300 rounded-md bg-white group">
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={formState.arrivalStatus.pendingAmount ?? ''}
+              onChange={(e) => handlePaymentFieldChange('pendingAmount', e.target.value)}
+              className={`w-full p-2 border-0 focus:outline-none rounded-md peer ${
+                validation.isInvalid ? 'bg-red-50 text-red-700' : ''
+              }`}
+              id="pendingAmount"
+              required
+              placeholder=" "
+            />
+            <label 
+              htmlFor="pendingAmount" 
+              className={`absolute duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1 ${
+                validation.isInvalid ? 'text-red-600' : 'text-gray-500'
+              }`}
+            >
+              Pending Amount
+            </label>
+          </div>
+
+          <div className="relative border border-gray-300 rounded-md bg-white group">
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={formState.arrivalStatus.paidAmount ?? ''}
+              onChange={(e) => handlePaymentFieldChange('paidAmount', e.target.value)}
+              className={`w-full p-2 border-0 focus:outline-none rounded-md peer ${
+                validation.isInvalid ? 'bg-red-50 text-red-700' : ''
+              }`}
+              id="paidAmount"
+              required
+              placeholder=" "
+            />
+            <label 
+              htmlFor="paidAmount" 
+              className={`absolute duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1 ${
+                validation.isInvalid ? 'text-red-600' : 'text-gray-500'
+              }`}
+            >
+              Paid Amount
+            </label>
+          </div>
+
+          {validation.isInvalid && (
+            <div className={`${isMobile ? 'col-span-1' : 'col-span-3'} mt-2`}>
+              <div className="bg-red-50 border border-red-200 rounded-md p-3 flex items-center">
+                <svg className="w-5 h-5 text-red-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                <span className="text-red-700 text-sm font-medium">
+                  {validation.message}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* <select
+            value={formState.arrivalStatus.modeOfPayment}
+            onChange={(e) => handleInputChange('arrivalStatus', 'modeOfPayment', e.target.value)}
+            required
+            className="p-2 border border-gray-300 rounded-md"
+          >
+            <option value="">Mode of Payment*</option>
+            <option value="Cash">Cash</option>
+            <option value="UPI">UPI (Gokul)</option>
+            <option value="UPI Loknath">UPI (Loknath)</option>
+            <option value="Net Banking">Net Banking (OnlyBigCars)</option>
+          </select> */}
+        </>
+      );
+    })()}
+  </div>
+)}
+      {/* <select
+        value={formState.arrivalStatus.modeOfPayment}
+        onChange={(e) => handleInputChange('arrivalStatus', 'modeOfPayment', e.target.value)}
+        className="p-2 border border-gray-300 rounded-md"
+      >
+        <option value="">Mode of Payment</option>
+        <option value="Cash">Cash</option>
+        <option value="UPI">UPI (Gokul)</option>
+        <option value="Net Banking">Net Banking (OnlyBigCars)</option>
+      </select>
     </div>
-  )}
+  )} */}
 
   {/* Commission Due specific fields */}
-  {(formState.arrivalStatus.leadStatus === 'Commision Due' || formState.arrivalStatus.leadStatus === 'Completed') && (
+  {(formState.arrivalStatus.leadStatus === 'Commision Due') && (
     <div className={`${isMobile ? 'grid grid-cols-2 gap-2 mb-3' : 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-3'}`}>
       <div className="relative border border-gray-300 rounded-md bg-white group">
         <input
@@ -6379,7 +7345,20 @@ const handleGenerateEstimate = async () => {
         <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
           %
         </div>
+
       </div>
+      {/* <select
+          value={formState.arrivalStatus.commissionModeOfPayment}
+          onChange={(e) => handleInputChange('arrivalStatus', 'commissionModeOfPayment', e.target.value)}
+          className="p-2 border border-gray-300 rounded-md"
+          required
+        >
+          <option value="">Commission Mode of Payment</option>
+          <option value="Cash">Cash</option>
+          <option value="UPI">UPI (Gokul)</option>
+          <option value="UPI Loknath">UPI (Loknath)</option>
+          <option value="Net Banking">Net Banking (OnlyBigCars)</option>
+        </select> */}
 
       <div className={`relative border border-gray-300 rounded-md bg-white group ${isMobile ? 'col-span-2' : ''}`}>
         <input
@@ -6401,7 +7380,6 @@ const handleGenerateEstimate = async () => {
           }}
           className="w-full p-2 pr-7 border-0 focus:outline-none rounded-md peer placeholder-transparent"
           disabled={location.state?.previousStatus === "Completed"}
-          required
           id="gstField"
           placeholder=" "
         />
@@ -6417,6 +7395,524 @@ const handleGenerateEstimate = async () => {
       </div>
     </div>
   )}
+
+  
+{/* Find the end of Vehicle Images section and add these RIGHT AFTER: */}
+
+{/* Payment Screenshot section for Payment Due */}
+{/* {formState.arrivalStatus.leadStatus === "Payment Due" && (
+  <div className="mt-4 p-3 border border-gray-200 rounded-md">
+    <h3 className="text-md font-medium mb-3">Payment Screenshot</h3>
+    
+    <div className="mb-4">
+      <label 
+        htmlFor="paymentImageUpload" 
+        className="flex justify-center items-center p-4 border-2 border-dashed border-gray-300 rounded-md cursor-pointer hover:bg-gray-50"
+      >
+        <div className="text-center">
+          <svg className="mx-auto h-10 w-10 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <p className="mt-1 text-sm text-gray-600">
+            Click to upload payment screenshot
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            PNG, JPG
+          </p>
+        </div>
+        <input 
+          type="file" 
+          id="paymentImageUpload" 
+          multiple 
+          accept="image/*"
+          onChange={handlePaymentImageChange} 
+          className="hidden"
+        />
+      </label>
+      <label className="flex-1 flex justify-center items-center p-2 border-2 border-gray-300 rounded-md cursor-pointer hover:bg-gray-800 bg-black mt-2">
+        <div className="text-center">
+          <span className="text-sm text-white font-bold">Take Payment Photo</span>
+        </div>
+        <input 
+          type="file" 
+          accept="image/*"
+          capture="environment"
+          onChange={handlePaymentImageChange} 
+          className="hidden"
+        />
+      </label>
+      
+      {paymentImageTooltipText && (
+        <div className="text-center text-red-500 text-sm mt-2">
+          {paymentImageTooltipText}
+        </div>
+      )}
+    </div>
+    
+    {existingPaymentImageUrls.length > 0 && (
+      <div className="mb-4">
+        <div className="text-sm font-medium mb-2">Saved Payment Screenshots ({existingPaymentImageUrls.length})</div>
+        <div className="grid grid-cols-12 sm:grid-cols-6 md:grid-cols-6 gap-3">
+          {existingPaymentImageUrls.map((imageUrl, index) => (
+            <div key={`existing-payment-${index}`} className="relative group">
+              <img
+                src={imageUrl}
+                alt={`Saved Payment ${index}`}
+                className="h-24 w-24 object-cover rounded-md border border-gray-200"
+              />
+              <button
+                type="button"
+                onClick={() => handleRemoveExistingPaymentImage(index)}
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-100 hover:bg-red-600 transition-opacity"
+                aria-label="Remove payment image"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+
+    {selectedPaymentImages.length > 0 && (
+      <div>
+        <div className="text-sm font-medium mb-2">New Payment Screenshots ({selectedPaymentImages.length})</div>
+        <div className="grid grid-cols-12 sm:grid-cols-8 md:grid-cols-8 gap-3">
+          {selectedPaymentImages.map((image, index) => (
+            <div key={`new-payment-${index}`} className="relative group">
+              <img
+                src={URL.createObjectURL(image)}
+                alt={`Payment Preview ${index}`}
+                className="h-24 w-24 object-cover rounded-md border border-gray-200"
+              />
+              <button
+                type="button"
+                onClick={() => handleRemovePaymentImage(index)}
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-100 hover:bg-red-600 transition-opacity"
+                aria-label="Remove payment image"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <p className="text-xs mt-1 truncate">{image.name}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+)} */}
+
+{/* // Replace the Payment Screenshot section with this enhanced version: */}
+{formState.arrivalStatus.leadStatus === "Completed" && (
+  <>
+    {/* Add the mode of payment field here */}
+    <div className={`${isMobile ? 'grid grid-cols-1 gap-2 mb-3' : 'grid grid-cols-1 md:grid-cols-1 gap-4 mb-3'}`}>
+      <select
+        value={formState.arrivalStatus.modeOfPayment}
+        onChange={(e) => handleInputChange('arrivalStatus', 'modeOfPayment', e.target.value)}
+        required={hasStatusInHistory("Payment Due")} // Only required if Payment Due was in history
+        className="p-2 border border-gray-300 rounded-md"
+      >
+        <option value="">
+          Mode of Payment{hasStatusInHistory("Payment Due") ? '*' : ''}
+        </option>
+        <option value="Cash">Cash</option>
+        <option value="UPI">UPI (Gokul)</option>
+        <option value="UPI Loknath">UPI (Loknath)</option>
+        <option value="Net Banking">Net Banking (OnlyBigCars)</option>
+      </select>
+    </div>
+  </>
+)}
+
+{/* Payment Screenshot section for Payment Due */}
+{formState.arrivalStatus.leadStatus === "Completed" && (
+  <div className="mt-4 p-3 border border-gray-200 rounded-md">
+    <h3 className="text-md font-medium mb-3">
+      Payment Screenshot
+      {/* Show asterisk if payment mode is not Cash */}
+      {formState.arrivalStatus.modeOfPayment && formState.arrivalStatus.modeOfPayment !== 'Cash' && (
+        <span className="text-red-500 ml-1">*</span>
+      )}
+    </h3>
+    
+    {/* Show requirement info based on payment mode */}
+    {formState.arrivalStatus.modeOfPayment && (
+      <div className={`mb-3 p-2 rounded text-xs ${
+        formState.arrivalStatus.modeOfPayment === 'Cash' 
+          ? 'bg-green-50 text-green-700' 
+          : 'bg-yellow-50 text-yellow-700'
+      }`}>
+        {formState.arrivalStatus.modeOfPayment === 'Cash' 
+          ? 'Payment screenshot is optional for Cash payments'
+          : 'Payment screenshot is required for non-Cash payments'
+        }
+      </div>
+    )}
+    
+    <div className="mb-4">
+      <label 
+        htmlFor="paymentImageUpload" 
+        className="flex justify-center items-center p-4 border-2 border-dashed border-gray-300 rounded-md cursor-pointer hover:bg-gray-50"
+      >
+        <div className="text-center">
+          <svg className="mx-auto h-10 w-10 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <p className="mt-1 text-sm text-gray-600">
+            Click to upload payment screenshot
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            PNG, JPG
+          </p>
+        </div>
+        <input 
+          type="file" 
+          id="paymentImageUpload" 
+          multiple 
+          accept="image/*"
+          onChange={handlePaymentImageChange} 
+          className="hidden"
+        />
+      </label>
+      <label className="flex-1 flex justify-center items-center p-2 border-2 border-gray-300 rounded-md cursor-pointer hover:bg-gray-800 bg-black mt-2">
+        <div className="text-center">
+          <span className="text-sm text-white font-bold">Take Payment Photo</span>
+        </div>
+        <input 
+          type="file" 
+          accept="image/*"
+          capture="environment"
+          onChange={handlePaymentImageChange} 
+          className="hidden"
+        />
+      </label>
+      
+      {paymentImageTooltipText && (
+        <div className="text-center text-red-500 text-sm mt-2">
+          {paymentImageTooltipText}
+        </div>
+      )}
+    </div>
+    
+    {existingPaymentImageUrls.length > 0 && (
+      <div className="mb-4">
+        <div className="text-sm font-medium mb-2">Saved Payment Screenshots ({existingPaymentImageUrls.length})</div>
+        <div className="grid grid-cols-12 sm:grid-cols-6 md:grid-cols-6 gap-3">
+          {existingPaymentImageUrls.map((imageUrl, index) => (
+            <div key={`existing-payment-${index}`} className="relative group">
+              <img
+                src={imageUrl}
+                alt={`Saved Payment ${index}`}
+                className="h-24 w-24 object-cover rounded-md border border-gray-200"
+              />
+              <button
+                type="button"
+                onClick={() => handleRemoveExistingPaymentImage(index)}
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-100 hover:bg-red-600 transition-opacity"
+                aria-label="Remove payment image"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+
+    {selectedPaymentImages.length > 0 && (
+      <div>
+        <div className="text-sm font-medium mb-2">New Payment Screenshots ({selectedPaymentImages.length})</div>
+        <div className="grid grid-cols-12 sm:grid-cols-8 md:grid-cols-8 gap-3">
+          {selectedPaymentImages.map((image, index) => (
+            <div key={`new-payment-${index}`} className="relative group">
+              <img
+                src={URL.createObjectURL(image)}
+                alt={`Payment Preview ${index}`}
+                className="h-24 w-24 object-cover rounded-md border border-gray-200"
+              />
+              <button
+                type="button"
+                onClick={() => handleRemovePaymentImage(index)}
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-100 hover:bg-red-600 transition-opacity"
+                aria-label="Remove payment image"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <p className="text-xs mt-1 truncate">{image.name}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+)}
+
+{/* Commission Screenshot section for Commission Due */}
+{/* {formState.arrivalStatus.leadStatus === "Commision Due" && (
+  <div className="mt-4 p-3 border border-gray-200 rounded-md">
+    <h3 className="text-md font-medium mb-3">Commission Screenshot</h3>
+    
+    <div className="mb-4">
+      <label 
+        htmlFor="commissionImageUpload" 
+        className="flex justify-center items-center p-4 border-2 border-dashed border-gray-300 rounded-md cursor-pointer hover:bg-gray-50"
+      >
+        <div className="text-center">
+          <svg className="mx-auto h-10 w-10 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <p className="mt-1 text-sm text-gray-600">
+            Click to upload commission screenshot
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            PNG, JPG
+          </p>
+        </div>
+        <input 
+          type="file" 
+          id="commissionImageUpload" 
+          multiple 
+          accept="image/*"
+          onChange={handleCommissionImageChange} 
+          className="hidden"
+        />
+      </label>
+      <label className="flex-1 flex justify-center items-center p-2 border-2 border-gray-300 rounded-md cursor-pointer hover:bg-gray-800 bg-black mt-2">
+        <div className="text-center">
+          <span className="text-sm text-white font-bold">Take Commission Photo</span>
+        </div>
+        <input 
+          type="file" 
+          accept="image/*"
+          capture="environment"
+          onChange={handleCommissionImageChange} 
+          className="hidden"
+        />
+      </label>
+      
+      {commissionImageTooltipText && (
+        <div className="text-center text-red-500 text-sm mt-2">
+          {commissionImageTooltipText}
+        </div>
+      )}
+    </div>
+    
+    {existingCommissionImageUrls.length > 0 && (
+      <div className="mb-4">
+        <div className="text-sm font-medium mb-2">Saved Commission Screenshots ({existingCommissionImageUrls.length})</div>
+        <div className="grid grid-cols-12 sm:grid-cols-6 md:grid-cols-6 gap-3">
+          {existingCommissionImageUrls.map((imageUrl, index) => (
+            <div key={`existing-commission-${index}`} className="relative group">
+              <img
+                src={imageUrl}
+                alt={`Saved Commission ${index}`}
+                className="h-24 w-24 object-cover rounded-md border border-gray-200"
+              />
+              <button
+                type="button"
+                onClick={() => handleRemoveExistingCommissionImage(index)}
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-100 hover:bg-red-600 transition-opacity"
+                aria-label="Remove commission image"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+
+    {selectedCommissionImages.length > 0 && (
+      <div>
+        <div className="text-sm font-medium mb-2">New Commission Screenshots ({selectedCommissionImages.length})</div>
+        <div className="grid grid-cols-12 sm:grid-cols-8 md:grid-cols-8 gap-3">
+          {selectedCommissionImages.map((image, index) => (
+            <div key={`new-commission-${index}`} className="relative group">
+              <img
+                src={URL.createObjectURL(image)}
+                alt={`Commission Preview ${index}`}
+                className="h-24 w-24 object-cover rounded-md border border-gray-200"
+              />
+              <button
+                type="button"
+                onClick={() => handleRemoveCommissionImage(index)}
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-100 hover:bg-red-600 transition-opacity"
+                aria-label="Remove commission image"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <p className="text-xs mt-1 truncate">{image.name}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+)} */}
+
+
+{formState.arrivalStatus.leadStatus === "Completed" && (
+  <>
+    {/* Add the mode of payment field here */}
+    <div className={`${isMobile ? 'grid grid-cols-1 gap-2 mb-3' : 'grid grid-cols-1 md:grid-cols-2 gap-4 mb-3'}`}>
+
+      {/* Add Commission Mode of Payment field here */}
+      <select
+        value={formState.arrivalStatus.commissionModeOfPayment}
+        onChange={(e) => handleInputChange('arrivalStatus', 'commissionModeOfPayment', e.target.value)}
+        className="p-2 border border-gray-300 rounded-md"
+        required={hasStatusInHistory("Commision Due")} // Only required if Commision Due was in history
+      >
+        <option value="">
+          Commission Mode of Payment{hasStatusInHistory("Commision Due") ? '*' : ''}
+        </option>
+        <option value="Cash">Cash</option>
+        <option value="UPI">UPI (Gokul)</option>
+        <option value="UPI Loknath">UPI (Loknath)</option>
+        <option value="Net Banking">Net Banking (OnlyBigCars)</option>
+      </select>
+    </div>
+  </>
+)}
+
+{formState.arrivalStatus.leadStatus === "Completed" && (
+  <div className="mt-4 p-3 border border-gray-200 rounded-md">
+    <h3 className="text-md font-medium mb-3">
+      Commission Screenshot
+      {/* Show asterisk if commission payment mode is not Cash */}
+      {formState.arrivalStatus.commissionModeOfPayment && formState.arrivalStatus.commissionModeOfPayment !== 'Cash' && (
+        <span className="text-red-500 ml-1">*</span>
+      )}
+    </h3>
+    
+    {/* Show requirement info based on commission payment mode */}
+    {formState.arrivalStatus.commissionModeOfPayment && (
+      <div className={`mb-3 p-2 rounded text-xs ${
+        formState.arrivalStatus.commissionModeOfPayment === 'Cash' 
+          ? 'bg-green-50 text-green-700' 
+          : 'bg-yellow-50 text-yellow-700'
+      }`}>
+        {formState.arrivalStatus.commissionModeOfPayment === 'Cash' 
+          ? 'Commission screenshot is optional for Cash payments'
+          : 'Commission screenshot is required for non-Cash commission payments'
+        }
+      </div>
+    )}
+    
+    <div className="mb-4">
+      <label 
+        htmlFor="commissionImageUpload" 
+        className="flex justify-center items-center p-4 border-2 border-dashed border-gray-300 rounded-md cursor-pointer hover:bg-gray-50"
+      >
+        <div className="text-center">
+          <svg className="mx-auto h-10 w-10 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <p className="mt-1 text-sm text-gray-600">
+            Click to upload commission screenshot
+          </p>
+          <p className="mt-1 text-xs text-gray-500">
+            PNG, JPG
+          </p>
+        </div>
+        <input 
+          type="file" 
+          id="commissionImageUpload" 
+          multiple 
+          accept="image/*"
+          onChange={handleCommissionImageChange} 
+          className="hidden"
+        />
+      </label>
+      <label className="flex-1 flex justify-center items-center p-2 border-2 border-gray-300 rounded-md cursor-pointer hover:bg-gray-800 bg-black mt-2">
+        <div className="text-center">
+          <span className="text-sm text-white font-bold">Take Commission Photo</span>
+        </div>
+        <input 
+          type="file" 
+          accept="image/*"
+          capture="environment"
+          onChange={handleCommissionImageChange} 
+          className="hidden"
+        />
+      </label>
+      
+      {commissionImageTooltipText && (
+        <div className="text-center text-red-500 text-sm mt-2">
+          {commissionImageTooltipText}
+        </div>
+      )}
+    </div>
+    
+    {existingCommissionImageUrls.length > 0 && (
+      <div className="mb-4">
+        <div className="text-sm font-medium mb-2">Saved Commission Screenshots ({existingCommissionImageUrls.length})</div>
+        <div className="grid grid-cols-12 sm:grid-cols-6 md:grid-cols-6 gap-3">
+          {existingCommissionImageUrls.map((imageUrl, index) => (
+            <div key={`existing-commission-${index}`} className="relative group">
+              <img
+                src={imageUrl}
+                alt={`Saved Commission ${index}`}
+                className="h-24 w-24 object-cover rounded-md border border-gray-200"
+              />
+              <button
+                type="button"
+                onClick={() => handleRemoveExistingCommissionImage(index)}
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-100 hover:bg-red-600 transition-opacity"
+                aria-label="Remove commission image"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+
+    {selectedCommissionImages.length > 0 && (
+      <div>
+        <div className="text-sm font-medium mb-2">New Commission Screenshots ({selectedCommissionImages.length})</div>
+        <div className="grid grid-cols-12 sm:grid-cols-8 md:grid-cols-8 gap-3">
+          {selectedCommissionImages.map((image, index) => (
+            <div key={`new-commission-${index}`} className="relative group">
+              <img
+                src={URL.createObjectURL(image)}
+                alt={`Commission Preview ${index}`}
+                className="h-24 w-24 object-cover rounded-md border border-gray-200"
+              />
+              <button
+                type="button"
+                onClick={() => handleRemoveCommissionImage(index)}
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-100 hover:bg-red-600 transition-opacity"
+                aria-label="Remove commission image"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <p className="text-xs mt-1 truncate">{image.name}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+)}
 
   {/* Vehicle Images section for Job Card */}
   {formState.arrivalStatus.leadStatus === "Job Card" && (
@@ -6443,23 +7939,48 @@ const handleGenerateEstimate = async () => {
             type="file" 
             id="imageUpload" 
             multiple 
-            accept="image/*" 
+            accept="image/*"
             onChange={handleImageChange} 
             className="hidden"
           />
         </label>
+        {/* <label className="flex-1 flex justify-center items-center p-2 border-2 border-dashed border-gray-300 rounded-md cursor-pointer hover:bg-gray-50">
+  <div className="text-center bg-black text-white font-bold py-2 px-4 rounded">
+  <span className="text-sm">Take Photo</span>
+</div>
+    <input 
+      type="file" 
+      accept="image/*"
+      capture="environment"
+      onChange={handleImageChange} 
+      className="hidden"
+    />
+  </label> */}
+  <label className="flex-1 flex justify-center items-center p-2 border-2  border-gray-300 rounded-md cursor-pointer hover:bg-gray-800 bg-black">
+  <div className="text-center">
+    <span className="text-sm text-white font-bold">Take Photo</span>
+  </div>
+  <input 
+    type="file" 
+    accept="image/*"
+    capture="environment"
+    onChange={handleImageChange} 
+    className="hidden"
+  />
+</label>
       </div>
       
       {existingImageUrls.length > 0 && (
         <div className="mb-4">
           <div className="text-sm font-medium mb-2">Saved Images ({existingImageUrls.length})</div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-12 sm:grid-cols-6 md:grid-cols-6 gap-3">
             {existingImageUrls.map((imageUrl, index) => (
               <div key={`existing-${index}`} className="relative group">
                 <img
                   src={imageUrl}
                   alt={`Saved ${index}`}
-                  className="h-24 w-24 object-cover rounded-md border border-gray-200"
+                  className="h-24 w-24 object-cover rounded-md border border-gray-200 cursor-pointer"
+                  onClick={()=>setImageToPreview(imageUrl)}
                 />
                 <button
                   type="button"
@@ -6480,13 +8001,14 @@ const handleGenerateEstimate = async () => {
       {selectedImages.length > 0 && (
         <div>
           <div className="text-sm font-medium mb-2">New Images ({selectedImages.length})</div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-12 sm:grid-cols-8 md:grid-cols-8 gap-3">
             {selectedImages.map((image, index) => (
               <div key={`new-${index}`} className="relative group">
                 <img
                   src={URL.createObjectURL(image)}
                   alt={`Preview ${index}`}
-                  className="h-24 w-24 object-cover rounded-md border border-gray-200"
+                  className="h-24 w-24 object-cover rounded-md border border-gray-200 cursor-pointer"
+                  onClick={() => setImageToPreview(URL.createObjectURL(image))}
                 />
                 <button
                   type="button"
@@ -6530,7 +8052,7 @@ const handleGenerateEstimate = async () => {
             {/* Garage Details */}
 
             <div className="w-full p-2 rounded-lg">
-              <div className="text-gray-700 mb-2" style={{ padding: "15px", borderRadius: "5px", background: "#F2F2F2" }}>Workshop Details*</div>
+              <div className="text-white bg-gray-800 font-bold text-lg mb-2 p-3 rounded-md">Workshop Details*</div>
 
               <div className="p-4">
 
@@ -6591,11 +8113,9 @@ const handleGenerateEstimate = async () => {
           required={!isAdmin}
         >
           <option value="">Select Technician</option>
-          <option value="Anjali">Anjali</option>
-          <option value="Loknath">Loknath</option>
-          <option value="Abhishek">Abhishek</option>
-          <option value="Sahil">Sahil</option>
-          <option value="Gokul">Gokul</option>
+          {users.map(user => (
+              <option key={user.id} value={user.username}>{user.username}</option>
+            ))}
         </Form.Select>
       </div>
     </Col>
@@ -6749,7 +8269,7 @@ const handleGenerateEstimate = async () => {
             <span className="animate-pulse">Generating PDF...</span>
           </>
         ) : (
-          'Generate Card'
+          'Generate Job Card'
         )}
       </Button>
 
@@ -6920,7 +8440,48 @@ Generate Bill
                       "You can only save leads assigned to you or from workshop" : ""}
                   >
                     {isSubmitting ? 'Saving...' : 'Save & Copy'}
-                  </Button></div>
+                  </Button>
+
+                  {/* <Button 
+  variant={location.state?.previousStatus === "Completed" ? "secondary" : "danger"}
+  type="submit" 
+  disabled={
+    isSubmitting || 
+    isSubmitInProgress || 
+    location.state?.previousStatus === "Completed" || 
+    (formState.basicInfo.cceName !== user?.username && 
+     formState.basicInfo.cceName !== "workshop" && 
+     !isAdmin)
+  }
+  title={
+    isSubmitInProgress 
+      ? "Processing submission..." 
+      : formState.basicInfo.cceName !== user?.username && 
+        formState.basicInfo.cceName !== "workshop" && 
+        !isAdmin 
+        ? "You can only save leads assigned to you or from workshop" 
+        : ""
+  }
+  onClick={(e) => {
+    // Additional click handler for extra protection
+    if (isSubmitInProgress || isSubmitting) {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    }
+  }}
+  style={{
+    pointerEvents: isSubmitInProgress || isSubmitting ? 'none' : 'auto',
+    opacity: isSubmitInProgress || isSubmitting ? 0.7 : 1
+  }}
+>
+  {isSubmitting || isSubmitInProgress ? 'Saving...' : 'Save & Copy'}
+</Button> */}
+                  
+                  
+
+                 
+                  </div>
               </div>
 
               {/* {error && (
@@ -7202,11 +8763,26 @@ Generate Bill
         customerGSTIN: '',
         commissionReceived: formState.arrivalStatus.commissionReceived || 0,
         commissionDue: formState.arrivalStatus.commissionDue || 0,
-        wxgst:formState.arrivalStatus.gst || 0,
-        workshopDetailName: formState.gstDetail.wx_name || formState.workshop.name,
-        workshopDetailAddress: formState.gstDetail.wx_address || formState.workshop.locality,
-        workshopDetailGSTIN: formState.gstDetail.wx_gstin || 'N/A',
-        workshopDetailState: formState.gstDetail.wx_state || '',
+        // wxgst:formState.arrivalStatus.gst || 0,
+        // workshopDetailName: formState.gstDetail.wx_name || formState.workshop.name,
+        // workshopDetailAddress: formState.gstDetail.wx_address || formState.workshop.locality,
+        // workshopDetailGSTIN: formState.gstDetail.wx_gstin || 'N/A',
+        // workshopDetailState: formState.gstDetail.wx_state || '',
+        workshopDetailName: (formState.workshop.gst_workshop_name) || 
+                   (formState.gstDetail.wx_name) || 
+                   formState.workshop.name,
+
+        workshopDetailAddress: (formState.workshop.gst_address) || 
+                              (formState.gstDetail.wx_address) || 
+                              formState.workshop.locality,
+
+        workshopDetailGSTIN: (formState.workshop.gst_number) || 
+                            (formState.gstDetail.wx_gstin) || 
+                            'N/A',
+
+        workshopDetailState: (formState.workshop.gst_state) || 
+                            (formState.gstDetail.wx_state) || 
+                    '',
         additionalWorkItems: formState.arrivalStatus.additionalWork,
       }}
     />
@@ -7857,7 +9433,7 @@ Generate Bill
                     className="w-full p-3 border-0 focus:ring-2 focus:ring-dark" 
                     placeholder="Workshop Name"
                     // CORRECTION: Read from gstDetails state
-                    value={gstDetails.wx_name}
+                    value={formState.workshop.gst_workshop_name || gstDetails.wx_name}
                     // CORRECTION: Write to gstDetails state
                     onChange={e => handleGstDetailsChange('wx_name', e.target.value)}
                 />
@@ -7867,7 +9443,7 @@ Generate Bill
                 <input 
                     className="w-full p-3 border-0 focus:ring-2 focus:ring-dark" 
                     placeholder="Workshop Address"
-                    value={gstDetails.wx_address}
+                    value={formState.workshop.gst_address || gstDetails.wx_address}
                     onChange={e => handleGstDetailsChange('wx_address', e.target.value)}
                 />
                 <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">Workshop Address</label>
@@ -7876,7 +9452,7 @@ Generate Bill
                 <input 
                     className="w-full p-3 border-0 focus:ring-2 focus:ring-dark" 
                     placeholder="Workshop GSTIN"
-                    value={gstDetails.wx_gstin}
+                    value={formState.workshop.gst_number || gstDetails.wx_gstin}
                     onChange={e => handleGstDetailsChange('wx_gstin', e.target.value)}
                 />
                 <label className="absolute -top-2.5 left-2 bg-white px-1 text-xs text-gray-500">Workshop GSTIN</label>
@@ -7886,7 +9462,7 @@ Generate Bill
                 <input
                     className="w-full p-3 border-0 focus:ring-2 focus:ring-dark"
                     placeholder="Workshop State"
-                    value={gstDetails.wx_state}
+                    value={formState.workshop.gst_state || gstDetails.wx_state}
                     onChange={e => {
                         handleGstDetailsChange('wx_state', e.target.value);
                         setStateSearchWorkshop(e.target.value);
@@ -7936,6 +9512,389 @@ Generate Bill
 )}
 
 
+{/* GST Processing Popup */}
+{/* {showGSTPopup && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+    <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] overflow-y-auto">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-semibold">GST Processing Results</h3>
+        <button
+          type="button"
+          onClick={() => setShowGSTPopup(false)}
+          className="text-gray-400 hover:text-red-500 text-xl"
+        >
+          ×
+        </button>
+      </div>
+      
+      {isProcessingGST ? (
+        <div className="flex flex-col items-center py-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
+          <p className="text-gray-600">Processing GST data...</p>
+        </div>
+      ) : gstError ? (
+        <div className="text-red-500 text-center py-8">
+          <p>{gstError}</p>
+          <button
+            onClick={() => setShowGSTPopup(false)}
+            className="mt-4 px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400"
+          >
+            Close
+          </button>
+        </div>
+      ) : gstData ? (
+        <div className="space-y-6">
+          {gstData.service_details.map((serviceDetail, rowIndex) => (
+            <div key={rowIndex} className="border rounded-lg p-4">
+              <h4 className="font-semibold text-lg mb-3">
+                Row {rowIndex + 1} - Average GST: {serviceDetail.average_gst_percentage}%
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {serviceDetail.services.map((service, serviceIndex) => (
+                  <div key={serviceIndex} className="bg-gray-50 p-3 rounded">
+                    <div className="font-medium text-sm">{service.service_name}</div>
+                    <div className="text-xs text-gray-600">HSN: {service.hsn_code}</div>
+                    <div className="text-xs text-blue-600">GST: {service.gst_percentage}%</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+          
+          <div className="flex justify-end space-x-3 pt-4 border-t">
+            <button
+              type="button"
+              onClick={() => setShowGSTPopup(false)}
+              className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleApplyGST}
+              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+            >
+              Add GST
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-8">
+          <p>No data to display</p>
+        </div>
+      )}
+    </div>
+  </div>
+)} */}
+
+
+
+
+
+{/* GST Processing Popup */}
+{/* {showGSTPopup && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+    <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] overflow-y-auto">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-semibold">GST Processing Results</h3>
+        <button
+          type="button"
+          onClick={() => setShowGSTPopup(false)}
+          className="text-gray-400 hover:text-red-500 text-xl"
+        >
+          ×
+        </button>
+      </div>
+      
+      {isProcessingGST ? (
+        <div className="flex flex-col items-center py-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
+          <p className="text-gray-600 mb-4">Processing GST data...</p>
+          
+    
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4 max-w-md text-center">
+            <div className="flex items-center justify-center mb-2">
+              <svg className="w-5 h-5 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              <span className="text-yellow-800 font-medium">Please wait</span>
+            </div>
+            <p className="text-yellow-700 text-sm mb-3">
+              This process can take up to 2 minutes to complete. 
+              Our AI is analyzing your services and assigning appropriate GST rates.
+            </p>
+            
+           
+            <div className="flex items-center justify-center space-x-2">
+              <div className="text-2xl font-mono font-bold text-blue-600">
+                {formatTime(gstTimer)}
+              </div>
+              <div className="text-sm text-gray-500">
+                / 2:00
+              </div>
+            </div>
+            
+           
+            <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
+              <div 
+                className="bg-blue-600 h-2 rounded-full transition-all duration-1000 ease-out"
+                style={{ width: `${(gstTimer / maxGstTime) * 100}%` }}
+              ></div>
+            </div>
+            
+   
+            <div className="mt-2 text-xs text-gray-500">
+              {gstTimer >= maxGstTime ? (
+                <span className="text-orange-600 font-medium">
+                  Taking longer than expected...
+                </span>
+              ) : (
+                <span>
+                  Processing... {Math.round(((gstTimer / maxGstTime) * 100))}% of expected time
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : gstError ? (
+        <div className="text-red-500 text-center py-8">
+          <div className="mb-4">
+            <svg className="w-16 h-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <p className="text-lg font-medium mb-2">Processing Failed</p>
+          <p className="text-sm text-gray-600 mb-4">{gstError}</p>
+          <button
+            onClick={() => setShowGSTPopup(false)}
+            className="mt-4 px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400"
+          >
+            Close
+          </button>
+        </div>
+      ) : gstData ? (
+        <div className="space-y-6">
+         
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-green-800 font-medium">
+                GST analysis completed successfully! 
+              </span>
+              <span className="text-green-600 text-sm ml-2">
+                (Processed in {formatTime(gstTimer)})
+              </span>
+            </div>
+          </div>
+
+          {gstData.service_details.map((serviceDetail, rowIndex) => (
+            <div key={rowIndex} className="border rounded-lg p-4">
+              <h4 className="font-semibold text-lg mb-3">
+                Row {rowIndex + 1} - Average GST: {serviceDetail.average_gst_percentage}%
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {serviceDetail.services.map((service, serviceIndex) => (
+                  <div key={serviceIndex} className="bg-gray-50 p-3 rounded">
+                    <div className="font-medium text-sm">{service.service_name}</div>
+                    <div className="font-medium text-sm">{service.item_type}</div>
+                    <div className="text-xs text-gray-600">HSN: {service.hsn_code}</div>
+                    <div className="text-xs text-blue-600">GST: {service.gst_percentage}%</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+          
+          <div className="flex justify-end space-x-3 pt-4 border-t">
+            <button
+              type="button"
+              onClick={() => setShowGSTPopup(false)}
+              className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleApplyGST}
+              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+            >
+              Apply GST Rates
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-8">
+          <p>No data to display</p>
+        </div>
+      )}
+    </div>
+  </div>
+)} */}
+
+{showGSTPopup && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+    <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] overflow-y-auto">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-semibold">GST Processing Results</h3>
+        <button
+          type="button"
+          onClick={() => {
+            setShowGSTPopup(false);
+            setEditableGstData(null);
+            setGstChanges({});
+          }}
+          className="text-gray-400 hover:text-red-500 text-xl"
+        >
+          ×
+        </button>
+      </div>
+      
+      {isProcessingGST ? (
+        <div className="flex flex-col items-center py-8">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
+          <p className="text-gray-600 mb-4">Processing GST data...</p>
+          
+          {/* Enhanced Timer Display */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4 max-w-md text-center">
+            <div className="flex items-center justify-center mb-2">
+              <svg className="w-5 h-5 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              <span className="text-yellow-800 font-medium">Please wait</span>
+            </div>
+            <p className="text-yellow-700 text-sm mb-3">
+              This process can take up to 2 minutes to complete. 
+              Our AI is analyzing your services and assigning appropriate GST rates.
+            </p>
+            
+            {/* Timer Display */}
+            <div className="flex items-center justify-center space-x-2">
+              <div className="text-2xl font-mono font-bold text-blue-600">
+                {formatTime(gstTimer)}
+              </div>
+              <div className="text-sm text-gray-500">
+                / 2:00
+              </div>
+            </div>
+            
+            {/* Progress Bar */}
+            <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
+              <div 
+                className="bg-blue-600 h-2 rounded-full transition-all duration-1000 ease-out"
+                style={{ width: `${(gstTimer / maxGstTime) * 100}%` }}
+              ></div>
+            </div>
+            
+            {/* Status Message */}
+            <div className="mt-2 text-xs text-gray-500">
+              {gstTimer >= maxGstTime ? (
+                <span className="text-orange-600 font-medium">
+                  Taking longer than expected...
+                </span>
+              ) : (
+                <span>
+                  Processing... {Math.round(((gstTimer / maxGstTime) * 100))}% of expected time
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : gstError ? (
+        <div className="text-red-500 text-center py-8">
+          <div className="mb-4">
+            <svg className="w-16 h-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <p className="text-lg font-medium mb-2">Processing Failed</p>
+          <p className="text-sm text-gray-600 mb-4">{gstError}</p>
+          <button
+            onClick={() => setShowGSTPopup(false)}
+            className="mt-4 px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400"
+          >
+            Close
+          </button>
+        </div>
+      ) : editableGstData ? (
+        <div className="space-y-6">
+          <div className="bg-green-50 border-l-4 border-green-400 p-4 mb-4">
+            <div className="flex items-center">
+              <svg className="w-5 h-5 text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-green-800 font-medium">
+                GST analysis completed successfully! 
+              </span>
+              <span className="text-green-600 text-sm ml-2">
+                (Processed in {formatTime(gstTimer)})
+              </span>
+            </div>
+          </div>
+
+          {editableGstData.service_details.map((serviceDetail, rowIndex) => (
+            <div key={rowIndex} className="border rounded-lg p-4">
+              <h4 className="font-semibold text-lg mb-3">
+                Row {rowIndex + 1} - Average GST: 
+                <span className="text-blue-600 ml-2">
+                  {calculateDynamicAverageGST(serviceDetail, rowIndex)}%
+                </span>
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {serviceDetail.services.map((service, serviceIndex) => (
+                  <div key={serviceIndex} className="bg-gray-50 p-3 rounded">
+                    <div className="font-medium text-sm mb-2">{service.service_name}</div>
+                    <div className="text-xs text-gray-600 mb-1">HSN: {service.hsn_code}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-blue-600">GST:</span>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={getGSTValue(rowIndex, serviceIndex, service.gst_percentage)}
+                        onChange={(e) => handleGSTChangeInPopup(rowIndex, serviceIndex, parseFloat(e.target.value) || 0)}
+                        className="w-16 text-xs p-1 border rounded text-center"
+                      />
+                      <span className="text-xs text-blue-600">%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+          
+          <div className="flex justify-end space-x-3 pt-4 border-t">
+            <button
+              type="button"
+              onClick={() => {
+                setShowGSTPopup(false);
+                setEditableGstData(null);
+                setGstChanges({});
+              }}
+              className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleApplyGST}
+              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+            >
+              Apply GST
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="text-center py-8">
+          <p>No data to display</p>
+        </div>
+      )}
+    </div>
+  </div>
+)}
+
 {showWarrantyPopup && (
      
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
@@ -7977,6 +9936,35 @@ Generate Bill
                 Save Warranty
               </button>
             </div>
+            </div>
+        </div>
+      )}
+     {imageToPreview && (
+  <div 
+    className="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50"
+    onClick={() => setImageToPreview(null)}
+  >
+    <div 
+      // Set a generous max-height here and add overflow-auto as a safeguard.
+      // e.stopPropagation() prevents closing the modal when you click on the popup itself.
+      className="relative p-4 bg-white rounded-lg shadow-xl max-w-4xl max-h-[90vh] overflow-auto"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <img 
+        src={imageToPreview} 
+        alt="Preview" 
+        // These classes make the image fit within the parent div while maintaining its aspect ratio.
+        className="object-contain max-w-full max-h-full"
+      />
+      <button
+        onClick={() => setImageToPreview(null)}
+        className="absolute top-2 right-2 bg-white rounded-full p-2 text-gray-800 hover:bg-gray-200"
+        aria-label="Close preview"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
           </div>
         </div>
       )}
