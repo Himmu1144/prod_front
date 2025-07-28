@@ -6852,7 +6852,7 @@ const handleGenerateEstimate = async () => {
       </Button>
       
       {/* Send Estimate Button beside Generate Estimate */}
-      {cards && (['Estimate', 'Job Card', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
+      {/* {cards && (['Follow Up','Communicate To Ops','Referred To Ops','Walkin','Pickup','Doorstep','At Workshop','Estimate', 'Job Card', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && ( */}
   <Button
     variant="outline-success"
     type="button"
@@ -6879,7 +6879,7 @@ const handleGenerateEstimate = async () => {
       </>
     )}
   </Button>
-)}    
+{/* )}     */}
     </div>
   </div>
 
@@ -7579,18 +7579,18 @@ const handleGenerateEstimate = async () => {
           className="hidden"
         />
       </label>
-      <label className="flex-1 flex justify-center items-center p-2 border-2 border-gray-300 rounded-md cursor-pointer hover:bg-gray-800 bg-black mt-2">
-        <div className="text-center">
-          <span className="text-sm text-white font-bold">Take Payment Photo</span>
-        </div>
-        <input 
-          type="file" 
-          accept="image/*"
-          capture="environment"
-          onChange={handlePaymentImageChange} 
-          className="hidden"
-        />
-      </label>
+<label className="group flex-1 flex justify-center items-center p-2 border-2 border-gray-300 rounded-md cursor-pointer bg-black hover:!bg-white transition-all duration-300">
+  <div className="text-center">
+    <span className="text-sm font-bold text-white group-hover:!text-black transition-colors duration-300">Take Payment Photo</span>
+  </div>
+  <input 
+    type="file" 
+    accept="image/*"
+    capture="environment"
+    onChange={handlePaymentImageChange} 
+    className="hidden"
+  />
+</label>
       
       {paymentImageTooltipText && (
         <div className="text-center text-red-500 text-sm mt-2">
@@ -7767,7 +7767,7 @@ const handleGenerateEstimate = async () => {
 {formState.arrivalStatus.leadStatus === "Completed" && (
   <>
     {/* Add the mode of payment field here */}
-    <div className={`${isMobile ? 'grid grid-cols-1 gap-2 mb-3' : 'grid grid-cols-1 md:grid-cols-2 gap-4 mb-3'}`}>
+    <div className={`${isMobile ? 'grid grid-cols-1 gap-2 mb-3' : 'grid grid-cols-1 md:grid-cols-1 gap-4 mb-3 mt-3'}`}>
 
       {/* Add Commission Mode of Payment field here */}
       <select
@@ -7837,18 +7837,18 @@ const handleGenerateEstimate = async () => {
           className="hidden"
         />
       </label>
-      <label className="flex-1 flex justify-center items-center p-2 border-2 border-gray-300 rounded-md cursor-pointer hover:bg-gray-800 bg-black mt-2">
-        <div className="text-center">
-          <span className="text-sm text-white font-bold">Take Commission Photo</span>
-        </div>
-        <input 
-          type="file" 
-          accept="image/*"
-          capture="environment"
-          onChange={handleCommissionImageChange} 
-          className="hidden"
-        />
-      </label>
+      <label className="group flex-1 flex justify-center items-center p-2 border-2 border-gray-300 rounded-md cursor-pointer bg-black hover:!bg-white transition-all duration-300 mt-2">
+  <div className="text-center">
+    <span className="text-sm font-bold text-white group-hover:!text-black transition-colors duration-300">Take Commission Photo</span>
+  </div>
+  <input 
+    type="file" 
+    accept="image/*"
+    capture="environment"
+    onChange={handleCommissionImageChange} 
+    className="hidden"
+  />
+</label>
       
       {commissionImageTooltipText && (
         <div className="text-center text-red-500 text-sm mt-2">
@@ -7956,9 +7956,9 @@ const handleGenerateEstimate = async () => {
       className="hidden"
     />
   </label> */}
-  <label className="flex-1 flex justify-center items-center p-2 border-2  border-gray-300 rounded-md cursor-pointer hover:bg-gray-800 bg-black">
+<label className="group flex-1 flex justify-center items-center p-2 border-2 border-gray-300 rounded-md cursor-pointer bg-black hover:!bg-white transition-all duration-300">
   <div className="text-center">
-    <span className="text-sm text-white font-bold">Take Photo</span>
+    <span className="text-sm font-bold text-white group-hover:!text-black transition-colors duration-300">Take Photo</span>
   </div>
   <input 
     type="file" 
@@ -8269,7 +8269,7 @@ const handleGenerateEstimate = async () => {
             <span className="animate-pulse">Generating PDF...</span>
           </>
         ) : (
-          'Generate Job Card'
+          'Generate JobCard'
         )}
       </Button>
 
@@ -8431,7 +8431,7 @@ Generate Bill
 
 
                   
-       <Button 
+       {/* <Button 
                     variant={location.state?.previousStatus === "Completed" ? "secondary" : "danger"}
                     type="submit" 
                     disabled={isSubmitting || location.state?.previousStatus === "Completed" || 
@@ -8440,7 +8440,33 @@ Generate Bill
                       "You can only save leads assigned to you or from workshop" : ""}
                   >
                     {isSubmitting ? 'Saving...' : 'Save & Copy'}
-                  </Button>
+                  </Button> */}
+
+                  <Button 
+  variant="danger"
+  type="submit" 
+  disabled={isSubmitting}
+  className="relative flex items-center justify-center min-w-[120px]"
+  onClick={(e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
+    // Show loading state for 3 seconds
+    setTimeout(() => {
+      handleSubmit(e);
+      setIsSubmitting(false);
+    }, 1000);
+  }}
+>
+  {isSubmitting ? (
+    <>
+      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+      <span>Saving...</span>
+    </>
+  ) : (
+    'Save & Copy'
+  )}
+</Button>
 
                   {/* <Button 
   variant={location.state?.previousStatus === "Completed" ? "secondary" : "danger"}
