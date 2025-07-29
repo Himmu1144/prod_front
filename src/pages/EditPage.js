@@ -244,6 +244,7 @@ const [statusCounterData, setStatusCounterData] = useState({
   const billRef = useRef(null);
   const wxBillRef = useRef();
   const estimateRef = useRef(null);
+  const selectedCarIndexRef = useRef(selectedCarIndex);
 
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
@@ -852,6 +853,8 @@ const StatusHistoryDisplay = ({ statusHistory, statusCounterData = {} }) => {
       setIsLoadingPreviousLeads(false);
     }
   };
+
+
 // Add this useEffect hook to the main EditPage component
 useEffect(() => {
   if (formState.customerInfo.mobileNumber) {
@@ -1539,6 +1542,11 @@ useEffect(() => {
   statusCounterData.payment_due_count
 ]);
 
+// Update the ref whenever selectedCarIndex changes
+useEffect(() => {
+  selectedCarIndexRef.current = selectedCarIndex;
+}, [selectedCarIndex]);
+
 useEffect(() => {
   let interval;
   if (isProcessingGST && gstTimer < maxGstTime) {
@@ -1954,13 +1962,27 @@ const getAllServices = () => {
 };
 
 // Function to filter services based on search query
+// Function to filter services based on search query (now searches details)
 const getFilteredSuggestions = (query) => {
   if (!query || query.length < 2) return [];
-  
+
   const allServices = getAllServices();
-  return allServices.filter(service =>
-    service.title.toLowerCase().includes(query.toLowerCase())
-  ).slice(0, 5); // Limit to 5 suggestions
+  const queryLC = query.toLowerCase(); // Lowercase the query once for efficiency
+
+  return allServices.filter(service => {
+    // 1. Check if the title matches
+    const titleMatch = service.title.toLowerCase().includes(queryLC);
+
+    // 2. Combine all HTML details into one string
+    const detailsHtml = `${service.description || ''} ${service.workshopServices || ''} ${service.doorstepServices || ''}`;
+    
+    // 3. Strip HTML tags and check if the details text matches
+    const detailsText = stripHtml(detailsHtml);
+    const detailsMatch = detailsText.toLowerCase().includes(queryLC);
+
+    // Return true if either the title or details match
+    return titleMatch || detailsMatch;
+  }).slice(0, 5); // Limit to 5 suggestions
 };
 
 // Function to handle suggestion selection
@@ -2283,10 +2305,10 @@ const validateForm = () => {
 
 
 
-  // Set the current car index
-  setSelectedCarIndex(currentCarIndex);
+  // Preserve the current selected car index at the start
+  const currentSelectedCarIndex = selectedCarIndexRef.current;
 
-    setIsSubmitting(true);
+  setIsSubmitting(true);
           // Prevent multiple submissions
 
     const errors = validateForm();
@@ -2367,6 +2389,7 @@ const validateForm = () => {
     // Check if reminder should be shown BEFORE proceeding with save
   const shouldShowReminder = checkAndShowReminder();
   if (shouldShowReminder) {
+    setSelectedCarIndex(currentSelectedCarIndex);
     setIsSubmitting(false);
     return; // Don't proceed with save, show reminder first
   }
@@ -3562,6 +3585,12 @@ const handleDeleteCar = (index) => {
   }
 };
 
+const stripHtml = (html) => {
+  if (!html) return '';
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return doc.body.textContent || "";
+};
+
 // Add this to your CarCard component
 {/* <button
   className="absolute top-2 right-2 p-1 text-gray-500 hover:text-red-500"
@@ -3933,6 +3962,44 @@ const handleRephraseWarranty = async () => {
       if (response.data && response.data.rephrased_text) {
           handleWarrantyInputChange(response.data.rephrased_text);
           console.log('Rephrased text:', response.data.rephrased_text);
+          toast.success('Text rephrased successfully!', { position: "top-right" });
+      } else {
+          toast.error(response.data.error || 'Failed to get rephrased text.', { position: "top-right" });
+      }
+  } catch (error) {
+      console.error('Error rephrasing text:', error);
+      toast.error(error.response?.data?.error || 'An error occurred while rephrasing.', { position: "top-right" });
+  } finally {
+      setIsRephrasing(false);
+  }
+};
+
+
+const handleRephraseAdditionalWork = async () => {
+  const currentWork = formState.arrivalStatus.additionalWork;
+  if (!currentWork || !currentWork.trim()) {
+      toast.warn('Please enter some text to rephrase.', { position: "top-right" });
+      return;
+  }
+
+  setIsRephrasing(true);
+  try {
+      const response = await axios.post(
+          'https://admin.onlybigcars.com/api/rephrase-text/',
+          { 
+            text: currentWork,
+            context: 'additional_work' // Specify the context
+          },
+          {
+              headers: {
+                  'Authorization': `Token ${token}`,
+              }
+          }
+      );
+
+      if (response.data && response.data.rephrased_text) {
+          // Use handleAdditionalWorkChange to update the state
+          handleAdditionalWorkChange(response.data.rephrased_text);
           toast.success('Text rephrased successfully!', { position: "top-right" });
       } else {
           toast.error(response.data.error || 'Failed to get rephrased text.', { position: "top-right" });
@@ -4488,6 +4555,27 @@ const fetchCustomerData = async (mobileNumber) => {
 const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 const [isGeneratingWxBill, setIsGeneratingWxBill] = useState(false); // Add this
 const handleGenerateCard = async () => {
+  // --- START: NEW VALIDATION LOGIC ---
+
+  // 1. Get the currently selected car from the form state.
+  const selectedCar = formState.cars[selectedCarIndex];
+
+  // 2. Check if a car is selected and if its registration number is missing.
+  if (selectedCar && (!selectedCar.regNo || !selectedCar.regNo.trim())) {
+    
+    // 3. If Reg No. is missing, show an alert to the user.
+    alert('Please enter the Registration Number (Reg No.) for the selected car to generate a Job Card.');
+    
+    // 4. Set the current car for editing and open the 'AddNewCar' modal.
+    setEditingCar(selectedCar); 
+    setShowAddCarModal(true); 
+    
+    // 5. Stop the rest of the function from running.
+    return; 
+  }
+  // --- END: NEW VALIDATION LOGIC ---
+
+  // If the validation passes, the original function logic will run as before.
   console.log('pdf function is called');
   setIsGeneratingPDF(true); // Start animation
   setShowJobCard(true);
@@ -6252,46 +6340,44 @@ const handleGenerateEstimate = async () => {
   {/* Car Slider Navigation */}
   {formState.cars.length > 3 && (
     <div className="flex justify-between items-center mb-2">
-      <button 
-        type="button"
-        onClick={() => {
-          const newIndex = Math.max(0, selectedCarIndex - 1);
-          setSelectedCarIndex(newIndex);
-          document.getElementById(`car-card-${newIndex}`)?.scrollIntoView({
-            behavior: 'smooth',
-            block: 'nearest',
-            inline: 'center'
-          });
-        }}
-        className="bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-full"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-          <path fillRule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
-        </svg>
-      </button>
-      
-      <span className="text-sm font-medium">
-        {selectedCarIndex + 1} of {formState.cars.length}
-      </span>
-      
-      <button 
-        type="button"
-        onClick={() => {
-          const newIndex = Math.min(formState.cars.length - 1, selectedCarIndex + 1);
-          setSelectedCarIndex(newIndex);
-          document.getElementById(`car-card-${newIndex}`)?.scrollIntoView({
-            behavior: 'smooth',
-            block: 'nearest',
-            inline: 'center'
-          });
-        }}
-        className="bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-full"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-          <path fillRule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
-        </svg>
-      </button>
-    </div>
+    <button
+      type="button"
+      onClick={() => {
+        const newIndex = Math.max(0, selectedCarIndex - 1);
+        setSelectedCarIndex(newIndex);
+        document.getElementById(`car-card-${newIndex}`)?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'center'
+        });
+      }}
+      className="bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-full"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+        <path fillRule="evenodd" d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/>
+      </svg>
+    </button>
+    <span className="text-sm font-medium">
+      {selectedCarIndex + 1} of {formState.cars.length}
+    </span>
+    <button
+      type="button"
+      onClick={() => {
+        const newIndex = Math.min(formState.cars.length - 1, selectedCarIndex + 1);
+        setSelectedCarIndex(newIndex);
+        document.getElementById(`car-card-${newIndex}`)?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'center'
+        });
+      }}
+      className="bg-gray-200 hover:bg-gray-300 text-gray-800 p-2 rounded-full"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+        <path fillRule="evenodd" d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/>
+      </svg>
+    </button>
+  </div>
   )}
 
   {/* Car Slider Container */}
@@ -6822,7 +6908,7 @@ const handleGenerateEstimate = async () => {
           <button
             type="button"
             onClick={() => handleDeleteRow(index)}
-            className={`text-red-500 hover:text-red-700 ${isMobile ? 'text-xl font-bold' : ''}`}
+            className={`text-red-500 hover:text-red-700 ${isMobile ? 'text-3xl font-bold' : ''}`}
           >
             ×
           </button>
@@ -6983,7 +7069,7 @@ const handleGenerateEstimate = async () => {
       className={`p-2 border border-gray-300 rounded-md w-full`}
       required={!isAdmin}
     />
-{(!isMobile || !['Job Card', 'Payment Due', 'Commision Due', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && (
+{!['Job Card', 'Payment Due', 'Commision Due', 'Completed'].includes(formState.arrivalStatus.leadStatus) && (
       <>
     <select
       value={formState.arrivalStatus.arrivalMode}
@@ -7050,34 +7136,64 @@ const handleGenerateEstimate = async () => {
 
 
       {/* New layout for Inventory, Odometer, and Additional Work on mobile */}
+      {/* New layout for Inventory, Odometer, and Additional Work on mobile */}
       {isMobile ? (
-        <div className="flex w-full gap-2">
-          <div className="w-1/2">
-            <textarea
-              value={formState.arrivalStatus.inventory}
-              onChange={(e) => handleInputChange('arrivalStatus', 'inventory', e.target.value)}
-              placeholder="Inventory (one per line)&#10;- Item 1&#10;- Item 2"
-              className="p-2 border border-gray-300 rounded-md w-full h-full"
-              rows={3}
-              style={{ resize: 'vertical' }}
-            />
+        <div className="w-full flex flex-col gap-2">
+          {/* Line 1: Fuel Status and Odometer */}
+          <div className="flex w-full gap-2">
+            <div className="w-1/2">
+              <input
+                type="text"
+                value={formState.arrivalStatus.fuelStatus}
+                onChange={(e) => handleInputChange('arrivalStatus', 'fuelStatus', e.target.value)}
+                placeholder="Fuel Status (Ex. 50%)"
+                className="p-2 border border-gray-300 rounded-md w-full"
+                required
+              />
+            </div>
+            <div className="w-1/2">
+              <input
+                type="text"
+                value={formState.arrivalStatus.speedometerRd}
+                onChange={(e) => handleInputChange('arrivalStatus', 'speedometerRd', e.target.value)}
+                placeholder="Odometer"
+                className="p-2 border border-gray-300 rounded-md w-full"
+                required
+              />
+            </div>
           </div>
-          <div className="w-1/2 flex flex-col gap-2">
-            <input
-              type="text"
-              value={formState.arrivalStatus.speedometerRd}
-              onChange={(e) => handleInputChange('arrivalStatus', 'speedometerRd', e.target.value)}
-              placeholder="Odometer"
-              className="p-2 border border-gray-300 rounded-md w-full"
-              required
-            />
-            <input
-              type="text"
-              value={formState.arrivalStatus.additionalWork}
-              onChange={(e) => handleInputChange('arrivalStatus', 'additionalWork', e.target.value)}
-              placeholder="Additional Work"
-              className="p-2 border border-gray-300 rounded-md w-full"
-            />
+
+          {/* Line 2: Inventory and Additional Work */}
+          <div className="flex w-full gap-2">
+            <div className="w-1/2">
+              <textarea
+                value={formState.arrivalStatus.inventory}
+                onChange={(e) => handleInputChange('arrivalStatus', 'inventory', e.target.value)}
+                placeholder="Inventory"
+                className="p-2 border border-gray-300 rounded-md w-full h-full"
+                rows={3}
+                style={{ resize: 'vertical' }}
+              />
+            </div>
+             <div className="w-1/2 relative">
+        <textarea
+          value={formState.arrivalStatus.additionalWork}
+          onChange={(e) => handleAdditionalWorkChange(e.target.value)}
+          placeholder="Additional Work"
+          className="p-2 border border-gray-300 rounded-md w-full h-full"
+          rows={3}
+          style={{ resize: 'vertical' }}
+        />
+        {/* Rephrase Button */}
+        <button
+          type="button"
+          onClick={handleRephraseAdditionalWork}
+          className="absolute bottom-2 right-2 px-3 py-1 bg-yellow-500 text-white text-xs font-semibold rounded-md hover:bg-yellow-600 disabled:bg-yellow-300 transition-colors"
+          disabled={isRephrasing}
+        >
+          {isRephrasing ? '...' : 'Rephrase'}
+        </button>
+            </div>
           </div>
         </div>
       ) : (
@@ -7100,9 +7216,8 @@ const handleGenerateEstimate = async () => {
         className="p-2 border border-gray-300 rounded-md w-full"
         required
       />
-      <div className="relative">
-  <input
-    type="text"
+      <div className="relative w-full">
+  <textarea
     value={formState.arrivalStatus.additionalWork}
     onChange={(e) => handleAdditionalWorkChange(e.target.value)}
     onFocus={() => {
@@ -7130,9 +7245,20 @@ const handleGenerateEstimate = async () => {
         }, 300);
       }
     }}
-    placeholder="Additional Work - Type to search services..."
+    placeholder="Additional Work (one per line)"
     className="p-2 border border-gray-300 rounded-md w-full"
+    rows={3}
   />
+
+  {/* Rephrase Button */}
+  <button
+    type="button"
+    onClick={handleRephraseAdditionalWork}
+    className="absolute bottom-2 right-2 px-3 py-1 bg-yellow-500 text-white text-xs font-semibold rounded-md hover:bg-yellow-600 disabled:bg-yellow-300 transition-colors"
+    disabled={isRephrasing}
+  >
+    {isRephrasing ? '...' : 'Rephrase'}
+  </button>
 
   {suggestionStates['additionalWork']?.isOpen && suggestionStates['additionalWork']?.suggestions?.length > 0 && (
     <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">

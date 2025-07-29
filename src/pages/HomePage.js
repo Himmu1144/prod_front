@@ -1980,8 +1980,8 @@ const excelData = response.data.leads.map(lead => ({
                                         // >
                                         <tr 
     key={`${lead.id}-${index}`} 
-    className={`
-        border-b hover:bg-gray-50 group 
+     className={`
+        border-b border-gray-900 hover:bg-gray-50 group 
         ${lead.status === "Assigned" ? "bg-gray-100 border-l-2 border-l-red-500" : ""}
         transition-all duration-200 ease-in-out
     `}
@@ -1995,13 +1995,21 @@ const excelData = response.data.leads.map(lead => ({
     `}
 > */}
                                             {/* 14-2 */}
-                                            <td className="p-2">
+                                             <td className="p-2">
                                                 <div className="relative">
                                                     <div className={`${isMobile ? 'h-20' : 'h-12'} group-hover:hidden`}>
-                                                        {truncateLeadId(lead.id)}<br />
-                                                        {lead.type}
-                                                        
-                                                        
+                                                        {isMobile ? (
+                                                            <>
+                                                                {lead.city}<br />
+                                                                {lead.type}<br />
+                                                                {truncateLeadId(lead.id)}
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                {truncateLeadId(lead.id)}<br />
+                                                                {lead.type}
+                                                            </>
+                                                        )}
                                                     </div>
                                                     <div className="hidden group-hover:block">
                                                         {/* <span className="font-medium">Full Details:</span><br /> */}
@@ -2012,12 +2020,20 @@ const excelData = response.data.leads.map(lead => ({
                                                 </div>
                                             </td>
                                             
-                                            <td className="p-2">
-                                                <div className={`${isMobile ? 'h-20' : 'h-12'} overflow-hidden group-hover:h-auto transition-all duration-200`}>
-                                                    {lead.name}<br />
-                                                    {lead.vehicle}
-                                                </div>
-                                            </td>
+                                           <td className="p-2">
+    <div className="relative">
+        {/* Collapsed view with overflow now hidden */}
+        <div className={`${isMobile ? 'h-20' : 'h-12'} group-hover:hidden overflow-hidden`}>
+            {isMobile && lead.name && lead.name.length > 8 ? `${lead.name.substring(0, 8)}...` : lead.name}<br />
+            {lead.vehicle}
+        </div>
+        {/* Expanded view (unchanged) */}
+        <div className="hidden group-hover:block">
+            {lead.name}<br />
+            {lead.vehicle}
+        </div>
+    </div>
+</td>
                                             <td className="p-2">
                                                 <div className={`${isMobile ? 'h-20' : 'h-12'} overflow-hidden group-hover:h-auto transition-all duration-200`}>
                                                     {lead.number}<br />
@@ -2108,82 +2124,54 @@ const excelData = response.data.leads.map(lead => ({
                                                 </div>
                                             </td>}
                                            <td className="p-2">
-    <div className="flex flex-col gap-1">
-        <div className={`flex gap-1 ${isMobile ? 'flex-col' : ''}`}>
+    <div className="flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className={`flex gap-2 ${isMobile ? 'flex-col' : 'flex-row items-center'}`}>
             {/* Edit Button */}
-            {isMobile ? (
-                <button
-                    className="flex items-center justify-center gap-1 px-2 py-2 bg-black text-white rounded text-xs hover:bg-gray-800 transition-colors duration-200 min-h-[36px] w-full"
-                    onClick={() => navigate(`/edit/${lead.id}`, {
+            <button
+                className={`flex items-center justify-center gap-1 px-2 py-2 bg-black text-white rounded text-xs hover:bg-gray-800 transition-colors duration-200 min-h-[36px] ${isMobile ? 'w-full' : ''}`}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/edit/${lead.id}`, {
                         state: { 
                             previousStatus: lead.status
                         }
-                    })}
-                >
-                    <Edit size={12} />
-                    <span>Edit</span>
-                </button>
-            ) : (
-                <Edit
-                    size={16}
-                    className="cursor-pointer hover:text-red-500 transition-colors duration-200"
-                    onClick={() => navigate(`/edit/${lead.id}`, {
-                        state: { 
-                            previousStatus: lead.status
-                        }
-                    })}
-                />
-            )}
+                    });
+                }}
+            >
+                <Edit size={12} />
+                <span>Edit</span>
+            </button>
 
             {/* Copy Button */}
-            {isMobile ? (
-                <button
-                    className="flex items-center justify-center gap-1 px-2 py-2 bg-white text-black border border-gray-300 rounded text-xs hover:bg-gray-50 transition-colors duration-200 min-h-[36px] w-full"
-                    onClick={() => handleCopyClick(lead)}
-                >
-                    <Copy size={12} />
-                    <span>Copy</span>
-                </button>
-            ) : (
-                <Copy 
-                    size={16} 
-                    className="cursor-pointer hover:text-red-500 transition-colors" 
-                    onClick={() => handleCopyClick(lead)}
-                />
-            )}
+            <button
+                className={`flex items-center justify-center gap-1 px-2 py-2 bg-white text-black border border-gray-300 rounded text-xs hover:bg-gray-50 transition-colors duration-200 min-h-[36px] ${isMobile ? 'w-full' : ''}`}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    handleCopyClick(lead);
+                }}
+            >
+                <Copy size={12} />
+                <span>Copy</span>
+            </button>
      
-{/* 18 feb end */}
-                                                        {/* <Plus
-                                                            size={16}
-                                                            className="cursor-pointer hover:text-red-500 transition-colors duration-200"
-                                                            onClick={() => navigate('/edit', {
-                                                                state: {
-                                                                    customerInfo: {
-                                                                        customerName: lead.name,
-                                                                        mobileNumber: lead.number,
-                                                                        source: lead.source
-                                                                    }
-                                                                }
-                                                            })}
-                                                        /> */}
-                                                        {/* Phone icon replacing the Plus button */}
-             {!isMobile && !isAdmin && (
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="cursor-pointer hover:text-green-500 transition-colors duration-200"
-                onClick={() => handleClick2Call(lead.number)}
-                title="Click to call"
-              >
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-              </svg>
+            {/* Other Action Icons */}
+            {!isMobile && !isAdmin && (
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="cursor-pointer hover:text-green-500 transition-colors duration-200"
+                    onClick={() => handleClick2Call(lead.number)}
+                    title="Click to call"
+                >
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+                </svg>
             )}
             {!isMobile && isAdmin && (
                 <input
@@ -2195,10 +2183,9 @@ const excelData = response.data.leads.map(lead => ({
                     title="Select for bulk update"
                 />
             )}
-                                                        
-                                                    </div>
-                                                </div>
-                                            </td>
+        </div>
+    </div>
+</td>
                                         </tr>
                                     ))}
                                 </tbody>
