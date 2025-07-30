@@ -79,6 +79,7 @@ const [filterFormData, setFilterFormData] = useState(() => {
     return initialFilterState;
 });
 
+const [expandedLeadId, setExpandedLeadId] = useState(null);
 
     // Add pagination state
     const [dataFromFilter, setDataFromFilter] = useState(false);
@@ -1978,10 +1979,16 @@ const excelData = response.data.leads.map(lead => ({
                                         //         transition-all duration-200 ease-in-out
                                         //     `}
                                         // >
-                                        <tr 
+                                         <tr 
     key={`${lead.id}-${index}`} 
-     className={`
-        border-b border-gray-900 hover:bg-gray-50 group 
+    onClick={() => {
+        if (isMobile) {
+            setExpandedLeadId(prevId => (prevId === lead.id ? null : lead.id));
+        }
+    }}
+    className={`
+        border-b border-gray-900 hover:bg-gray-50 
+        ${!isMobile ? 'group' : 'cursor-pointer'}
         ${lead.status === "Assigned" ? "bg-gray-100 border-l-2 border-l-red-500" : ""}
         transition-all duration-200 ease-in-out
     `}
@@ -1995,41 +2002,43 @@ const excelData = response.data.leads.map(lead => ({
     `}
 > */}
                                             {/* 14-2 */}
-                                             <td className="p-2">
-                                                <div className="relative">
-                                                    <div className={`${isMobile ? 'h-20' : 'h-12'} group-hover:hidden`}>
-                                                        {isMobile ? (
-                                                            <>
-                                                                {lead.city}<br />
-                                                                {lead.type}<br />
-                                                                {truncateLeadId(lead.id)}
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                {truncateLeadId(lead.id)}<br />
-                                                                {lead.type}
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                    <div className="hidden group-hover:block">
-                                                        {/* <span className="font-medium">Full Details:</span><br /> */}
-                                                        {lead.id}<br />
-                                                        {lead.type}<br />
-                                                        {lead.city}
-                                                    </div>
-                                                </div>
-                                            </td>
+                                              <td className="p-2">
+    <div className="relative">
+        {/* Expanded View */}
+        <div className={isMobile ? (expandedLeadId === lead.id ? 'block' : 'hidden') : 'hidden group-hover:block'}>
+            {lead.id}<br />
+            {lead.type}<br />
+            {lead.city}
+        </div>
+        {/* Collapsed View */}
+        <div className={isMobile ? (expandedLeadId === lead.id ? 'hidden' : 'block h-20') : `group-hover:hidden h-12`}>
+            {isMobile ? (
+                <>
+                    {lead.city}<br />
+                    {lead.type}<br />
+                    {truncateLeadId(lead.id)}
+                </>
+            ) : (
+                <>
+                    {truncateLeadId(lead.id)}<br />
+                    {lead.type}
+                </>
+            )}
+        </div>
+    </div>
+</td>
                                             
+                                          
                                            <td className="p-2">
     <div className="relative">
-        {/* Collapsed view with overflow now hidden */}
-        <div className={`${isMobile ? 'h-20' : 'h-12'} group-hover:hidden overflow-hidden`}>
-            {isMobile && lead.name && lead.name.length > 8 ? `${lead.name.substring(0, 8)}...` : lead.name}<br />
+        {/* Expanded View */}
+        <div className={isMobile ? (expandedLeadId === lead.id ? 'block' : 'hidden') : 'hidden group-hover:block'}>
+            {lead.name}<br />
             {lead.vehicle}
         </div>
-        {/* Expanded view (unchanged) */}
-        <div className="hidden group-hover:block">
-            {lead.name}<br />
+        {/* Collapsed View */}
+        <div className={isMobile ? (expandedLeadId === lead.id ? 'hidden' : 'block h-20 overflow-hidden') : 'group-hover:hidden h-12 overflow-hidden'}>
+            {isMobile && lead.name && lead.name.length > 8 ? `${lead.name.substring(0, 8)}...` : lead.name}<br />
             {lead.vehicle}
         </div>
     </div>
@@ -2124,7 +2133,7 @@ const excelData = response.data.leads.map(lead => ({
                                                 </div>
                                             </td>}
                                            <td className="p-2">
-    <div className="flex flex-col" onClick={(e) => e.stopPropagation()}>
+     <div className="flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className={`flex gap-2 ${isMobile ? 'flex-col' : 'flex-row items-center'}`}>
             {/* Edit Button */}
             <button
@@ -2144,15 +2153,15 @@ const excelData = response.data.leads.map(lead => ({
 
             {/* Copy Button */}
             <button
-                className={`flex items-center justify-center gap-1 px-2 py-2 bg-white text-black border border-gray-300 rounded text-xs hover:bg-gray-50 transition-colors duration-200 min-h-[36px] ${isMobile ? 'w-full' : ''}`}
-                onClick={(e) => {
-                    e.stopPropagation();
-                    handleCopyClick(lead);
-                }}
-            >
-                <Copy size={12} />
-                <span>Copy</span>
-            </button>
+                            className={`flex items-center justify-center gap-1 px-2 py-2 bg-white text-black border border-gray-300 rounded text-xs hover:bg-gray-50 transition-colors duration-200 min-h-[36px] ${isMobile ? 'w-full' : ''}`}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleCopyClick(lead);
+                            }}
+                        >
+                            <Copy size={12} />
+                            <span>Copy</span>
+                        </button>
      
             {/* Other Action Icons */}
             {!isMobile && !isAdmin && (
