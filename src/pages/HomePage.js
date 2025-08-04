@@ -27,6 +27,8 @@ const HomePage = () => {
     const [locationSearchQuery, setLocationSearchQuery] = useState('');
     const [isLocationDropdownOpen, setIsLocationDropdownOpen] = useState(false);
     
+    const locationDropdownRef = useRef(null);
+    const garageDropdownRef = useRef(null);
 
     // Add new state
     const [welcomeData, setWelcomeData] = useState('');
@@ -800,6 +802,33 @@ useEffect(() => {
     return () => window.removeEventListener('resize', checkIfMobile);
 }, []);
 
+useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (
+                locationDropdownRef.current &&
+                !locationDropdownRef.current.contains(event.target)
+            ) {
+                setIsLocationDropdownOpen(false);
+            }
+            if (
+                garageDropdownRef.current &&
+                !garageDropdownRef.current.contains(event.target)
+            ) {
+                setIsGarageDropdownOpen(false);
+            }
+        };
+
+        // Add event listener when a dropdown is open
+        if (isLocationDropdownOpen || isGarageDropdownOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        // Cleanup the event listener
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isLocationDropdownOpen, isGarageDropdownOpen]); 
+
     useEffect(() => {
         console.log('Here we are - ')
         // Fetch welcome message and users
@@ -1110,6 +1139,10 @@ const excelData = response.data.leads.map(lead => ({
     'Customer Name': lead.name,
     'Vehicle': lead.vehicle,
     'Phone Number': lead.number,
+    'WhatsApp Number': lead.whatsapp_number || 'NA',
+    'Customer Email': lead.email || 'NA',
+    'Address': lead.address || 'NA',
+    'Map Link': lead.map_link || 'NA',
     'Source': lead.source,
     'Order ID': lead.orderId,
     'Registration Number': lead.regNumber,
@@ -1135,9 +1168,9 @@ const excelData = response.data.leads.map(lead => ({
     // Payment/Commission fields
     'Estimated Price': typeof lead.estimated_price !== 'undefined' ? `${Number(lead.estimated_price).toLocaleString('en-IN')}` : 'NA',
     'Discount': typeof lead.overview?.discount !== 'undefined' ? `${Number(lead.overview?.discount).toLocaleString('en-IN')}` : 'NA',
-    // 'Final Amount': typeof lead.overview?.finalAmount !== 'undefined' 
-    //     ? `${Number(lead.overview.finalAmount).toLocaleString('en-IN')}` 
-    //     : (typeof lead.final_amount !== 'undefined' ? `${Number(lead.final_amount).toLocaleString('en-IN')}` : 'NA'),
+    'Final Amount': typeof lead.overview?.finalAmount !== 'undefined' 
+        ? `${Number(lead.overview.finalAmount).toLocaleString('en-IN')}` 
+        : (typeof lead.final_amount !== 'undefined' ? `${Number(lead.final_amount).toLocaleString('en-IN')}` : 'NA'),
     'Commission Due': typeof lead.commission_due !== 'undefined' ? `${Number(lead.commission_due).toLocaleString('en-IN')}` : 'NA',
     'Commission Received': typeof lead.commission_received !== 'undefined' ? `${Number(lead.commission_received).toLocaleString('en-IN')}` : 'NA',
     'Commission Percent': typeof lead.commission_percent !== 'undefined' ? `${lead.commission_percent}%` : 'NA',
@@ -1158,8 +1191,7 @@ const excelData = response.data.leads.map(lead => ({
     'Total Amount': lead.overview?.finalAmount !== undefined && lead.overview?.finalAmount !== null 
         ? `${Number(lead.overview.finalAmount).toLocaleString('en-IN')}`
         : 'NA',
-}));    
-    
+})); 
             // Create worksheet
             const worksheet = XLSX.utils.json_to_sheet(excelData);
             const workbook = XLSX.utils.book_new();
@@ -1508,8 +1540,7 @@ const excelData = response.data.leads.map(lead => ({
                         /> */}
                        {/* Replace the existing garage select element with this */}
 {/* Replace the existing garage select element with this */}
-
-<div className="relative w-full">
+<div className="relative w-full" ref={locationDropdownRef}>
                             <div 
                                 className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent cursor-pointer flex justify-between items-center h-[42px]"
                                 onClick={() => setIsLocationDropdownOpen(!isLocationDropdownOpen)}
@@ -1523,8 +1554,8 @@ const excelData = response.data.leads.map(lead => ({
                             </div>
 
                             {isLocationDropdownOpen && (
-                                <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
-                                    <div className="sticky top-0 bg-white p-2 border-b border-gray-200">
+                                <div className="absolute z-30 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-100 overflow-auto">
+                                    <div className="sticky z-30 top-0 bg-white p-2 border-b border-gray-200">
                                         <input
                                             type="text"
                                             value={locationSearchQuery}
@@ -1571,7 +1602,7 @@ const excelData = response.data.leads.map(lead => ({
                             )}
                         </div>
 
-<div className="relative w-full">
+<div className="relative w-full" ref={garageDropdownRef}>
     <div 
         className="w-full p-2 border border-gray-300 rounded-md bg-white focus:ring-2 focus:ring-red-500 focus:border-transparent cursor-pointer flex justify-between items-center"
         onClick={() => setIsGarageDropdownOpen(!isGarageDropdownOpen)}
@@ -1585,7 +1616,7 @@ const excelData = response.data.leads.map(lead => ({
     </div>
 
     {isGarageDropdownOpen && (
-        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+        <div className="absolute z-30 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-80 overflow-auto">
             <div className="sticky top-0 bg-white p-2 border-b border-gray-200">
                 <input
                     type="text"

@@ -195,6 +195,7 @@ const [maxGstTime] = useState(120); // 2 minutes in seconds
 // Add these state variables after your existing state declarations (around line 151)
 const [editableGstData, setEditableGstData] = useState(null);
 const [gstChanges, setGstChanges] = useState({});
+const [activeLineInfo, setActiveLineInfo] = useState({ text: '', start: 0, end: 0 });
 
 // Add these with your other state declarations
 // const [isSubmitInProgress, setIsSubmitInProgress] = useState(false);
@@ -3999,7 +4000,7 @@ const handleRephraseAdditionalWork = async () => {
 
       if (response.data && response.data.rephrased_text) {
           // Use handleAdditionalWorkChange to update the state
-          handleAdditionalWorkChange(response.data.rephrased_text);
+          handleInputChange('arrivalStatus', 'additionalWork', response.data.rephrased_text);
           toast.success('Text rephrased successfully!', { position: "top-right" });
       } else {
           toast.error(response.data.error || 'Failed to get rephrased text.', { position: "top-right" });
@@ -4311,20 +4312,35 @@ const serviceCardStyles = {
 // };
 
 // Function to handle additional work input changes
-const handleAdditionalWorkChange = (value) => {
-  // Update the field value
-  handleInputChange('arrivalStatus', 'additionalWork', value);
+const handleAdditionalWorkChange = (e) => {
+  const textarea = e.target;
+  const value = textarea.value;
+  const position = textarea.selectionStart;
+
+  // Find the start and end of the current line
+  const lineStart = value.lastIndexOf('\n', position - 1) + 1;
+  const lineEnd = value.indexOf('\n', position);
+  const endOfLine = lineEnd === -1 ? value.length : lineEnd;
   
-  // Get suggestions and update suggestion state
-  const suggestions = getFilteredSuggestions(value);
+  const currentLineText = value.substring(lineStart, endOfLine);
+
+  // Update the main form state
+  handleInputChange('arrivalStatus', 'additionalWork', value);
+
+  // Store active line info for suggestion replacement
+  setActiveLineInfo({ text: currentLineText, start: lineStart, end: endOfLine });
+
+  // Get suggestions based on the current line's text
+  const suggestions = getFilteredSuggestions(currentLineText);
   setSuggestionStates(prev => ({
     ...prev,
     'additionalWork': {
-      isOpen: suggestions.length > 0,
+      isOpen: suggestions.length > 0 && currentLineText.trim().length > 1,
       suggestions: suggestions
     }
   }));
 };
+
 
 // Function to handle suggestion selection for additional work
 const handleAdditionalWorkSuggestionSelect = (service) => {
@@ -4335,10 +4351,8 @@ const handleAdditionalWorkSuggestionSelect = (service) => {
   }));
   
   // Extract service description (same logic as subcategory)
-  const getServiceDescription = () => {
-    if (service.title === "Comprehensive Service" || 
-        service.title === "Standard Service" || 
-        service.title === "Basic Service") {
+ const getServiceDescription = () => {
+    if (["Comprehensive Service", "Standard Service", "Basic Service"].includes(service.title)) {
       const serviceList = activeViews[service.title] === 'workshop' 
         ? service.workshopServices 
         : service.doorstepServices;
@@ -4346,22 +4360,25 @@ const handleAdditionalWorkSuggestionSelect = (service) => {
       const parser = new DOMParser();
       const doc = parser.parseFromString(serviceList, 'text/html');
       const items = doc.querySelectorAll('li');
-      return Array.from(items)
-        .map(item => item.textContent.trim())
-        .join(', ');
+      return Array.from(items).map(item => item.textContent.trim()).join(', ');
     } else {
       const parser = new DOMParser();
       const doc = parser.parseFromString(service.description, 'text/html');
       const items = doc.querySelectorAll('li');
-      return Array.from(items)
-        .map(item => item.textContent.trim())
-        .join(', ');
+      return Array.from(items).map(item => item.textContent.trim()).join(', ');
     }
   };
   
   // Fill the additional work field with the service description
   const description = getServiceDescription();
-  handleInputChange('arrivalStatus', 'additionalWork', description);
+ const currentText = formState.arrivalStatus.additionalWork;
+  const { start, end } = activeLineInfo;
+
+  // Replace only the active line with the new description
+  const newText = currentText.substring(0, start) + description + currentText.substring(end);
+  
+  // Update the form state with the modified text
+  handleInputChange('arrivalStatus', 'additionalWork', newText);
 };
 
 const statusHierarchy = [
@@ -5973,18 +5990,15 @@ const handleGenerateEstimate = async () => {
    <div className="mt-4 p-3 flex gap-4">
   <div className="flex-1">
     <div className="relative flex">
+      <div className="relative border border-gray-300 rounded-l-md bg-white group flex-grow">
+      
       <input
         type="tel"
+        id="mobileNumber"
         value={formState.customerInfo.mobileNumber}
         onChange={(e) => handleInputChange('customerInfo', 'mobileNumber', e.target.value)}
-        className={`flex-1 p-2 border rounded-l border-r-0 ${
-          validationErrors.mobileNumber 
-            ? 'form-field-invalid' 
-            : formState.customerInfo.mobileNumber 
-              ? 'form-field-valid' 
-              : ''
-        }`}
-        placeholder="Mobile Number*"
+        className="w-full p-2 border-0 rounded-l-md peer bg-transparent"
+          placeholder=" "
         required
         maxLength={10}
         pattern="[0-9]{10}"
@@ -5995,6 +6009,13 @@ const handleGenerateEstimate = async () => {
           }
         }}
       />
+      <label
+                htmlFor="mobileNumber"
+                className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+              >
+                Mobile Number*
+              </label>
+              </div>
       <button
         className="flex items-center justify-center px-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-r border border-emerald-500 shadow-sm hover:shadow-md active:scale-95 transition-all duration-150"
         onClick={() => formState.customerInfo.mobileNumber ? handleClick2Call(formState.customerInfo.mobileNumber) : setError('No phone number available to call')}
@@ -6018,7 +6039,7 @@ const handleGenerateEstimate = async () => {
   </div>
 {/* </div> */}
 
-                <div className="flex-1">
+                <div className="flex-1 relative border border-gray-300 rounded-md bg-white group">
                   <input
                     type="text"
                     value={formState.customerInfo.customerName}
@@ -6026,8 +6047,13 @@ const handleGenerateEstimate = async () => {
                     className="w-full p-2 border border-gray-200 rounded bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200"
                     placeholder="Customer Name"
                   />
+                  <label
+      htmlFor="customerName"
+      className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+    >
+      Customer Name
+    </label>
                 </div>
-                
                 {!isMobile && (
                 <div className="flex-1">
                   <select
@@ -6057,33 +6083,42 @@ const handleGenerateEstimate = async () => {
                 )}
               </div>
 
-              <div className="p-3 flex gap-4">
-                              <div className="flex-1">
-                                 <div className="relative flex">
-                                  <input
-                                    type="tel"
-                                    value={formState.customerInfo.whatsappNumber}
-                                    onChange={(e) => handleInputChange('customerInfo', 'whatsappNumber', e.target.value)}
-                                    className="flex-1 p-2 border rounded-l border-r-0 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200"
-                                    placeholder="Whatsapp Number"
-                                    pattern="[0-9]{10}"
-                                    maxLength={10}
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (formState.customerInfo.whatsappNumber) {
-                                        window.open(`https://wa.me/+91${formState.customerInfo.whatsappNumber}`, '_blank');
-                                      }
-                                    }}
-                                    className="flex items-center justify-center px-3 bg-green-500 hover:bg-green-600 text-white rounded-r border border-green-500 shadow-sm hover:shadow-md active:scale-95 transition-all duration-150"
-                                    title="Open WhatsApp Chat"
-                                  >
-                                    <FaWhatsapp className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </div>
-
+             <div className="p-3 flex gap-4">
+                                           <div className="flex-1">
+                                              <div className="relative flex">
+                                               <div className="relative border border-gray-300 rounded-l-md bg-white group flex-grow">
+                                              <input
+                                     type="tel"
+                                     id="whatsappNumber"
+                                     value={formState.customerInfo.whatsappNumber}
+                                     onChange={(e) => handleInputChange('customerInfo', 'whatsappNumber', e.target.value)}
+                                     className="w-full p-2 border-0 rounded-l-md peer bg-transparent"
+                                     placeholder=" "
+                                     pattern="[0-9]{10}"
+                                     maxLength={10}
+                                   />
+                                                <label
+                                     htmlFor="whatsappNumber"
+                                     className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+                                   >
+                                     Whatsapp
+                                   </label>
+                                 </div>
+                                               <button
+                                                 type="button"
+                                                 onClick={() => {
+                                                   if (formState.customerInfo.whatsappNumber) {
+                                                     window.open(`https://wa.me/+91${formState.customerInfo.whatsappNumber}`, '_blank');
+                                                   }
+                                                 }}
+                                                 className="flex items-center justify-center px-3 bg-green-500 hover:bg-green-600 text-white rounded-r border border-green-500 shadow-sm hover:shadow-md active:scale-95 transition-all duration-150"
+                                                 title="Open WhatsApp Chat"
+                                               >
+                                                 <FaWhatsapp className="w-4 h-4" />
+                                               </button>
+                                             </div>
+                                           </div>
+             
                 {isMobile && (
     <div className="flex-1">
       <select
@@ -6135,14 +6170,19 @@ const handleGenerateEstimate = async () => {
 
   {/* Conditionally render the email input for non-mobile views */}
   {!isMobile && (
-    <div className="flex-1">
+     <div className="flex-1 relative border border-gray-300 rounded-md bg-white group">
       <input
         type="email"
         value={formState.customerInfo.customerEmail}
         onChange={(e) => handleInputChange('customerInfo', 'customerEmail', e.target.value)}
         className="w-full p-2 border border-gray-200 rounded bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200"
         placeholder="Customer Email"
-      />
+      /><label
+        htmlFor="customerEmail"
+        className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+      >
+        Customer Email
+      </label>
     </div>
   )}
 
@@ -6187,95 +6227,178 @@ const handleGenerateEstimate = async () => {
 {/* Location Form */}
 {isMobile ? (
   <div className="flex gap-2 mb-6">
-    <div className="flex-grow">
-      <LocationSearch 
-        ref={addressInputRef}
-        value={formState.location.address}
-        onChange={(e) => handleInputChange('location', 'address', e.target.value)}
-        onPlaceSelect={handlePlaceSelect}
-        className="p-2 border border-gray-300 rounded-md w-full"
-        placeholder="Address*"
-        required={!isAdmin} 
-      />
+    <div className="relative border border-gray-300 rounded-md bg-white group">
+      <LocationSearch
+      ref={addressInputRef}
+      value={formState.location.address}
+      onChange={(e) => handleInputChange('location', 'address', e.target.value)}
+      onPlaceSelect={handlePlaceSelect}
+      className="w-full p-2 border-0 rounded-md peer bg-transparent"
+      placeholder=" "
+      required={!isAdmin}
+      id="address"
+    />
+    <label
+      htmlFor="address"
+      className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+    >
+      Address*
+    </label>
     </div>
-    <div style={{ width: '25%' }}>
-      <input
-        type="text"
-        value={formState.location.city}
-        onChange={(e) => handleInputChange('location', 'city', e.target.value)}
-        className="p-2 border border-gray-300 rounded-md w-full"
-        placeholder="City"
-        required={!isAdmin}
-      />
-    </div>
-    <div style={{ width: '25%' }}>
-      <input
-        type="text"
-        value={formState.location.state}
-        onChange={(e) => handleInputChange('location', 'state', e.target.value)}
-        className="p-2 border border-gray-300 rounded-md w-full"
-        placeholder="State"
-        required={!isAdmin}
-      />
-    </div>
+    <div className="relative border border-gray-300 rounded-md bg-white group" style={{ width: '25%' }}>
+  <input
+    type="text"
+    id="city"
+    value={formState.location.city}
+    onChange={(e) => handleInputChange('location', 'city', e.target.value)}
+    className="w-full p-2 border-0 rounded-md peer bg-transparent"
+    placeholder=" "
+    required={!isAdmin}
+  />
+  <label
+    htmlFor="city"
+    className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+  >
+    City*
+  </label>
+</div>
+<div className="relative border border-gray-300 rounded-md bg-white group" style={{ width: '25%' }}>
+  <input
+    type="text"
+    id="state"
+    value={formState.location.state}
+    onChange={(e) => handleInputChange('location', 'state', e.target.value)}
+    className="w-full p-2 border-0 rounded-md peer bg-transparent"
+    placeholder=" "
+    required={!isAdmin}
+  />
+  <label
+    htmlFor="state"
+    className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+  >
+    State*
+  </label>
+</div>
   </div>
 ) : (
   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    <div className="relative border border-gray-300 rounded-md bg-white group">
     <LocationSearch 
       ref={addressInputRef}
       value={formState.location.address}
       onChange={(e) => handleInputChange('location', 'address', e.target.value)}
       onPlaceSelect={handlePlaceSelect}
-      className="p-2 border border-gray-300 rounded-md"
-      placeholder="Address*"
+      className="w-full p-2 border-0 rounded-md peer"
+      placeholder=" "
       required={!isAdmin} 
+      id="address"
     />
+    <label
+      htmlFor="address"
+      className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+    >
+      Address*
+    </label>
+  </div>
+
+  {/* City */}
+  <div className="relative border border-gray-300 rounded-md bg-white group">
     <input
       type="text"
+      id="city"
       value={formState.location.city}
       onChange={(e) => handleInputChange('location', 'city', e.target.value)}
-      className="p-2 border border-gray-300 rounded-md"
-      placeholder="City"
+      className="w-full p-2 border-0 rounded-md peer"
+      placeholder=" "
       required={!isAdmin}
     />
+    <label
+      htmlFor="city"
+      className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+    >
+      City*
+    </label>
+  </div>
+
+  {/* State */}
+  <div className="relative border border-gray-300 rounded-md bg-white group">
     <input
       type="text"
+      id="state"
       value={formState.location.state}
       onChange={(e) => handleInputChange('location', 'state', e.target.value)}
-      className="p-2 border border-gray-300 rounded-md"
-      placeholder="State"
+      className="w-full p-2 border-0 rounded-md peer"
+      placeholder=" "
       required={!isAdmin}
     />
+    <label
+      htmlFor="state"
+      className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+    >
+      State*
+    </label>
+  </div>
   </div>
 )}
 
               {/* Optional Fields */}
               {!isMobile && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <input
-                  type="text"
-                  value={formState.location.buildingName}
-                  onChange={(e) => handleInputChange('location', 'buildingName', e.target.value)}
-                  className="p-2 border border-gray-300 rounded-md"
-                  placeholder="Building/Flat (Optional)"
-                />
-                <input
-                  type="text"
-                  value={formState.location.mapLink}
-                  onChange={(e) => handleInputChange('location', 'mapLink', e.target.value)}
-                  className="p-2 border border-gray-300 rounded-md"
-                  placeholder="Map Link"
-                />
-                <input
-                  type="text"
-                  value={formState.location.landmark}
-                  onChange={(e) => handleInputChange('location', 'landmark', e.target.value)}
-                  className="p-2 border border-gray-300 rounded-md"
-                  placeholder="Landmark (Optional)"
-                />
-              </div>
-              )}
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    {/* Building/Flat */}
+    <div className="relative border border-gray-300 rounded-md bg-white group">
+      <input
+        type="text"
+        id="buildingName"
+        value={formState.location.buildingName}
+        onChange={(e) => handleInputChange('location', 'buildingName', e.target.value)}
+        className="w-full p-2 border-0 rounded-md peer"
+        placeholder=" "
+      />
+      <label
+        htmlFor="buildingName"
+        className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+      >
+        Building/Flat (Optional)
+      </label>
+    </div>
 
+    {/* Map Link */}
+    <div className="relative border border-gray-300 rounded-md bg-white group">
+      <input
+        type="text"
+        id="mapLink"
+        value={formState.location.mapLink}
+        onChange={(e) => handleInputChange('location', 'mapLink', e.target.value)}
+        className="w-full p-2 border-0 rounded-md peer"
+        placeholder=" "
+      />
+      <label
+        htmlFor="mapLink"
+        className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+      >
+        Map Link
+      </label>
+    </div>
+
+    {/* Landmark */}
+    <div className="relative border border-gray-300 rounded-md bg-white group">
+      <input
+        type="text"
+        id="landmark"
+        value={formState.location.landmark}
+        onChange={(e) => handleInputChange('location', 'landmark', e.target.value)}
+        className="w-full p-2 border-0 rounded-md peer"
+        placeholder=" "
+      />
+      <label
+        htmlFor="landmark"
+        className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+      >
+        Landmark (Optional)
+      </label>
+    </div>
+  </div>
+)}
               {/* Add New Car Button */}
               {/* <button 
   type='button'
@@ -7115,151 +7238,102 @@ const handleGenerateEstimate = async () => {
 
   {/* Job Card specific fields */}
   {formState.arrivalStatus.leadStatus === 'Job Card' && (
-    <div className={`${isMobile ? 'flex flex-wrap gap-2 mb-3' : 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-3'}`}>
-      <input
-        type="text"
-        value={formState.arrivalStatus.batteryFeature}
-        onChange={(e) => handleInputChange('arrivalStatus', 'batteryFeature', e.target.value)}
-        placeholder="Battery Feature"
-        className="p-2 border border-gray-300 rounded-md w-full"
-        required
-      />
-      <input
-        type="text"
-        value={formState.arrivalStatus.fuelStatus}
-        onChange={(e) => handleInputChange('arrivalStatus', 'fuelStatus', e.target.value)}
-        placeholder="Fuel Status (Ex. 50%)"
-        className="p-2 border border-gray-300 rounded-md w-full"
-        required
-      />
-
-
-
-      {/* New layout for Inventory, Odometer, and Additional Work on mobile */}
-      {/* New layout for Inventory, Odometer, and Additional Work on mobile */}
-      {isMobile ? (
-        <div className="w-full flex flex-col gap-2">
-          {/* Line 1: Fuel Status and Odometer */}
-          <div className="flex w-full gap-2">
-            <div className="w-1/2">
-              <input
-                type="text"
-                value={formState.arrivalStatus.fuelStatus}
-                onChange={(e) => handleInputChange('arrivalStatus', 'fuelStatus', e.target.value)}
-                placeholder="Fuel Status (Ex. 50%)"
-                className="p-2 border border-gray-300 rounded-md w-full"
-                required
-              />
-            </div>
-            <div className="w-1/2">
-              <input
-                type="text"
-                value={formState.arrivalStatus.speedometerRd}
-                onChange={(e) => handleInputChange('arrivalStatus', 'speedometerRd', e.target.value)}
-                placeholder="Odometer"
-                className="p-2 border border-gray-300 rounded-md w-full"
-                required
-              />
-            </div>
-          </div>
-
-          {/* Line 2: Inventory and Additional Work */}
-          <div className="flex w-full gap-2">
-            <div className="w-1/2">
-              <textarea
-                value={formState.arrivalStatus.inventory}
-                onChange={(e) => handleInputChange('arrivalStatus', 'inventory', e.target.value)}
-                placeholder="Inventory"
-                className="p-2 border border-gray-300 rounded-md w-full h-full"
-                rows={3}
-                style={{ resize: 'vertical' }}
-              />
-            </div>
-             <div className="w-1/2 relative">
-        <textarea
-          value={formState.arrivalStatus.additionalWork}
-          onChange={(e) => handleAdditionalWorkChange(e.target.value)}
-          placeholder="Additional Work"
-          className="p-2 border border-gray-300 rounded-md w-full h-full"
-          rows={3}
-          style={{ resize: 'vertical' }}
-        />
-        {/* Rephrase Button */}
-        <button
-          type="button"
-          onClick={handleRephraseAdditionalWork}
-          className="absolute bottom-2 right-2 px-3 py-1 bg-yellow-500 text-white text-xs font-semibold rounded-md hover:bg-yellow-600 disabled:bg-yellow-300 transition-colors"
-          disabled={isRephrasing}
-        >
-          {isRephrasing ? '...' : 'Rephrase'}
-        </button>
-            </div>
-          </div>
+  <>
+    {/* DESKTOP VIEW */}
+    {!isMobile && (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+        {/* Battery Feature */}
+        <div className="relative border border-gray-300 rounded-md bg-white group">
+          <input
+            type="text"
+            id="batteryFeature"
+            value={formState.arrivalStatus.batteryFeature}
+            onChange={(e) => handleInputChange('arrivalStatus', 'batteryFeature', e.target.value)}
+            className="w-full p-2 border-0 rounded-md peer"
+            placeholder=" "
+            required
+          />
+          <label htmlFor="batteryFeature" className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1">
+            Battery Feature*
+          </label>
         </div>
-      ) : (
-        // Desktop layout remains the same (grid-based)
-        <>
+
+        {/* Fuel Status */}
+        <div className="relative border border-gray-300 rounded-md bg-white group">
+          <input
+            type="text"
+            id="fuelStatus"
+            value={formState.arrivalStatus.fuelStatus}
+            onChange={(e) => handleInputChange('arrivalStatus', 'fuelStatus', e.target.value)}
+            className="w-full p-2 border-0 rounded-md peer"
+            placeholder=" "
+            required
+          />
+          <label htmlFor="fuelStatus" className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1">
+            Fuel Status (e.g., 50%)*
+          </label>
+        </div>
+
+        {/* Odometer */}
+        <div className="relative border border-gray-300 rounded-md bg-white group">
+          <input
+            type="text"
+            id="speedometerRd"
+            value={formState.arrivalStatus.speedometerRd}
+            onChange={(e) => handleInputChange('arrivalStatus', 'speedometerRd', e.target.value)}
+            className="w-full p-2 border-0 rounded-md peer"
+            placeholder=" "
+            required
+          />
+          <label htmlFor="speedometerRd" className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1">
+            Odometer*
+          </label>
+        </div>
+
+        {/* Inventory */}
+        <div className="relative border border-gray-300 rounded-md bg-white group md:col-span-1">
           <textarea
+            id="inventory"
             value={formState.arrivalStatus.inventory}
             onChange={(e) => handleInputChange('arrivalStatus', 'inventory', e.target.value)}
-            placeholder="Inventory (one per line)&#10;- Item 1&#10;- Item 2"
-            className="p-2 border border-gray-300 rounded-md w-full"
+            className="w-full p-2 border-0 rounded-md peer"
+            placeholder=" "
             rows={4}
-        style={{ resize: 'vertical' }}
-      />
+            style={{ resize: 'vertical' }}
+          />
+          <label htmlFor="inventory" className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-[15px] peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1">
+            Inventory (one per line)
+          </label>
+        </div>
 
-      <input
-        type="text"
-        value={formState.arrivalStatus.speedometerRd}
-        onChange={(e) => handleInputChange('arrivalStatus', 'speedometerRd', e.target.value)}
-        placeholder="Odometer"
-        className="p-2 border border-gray-300 rounded-md w-full"
-        required
-      />
-      <div className="relative w-full">
+        {/* Additional Work */}
+        <div className="relative border border-gray-300 rounded-md bg-white group md:col-span-2">
   <textarea
+    id="additionalWork"
     value={formState.arrivalStatus.additionalWork}
-    onChange={(e) => handleAdditionalWorkChange(e.target.value)}
-    onFocus={() => {
-      // Show suggestions if there's already text
-      if (formState.arrivalStatus.additionalWork && formState.arrivalStatus.additionalWork.length >= 2) {
-        const suggestions = getFilteredSuggestions(formState.arrivalStatus.additionalWork);
-        setSuggestionStates(prev => ({
-          ...prev,
-          'additionalWork': {
-            isOpen: suggestions.length > 0,
-            suggestions: suggestions
-          }
-        }));
-      }
-    }}
+    onChange={handleAdditionalWorkChange}
+    onFocus={handleAdditionalWorkChange}
+    onKeyUp={handleAdditionalWorkChange}
+    onClick={handleAdditionalWorkChange}
     onBlur={(e) => {
-      // Check if click is within dropdown before closing
       const suggestionDropdown = e.currentTarget.parentElement.querySelector('.absolute.z-50');
       if (!suggestionDropdown || !suggestionDropdown.contains(e.relatedTarget)) {
         setTimeout(() => {
-          setSuggestionStates(prev => ({
-            ...prev,
-            'additionalWork': { ...prev['additionalWork'], isOpen: false }
-          }));
+          setSuggestionStates(prev => ({ ...prev, 'additionalWork': { ...prev['additionalWork'], isOpen: false } }));
         }, 300);
       }
     }}
-    placeholder="Additional Work (one per line)"
-    className="p-2 border border-gray-300 rounded-md w-full"
-    rows={3}
+    className="w-full p-2 border-0 rounded-md peer"
+    placeholder=" "
+    rows={4}
+    style={{ resize: 'vertical' }}
   />
-
-  {/* Rephrase Button */}
-  <button
-    type="button"
-    onClick={handleRephraseAdditionalWork}
-    className="absolute bottom-2 right-2 px-3 py-1 bg-yellow-500 text-white text-xs font-semibold rounded-md hover:bg-yellow-600 disabled:bg-yellow-300 transition-colors"
-    disabled={isRephrasing}
-  >
+  <label htmlFor="additionalWork" className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-[15px] peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1">
+    Additional Work (one per line)
+  </label>
+  <button type="button" onClick={handleRephraseAdditionalWork} className="absolute bottom-2 right-2 px-3 py-1 bg-yellow-500 text-white text-xs font-semibold rounded-md hover:bg-yellow-600 disabled:bg-yellow-300 transition-colors" disabled={isRephrasing}>
     {isRephrasing ? '...' : 'Rephrase'}
   </button>
-
   {suggestionStates['additionalWork']?.isOpen && suggestionStates['additionalWork']?.suggestions?.length > 0 && (
     <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
       {suggestionStates['additionalWork'].suggestions.map((service, suggestionIndex) => (
@@ -7269,21 +7343,89 @@ const handleGenerateEstimate = async () => {
           onClick={() => handleAdditionalWorkSuggestionSelect(service)}
         >
           <div className="font-medium text-sm text-gray-800">{service.title}</div>
-          <div className="text-xs text-gray-600 mt-1">
-            Price: {servicePrices[`${service.id}-${service.title}`] || "Determine"}
-          </div>
-          <div className="text-xs text-gray-500 mt-1">
-            Click to auto-fill description
-          </div>
+          <div className="text-xs text-gray-600 mt-1">Price: {servicePrices[`${service.id}-${service.title}`] || "Determine"}</div>
+          <div className="text-xs text-gray-500 mt-1">Click to auto-fill description</div>
         </div>
       ))}
     </div>
   )}
 </div>
-   </>
-      )}
+      </div>
+    )}
+
+    {/* MOBILE VIEW */}
+    {isMobile && (
+      <div className="flex flex-col gap-2 mb-3">
+        {/* Row 1: Battery & Fuel */}
+        <div className="flex w-full gap-2">
+          <div className="w-1/2 relative border border-gray-300 rounded-md bg-white group">
+            <input type="text" id="batteryFeatureMobile" value={formState.arrivalStatus.batteryFeature} onChange={(e) => handleInputChange('arrivalStatus', 'batteryFeature', e.target.value)} className="w-full p-2 border-0 rounded-md peer" placeholder=" " required />
+            <label htmlFor="batteryFeatureMobile" className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1">Battery Feature*</label>
+          </div>
+          <div className="w-1/2 relative border border-gray-300 rounded-md bg-white group">
+            <input type="text" id="fuelStatusMobile" value={formState.arrivalStatus.fuelStatus} onChange={(e) => handleInputChange('arrivalStatus', 'fuelStatus', e.target.value)} className="w-full p-2 border-0 rounded-md peer" placeholder=" " required />
+            <label htmlFor="fuelStatusMobile" className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1">Fuel Status*</label>
+          </div>
+        </div>
+        
+        {/* Row 2: Odometer & Inventory */}
+        <div className="flex w-full gap-2">
+            <div className="w-1/2 relative border border-gray-300 rounded-md bg-white group">
+                <input type="text" id="speedometerRdMobile" value={formState.arrivalStatus.speedometerRd} onChange={(e) => handleInputChange('arrivalStatus', 'speedometerRd', e.target.value)} className="w-full p-2 border-0 rounded-md peer" placeholder=" " required />
+                <label htmlFor="speedometerRdMobile" className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1">Odometer*</label>
+            </div>
+            <div className="w-1/2 relative border border-gray-300 rounded-md bg-white group">
+                <textarea id="inventoryMobile" value={formState.arrivalStatus.inventory} onChange={(e) => handleInputChange('arrivalStatus', 'inventory', e.target.value)} className="w-full p-2 border-0 rounded-md peer h-full" placeholder=" " rows={3} style={{ resize: 'vertical' }} />
+                <label htmlFor="inventoryMobile" className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-[15px] peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1">Inventory</label>
+            </div>
+        </div>
+
+        {/* Row 3: Additional Work */}
+        <div className="relative border border-gray-300 rounded-md bg-white group">
+  <textarea
+    id="additionalWorkMobile"
+    value={formState.arrivalStatus.additionalWork}
+    onChange={handleAdditionalWorkChange}
+    onFocus={handleAdditionalWorkChange}
+    onKeyUp={handleAdditionalWorkChange}
+    onClick={handleAdditionalWorkChange}
+    onBlur={(e) => {
+      const suggestionDropdown = e.currentTarget.parentElement.querySelector('.absolute.z-50');
+      if (!suggestionDropdown || !suggestionDropdown.contains(e.relatedTarget)) {
+        setTimeout(() => {
+          setSuggestionStates(prev => ({ ...prev, 'additionalWork': { ...prev['additionalWork'], isOpen: false } }));
+        }, 300);
+      }
+    }}
+    className="w-full p-2 border-0 rounded-md peer"
+    placeholder=" "
+    rows={3}
+    style={{ resize: 'vertical' }}
+  />
+  <label htmlFor="additionalWorkMobile" className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-[15px] peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1">
+    Additional Work
+  </label>
+  <button type="button" onClick={handleRephraseAdditionalWork} className="absolute bottom-2 right-2 px-2 py-1 bg-yellow-500 text-white text-xs font-semibold rounded hover:bg-yellow-600" disabled={isRephrasing}>
+    {isRephrasing ? '...' : 'Rephrase'}
+  </button>
+  {suggestionStates['additionalWork']?.isOpen && suggestionStates['additionalWork']?.suggestions?.length > 0 && (
+    <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+      {suggestionStates['additionalWork'].suggestions.map((service, suggestionIndex) => (
+        <div
+          key={`${service.id}-${service.title}-${suggestionIndex}`}
+          className="p-2 hover:bg-gray-100 cursor-pointer border-b text-sm"
+          onClick={() => handleAdditionalWorkSuggestionSelect(service)}
+        >
+          {service.title}
+        </div>
+      ))}
     </div>
   )}
+</div>
+      </div>
+    )}
+  </>
+)}
 {/* Payment Due specific field */}
 {/* // Around line 7000-7040, replace the Payment Due section with: */}
 {/* // Around line 7000-7100, replace the Payment Due section with: */}

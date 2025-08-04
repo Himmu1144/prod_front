@@ -142,19 +142,41 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     borderBottom: '1pt solid #e5e7eb',
   },
-  workshopItem: {
-    alignItems: 'center',
-    padding: 15,
-  },
-  workshopImage: {
-    width: 45,
-    height: 45,
-  },
-  workshopLabel: {
-    fontWeight: 'medium',
-    color: '#4b5563',
-    marginTop: 7.5,
-  },
+  // workshopItem: {
+  //   alignItems: 'center',
+  //   padding: 15,
+  // },
+  // workshopImage: {
+  //   width: 45,
+  //   height: 45,
+  // },
+  // workshopLabel: {
+  //   fontWeight: 'medium',
+  //   color: '#4b5563',
+  //   marginTop: 7.5,
+  // },
+  workshopCard: {
+  backgroundColor: '#fee2e2', // A very light red background
+  borderColor: '#fca5a5',     // A soft red border color
+  borderWidth: 1,
+  borderRadius: 5,
+  padding: 10,
+  width: '32%',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+workshopLabel: {
+  fontSize: 8,
+  fontFamily: 'OpenSans',
+  fontWeight: 700,
+  color: '#b91c1c', // A deep red for the label text
+  marginBottom: 4,
+},
+workshopItem: {
+  textAlign: 'center',
+},
+
+
   termsHeader: {
     backgroundColor: '#f3f4f6',
     padding: 7.5,
@@ -340,26 +362,33 @@ const PDFDocument = ({ data }) => {
           </View>
 
           {/* Workshop Details */}
-          <View style={styles.section}>
+           <View style={styles.section}>
             <Text style={styles.redHeader}>WORKSHOP DETAILS</Text>
             <View style={styles.grid3}>
-              <View style={styles.workshopItem}>
-                <Image src={garageIcon} style={styles.workshopImage} />
-                <Text style={styles.workshopLabel}>WORKSHOP</Text>
-                <Text>{mergedData.workshop}</Text>
+              {/* Card 1: Workshop */}
+              <View style={styles.workshopCard}>
+                <View style={styles.workshopItem}>
+                  <Text style={styles.workshopLabel}>WORKSHOP</Text>
+                  <Text>{mergedData.workshop}</Text>
+                </View>
               </View>
-              <View style={styles.workshopItem}>
-                <Image src={timeTableIcon} style={styles.workshopImage} />
-                <Text style={styles.workshopLabel}>DATE & TIME</Text>
-                <Text>{mergedData.arrival_time}</Text>
+              {/* Card 2: Date & Time */}
+              <View style={styles.workshopCard}>
+                <View style={styles.workshopItem}>
+                  <Text style={styles.workshopLabel}>DATE & TIME</Text>
+                  <Text>{mergedData.arrival_time}</Text>
+                </View>
               </View>
-              <View style={styles.workshopItem}>
-                <Image src={qaIcon} style={styles.workshopImage} />
-                <Text style={styles.workshopLabel}>QA BY</Text>
-                <Text>ONLYBIGCARS ENGINEER</Text>
+              {/* Card 3: QA By */}
+              <View style={styles.workshopCard}>
+                <View style={styles.workshopItem}>
+                  <Text style={styles.workshopLabel}>QA BY</Text>
+                  <Text>ONLYBIGCARS ENGINEER</Text>
+                </View>
               </View>
             </View>
           </View>
+          
 
           {/* Vehicle Images */}
           <View style={styles.section}>
