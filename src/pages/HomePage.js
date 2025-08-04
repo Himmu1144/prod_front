@@ -2051,9 +2051,12 @@ const excelData = response.data.leads.map(lead => ({
                                             </td>
                                             {!isMobile &&<td className="p-2">
                                                 <div className="h-12 overflow-hidden group-hover:h-auto transition-all duration-200">
-                                                    {lead.orderId}<br />
-                                                    {lead.regNumber}
-                                                </div>
+    {lead.orderId}<br />
+    
+    <span className={lead.reg_llm ? "text-green-500 font-medium" : ""}>
+        {lead.regNumber}
+    </span>
+</div>
                                             </td>}
                                             {/* <td className="p-2">
                                                 <div className="h-12 overflow-hidden group-hover:h-auto transition-all duration-200">
