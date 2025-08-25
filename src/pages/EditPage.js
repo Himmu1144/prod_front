@@ -4,7 +4,7 @@ import { Alert } from 'react-bootstrap';
 import './editpage.css';
 import React, { useState, useEffect, useRef, useContext, useMemo, useCallback } from 'react';
 import { Card, Button, Collapse, Form, Row, Col } from 'react-bootstrap';
-import { FaMapMarkerAlt, FaPencilAlt , FaEdit, FaTimes, FaWhatsapp} from 'react-icons/fa';
+import { FaMapMarkerAlt, FaPencilAlt , FaEdit, FaTimes, FaWhatsapp, FaMicrophone} from 'react-icons/fa';
 import AddNewCar from './addcar';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -23,6 +23,7 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Estimate from './estimate.js';
 import { FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
+import { X } from 'lucide-react';
 
 // import { toast } from 'react-toastify';
 
@@ -136,6 +137,8 @@ const EditPage = () => {
   // Add this line near the top of your component
   const [currentCarIndex, setCurrentCarIndex] = useState(0);
   const [isFromWorkshop, setIsFromWorkshop] = useState(false);
+  const [originalCaName, setOriginalCaName] = useState(null); // Add this line
+
 
   const [selectedImages, setSelectedImages] = useState([]);
   const [existingImageUrls, setExistingImageUrls] = useState([]);
@@ -172,6 +175,9 @@ const EditPage = () => {
   const [isSendingJobCard, setIsSendingJobCard] = useState(false);
   // Add these with your other state declarations
   const [isSendingEstimate, setIsSendingEstimate] = useState(false);
+  // ...existing state variables...
+const [isSendingPreEstimate, setIsSendingPreEstimate] = useState(false);
+// ...existing code...
   // Add this with your other state declarations
   const [showSendCardPopup, setShowSendCardPopup] = useState(false);
   // Add these with your other state declarations
@@ -187,6 +193,8 @@ const [warrantyDetails, setWarrantyDetails] = useState({
   warranty: '',
 });
 const [isRephrasing, setIsRephrasing] = useState(false);
+const [isRephrasingAdditionalWork, setIsRephrasingAdditionalWork] = useState(false);
+const [isRephrasingCceComments, setIsRephrasingCceComments] = useState(false);
 const [imageToPreview, setImageToPreview]=useState(null);
 const [gstTimer, setGstTimer] = useState(0);
 const [maxGstTime] = useState(120); // 2 minutes in seconds
@@ -214,6 +222,7 @@ const [statusCounterData, setStatusCounterData] = useState({
   doorstep_count: 0,
   at_workshop_count: 0,
   job_card_count: 0,
+  pre_estimate_count: 0,
   payment_due_count: 0,
   commission_due_count: 0,
   completed_count: 0
@@ -365,6 +374,187 @@ const handleRemoveExistingCommissionImage = (index) => {
   updatedExistingImages.splice(index, 1);
   setExistingCommissionImageUrls(updatedExistingImages);
 };
+
+
+
+const textareaRef = useRef(null);       // ref to the textarea element
+// inside your component function, add these hooks near other hooks:
+const [dictatingField, setDictatingField] = useState(null); 
+// const recognitionRef = useRef(null);
+// const startingValueRef = useRef('');   // value of textarea when dictation starts
+// const finalTranscriptRef = useRef('');  // accumulates final results
+
+// // Start dictation (replace your existing startDictation with this)
+// const startDictation = () => {
+//   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+//   if (!SpeechRecognition) {
+//     alert('Speech recognition is not supported in this browser (use Chrome/Edge).');
+//     return;
+//   }
+
+//   // remember the current textarea value so we append to it
+//   startingValueRef.current = formState.arrivalStatus.additionalWork || '';
+//   finalTranscriptRef.current = ''; // reset accumulated finals
+
+//   const recognition = new SpeechRecognition();
+//   recognition.lang = 'en-US'; // change to 'hi-IN' etc if needed
+//   recognition.interimResults = true;
+//   recognition.continuous = true;
+
+//   // --- REPLACED onresult handler: uses event.resultIndex to avoid duplicates ---
+//   recognition.onresult = (event) => {
+//     let interim = '';
+
+//     // Only process new results (avoid reprocessing older finals)
+//     for (let i = event.resultIndex; i < event.results.length; i++) {
+//       const result = event.results[i];
+//       if (result.isFinal) {
+//         // add a space after each finalized chunk to avoid word concatenation
+//         finalTranscriptRef.current += result[0].transcript + ' ';
+//       } else {
+//         interim += result[0].transcript;
+//       }
+//     }
+
+//     // Build text: original value at start + newline separator + finalized + interim
+//     const base = startingValueRef.current || '';
+//     const separator = base ? (base.endsWith('\n') ? '' : '\n') : '';
+//     const finalPart = (finalTranscriptRef.current || '').trim();
+//     const newText = base + separator + (finalPart ? finalPart + ' ' : '') + interim;
+
+//     // call your existing handler so other logic still runs
+//     try {
+//       handleAdditionalWorkChange({ target: { id: 'additionalWork', value: newText } });
+//     } catch (err) {
+//       // fallback to direct textarea update if handler has different signature
+//       if (textareaRef.current) textareaRef.current.value = newText;
+//       console.error('handleAdditionalWorkChange call failed:', err);
+//     }
+//   };
+//   // ---------------------------------------------------------------------------
+
+//   recognition.onerror = (event) => {
+//     console.error('Speech recognition error:', event.error);
+//     setIsListening(false);
+//   };
+
+//   recognition.onend = () => {
+//     setIsListening(false);
+//     recognitionRef.current = null;
+//   };
+
+//   recognition.start();
+//   recognitionRef.current = recognition;
+//   setIsListening(true);
+// };
+
+
+// // Stop dictation
+// const stopDictation = () => {
+//   if (recognitionRef.current) {
+//     try {
+//       recognitionRef.current.stop();
+//     } catch (e) {
+//       /* ignore */
+//     }
+//     recognitionRef.current = null;
+//   }
+//   setIsListening(false);
+// };
+
+// // Toggle simple helper
+// const toggleDictation = () => {
+//   if (isListening) stopDictation();
+//   else startDictation();
+// };
+
+
+// Around line 384
+// REPLACE the existing startDictation, stopDictation, and toggleDictation functions
+
+const recognitionRef = useRef(null);
+const startingValueRef = useRef('');
+const finalTranscriptRef = useRef('');
+
+// --- NEW GENERIC DICTATION FUNCTIONS ---
+
+const startDictation = (section, field) => {
+  // Stop any other dictation that might be running
+  if (recognitionRef.current) {
+    stopDictation();
+  }
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    alert('Speech recognition is not supported in this browser (use Chrome/Edge).');
+    return;
+  }
+
+  // Get the current value of the target field
+  startingValueRef.current = formState[section]?.[field] || '';
+  finalTranscriptRef.current = ''; // Reset accumulated finals
+
+  const recognition = new SpeechRecognition();
+  recognition.lang = 'en-US';
+  recognition.interimResults = true;
+  recognition.continuous = true;
+
+  recognition.onresult = (event) => {
+    let interim = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const result = event.results[i];
+      if (result.isFinal) {
+        finalTranscriptRef.current += result[0].transcript + ' ';
+      } else {
+        interim += result[0].transcript;
+      }
+    }
+
+    const base = startingValueRef.current || '';
+    const separator = base ? (base.endsWith('\n') ? '' : '\n') : '';
+    const finalPart = (finalTranscriptRef.current || '').trim();
+    const newText = base + separator + (finalPart ? finalPart + ' ' : '') + interim;
+
+    // Use the generic handleInputChange to update the correct state
+    handleInputChange(section, field, newText);
+  };
+
+  recognition.onerror = (event) => {
+    console.error('Speech recognition error:', event.error);
+    setDictatingField(null);
+  };
+
+  recognition.onend = () => {
+    setDictatingField(null);
+    recognitionRef.current = null;
+  };
+
+  recognition.start();
+  recognitionRef.current = recognition;
+  setDictatingField(field); // Set which field is currently being dictated
+};
+
+const stopDictation = () => {
+  if (recognitionRef.current) {
+    try {
+      recognitionRef.current.stop();
+    } catch (e) {
+      /* ignore */
+    }
+    recognitionRef.current = null;
+  }
+  setDictatingField(null);
+};
+
+const toggleDictation = (section, field) => {
+  if (dictatingField === field) {
+    stopDictation();
+  } else {
+    startDictation(section, field);
+  }
+};
+
+
 
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -578,6 +768,23 @@ const StatusHistoryDisplay = ({ statusHistory, statusCounterData = {} }) => {
     return null;
   };
 
+  // ADD THIS NEW FUNCTION
+  const getLatestEntryForStatus = (statusToCheck) => {
+    if (!Array.isArray(statusHistory) || statusHistory.length === 0) {
+      return null;
+    }
+    
+    // Find the most recent entry that matches the status
+    for (let i = statusHistory.length - 1; i >= 0; i--) {
+      const entry = statusHistory[i];
+      if (entry && typeof entry === 'object' && entry.status && entry.status.toLowerCase().trim() === statusToCheck.toLowerCase().trim()) {
+        return entry;
+      }
+    }
+    
+    return null;
+  };
+
   const getStatusComments = (statusToCheck) => {
     if (!Array.isArray(statusHistory) || statusHistory.length === 0) {
       return [];
@@ -625,6 +832,7 @@ const StatusHistoryDisplay = ({ statusHistory, statusCounterData = {} }) => {
             const counterInfo = getCounterDisplay(status);
             const timestamp = hasThisStatus ? getLatestStatusTimestamp(status) : null;
             const comments = hasThisStatus ? getStatusComments(status) : [];
+            const latestEntry = hasThisStatus ? getLatestEntryForStatus(status) : null; // GET THE LATEST ENTRY
             
             return (
               <div 
@@ -645,6 +853,12 @@ const StatusHistoryDisplay = ({ statusHistory, statusCounterData = {} }) => {
                   </div>
                   {timestamp && (
                     <span className="text-xs text-gray-500">{timestamp}</span>
+                  )}
+
+                  {latestEntry && latestEntry.changed_by && (
+                    <div className="text-sm text-gray-500 mt-1">
+                      CCE : {latestEntry.changed_by}
+                    </div>
                   )}
                   
                   {comments.length > 0 && (
@@ -811,6 +1025,7 @@ const StatusHistoryDisplay = ({ statusHistory, statusCounterData = {} }) => {
       total: 0, // Sync with basicInfo,
 
     },
+    assignment_history: [],
     sellBuyInfo: {
     dealerName: '',
     dealerNumber: '',
@@ -1113,6 +1328,8 @@ useEffect(() => {
           // Restructure the incoming data to match formState structure
           const leadData = response.data[0];
 
+          setOriginalCaName(leadData.caName || null);
+
         
 
            // If the lead has images, store them in state
@@ -1260,6 +1477,7 @@ if (leadData.commission_images && Array.isArray(leadData.commission_images)) {
             },
             created_at: leadData.created_at,
             updated_at: leadData.updated_at,
+            assignment_history: leadData.assignment_history || [],
             warranty:leadData.warranty || '', 
           });
 
@@ -1967,23 +2185,42 @@ const getAllServices = () => {
 const getFilteredSuggestions = (query) => {
   if (!query || query.length < 2) return [];
 
-  const allServices = getAllServices();
-  const queryLC = query.toLowerCase(); // Lowercase the query once for efficiency
+  const queryLC = query.toLowerCase();
 
-  return allServices.filter(service => {
-    // 1. Check if the title matches
-    const titleMatch = service.title.toLowerCase().includes(queryLC);
+  const results = allIndividualServices
+    .filter(service => service.toLowerCase().includes(queryLC))
+    .map(service => {
+      const serviceLC = service.toLowerCase();
+      let score = 0;
 
-    // 2. Combine all HTML details into one string
-    const detailsHtml = `${service.description || ''} ${service.workshopServices || ''} ${service.doorstepServices || ''}`;
-    
-    // 3. Strip HTML tags and check if the details text matches
-    const detailsText = stripHtml(detailsHtml);
-    const detailsMatch = detailsText.toLowerCase().includes(queryLC);
+      // Highest score for an exact match or starting with the query
+      if (serviceLC.startsWith(queryLC)) {
+        score = 3;
+      }
+      // Next highest score if the query matches a whole word
+      else if (new RegExp(`\\b${queryLC}\\b`).test(serviceLC)) {
+        score = 2;
+      }
+      // Lowest score for just including the query
+      else {
+        score = 1;
+      }
+      
+      return { service, score };
+    })
+    // Sort by score (descending), then alphabetically (ascending)
+    .sort((a, b) => {
+      if (a.score !== b.score) {
+        return b.score - a.score;
+      }
+      return a.service.localeCompare(b.service);
+    })
+    // Extract just the service name from the sorted objects
+    .map(item => item.service)
+    // Finally, limit to the top 5 results
+    .slice(0, 5);
 
-    // Return true if either the title or details match
-    return titleMatch || detailsMatch;
-  }).slice(0, 5); // Limit to 5 suggestions
+  return results;
 };
 
 // Function to handle suggestion selection
@@ -3565,6 +3802,35 @@ if (selectedCommissionImages.length > 0) {
     ]   
 };
 
+const allIndividualServices = useMemo(() => {
+  const serviceSet = new Set();
+  const parser = new DOMParser();
+
+  // Helper function to parse HTML and add list items to the set
+  const parseAndAdd = (htmlString) => {
+    if (!htmlString) return;
+    const doc = parser.parseFromString(htmlString, 'text/html');
+    const items = doc.querySelectorAll('li');
+    items.forEach(item => {
+      const text = item.textContent.trim();
+      if (text) {
+        serviceSet.add(text);
+      }
+    });
+  };
+
+  // Iterate over all service packages and their details
+  Object.values(serviceCards).flat().forEach(service => {
+    parseAndAdd(service.description);
+    parseAndAdd(service.workshopServices);
+    parseAndAdd(service.doorstepServices);
+  });
+
+  // Convert the set to an array and return it
+  return Array.from(serviceSet);
+}, []); // The empty dependency array ensures this runs only once
+
+
 const handleDeleteCar = (index) => {
   setFormState(prev => {
     const newCars = [...prev.cars];
@@ -3694,7 +3960,7 @@ const filteredServices = useMemo(() => {
   const [isOpen, setIsOpen] = useState(true);
   const [isOpenRight, setIsOpenRight] = useState(false);
   const [isOpenLeft, setIsOpenLeft] = useState(false); // Set to true by default to show status history
-  
+    const [isAssignmentHistoryOpen, setIsAssignmentHistoryOpen] = useState(false);
   const [source, setSource] = useState('Checkout');
   const [customer, setCustomer] = useState('Customer');
   const [customerNumber, setCustomerNumber] = useState('6381234057');
@@ -3977,13 +4243,13 @@ const handleRephraseWarranty = async () => {
 
 
 const handleRephraseAdditionalWork = async () => {
+  stopDictation();
   const currentWork = formState.arrivalStatus.additionalWork;
   if (!currentWork || !currentWork.trim()) {
       toast.warn('Please enter some text to rephrase.', { position: "top-right" });
       return;
   }
-
-  setIsRephrasing(true);
+  setIsRephrasingAdditionalWork(true);
   try {
       const response = await axios.post(
           'https://admin.onlybigcars.com/api/rephrase-text/',
@@ -4009,7 +4275,7 @@ const handleRephraseAdditionalWork = async () => {
       console.error('Error rephrasing text:', error);
       toast.error(error.response?.data?.error || 'An error occurred while rephrasing.', { position: "top-right" });
   } finally {
-      setIsRephrasing(false);
+      setIsRephrasingAdditionalWork(false);
   }
 };
 
@@ -4341,9 +4607,46 @@ const handleAdditionalWorkChange = (e) => {
   }));
 };
 
+const handleRephraseCceComments = async () => {
+  stopDictation();
+  const currentComments = formState.basicInfo.cceComments;
+  if (!currentComments || !currentComments.trim()) {
+      toast.warn('Please enter some comments to rephrase.', { position: "top-right" });
+      return;
+  }
+
+  setIsRephrasingCceComments(true);
+  try {
+      const response = await axios.post(
+          'https://admin.onlybigcars.com/api/rephrase-text/',
+          { 
+            text: currentComments,
+            context: 'cce_comments' // Add context for better backend prompting
+          },
+          {
+              headers: {
+                  'Authorization': `Token ${token}`,
+              }
+          }
+      );
+
+      if (response.data && response.data.rephrased_text) {
+          handleInputChange('basicInfo', 'cceComments', response.data.rephrased_text);
+          toast.success('Comments rephrased successfully!', { position: "top-right" });
+      } else {
+          toast.error(response.data.error || 'Failed to get rephrased text.', { position: "top-right" });
+      }
+  } catch (error) {
+      console.error('Error rephrasing text:', error);
+      toast.error(error.response?.data?.error || 'An error occurred while rephrasing.', { position: "top-right" });
+  } finally {
+      setIsRephrasingCceComments(false);
+  }
+};
+
 
 // Function to handle suggestion selection for additional work
-const handleAdditionalWorkSuggestionSelect = (service) => {
+const handleAdditionalWorkSuggestionSelect = (serviceText) => {
   // Close suggestions
   setSuggestionStates(prev => ({
     ...prev,
@@ -4351,31 +4654,31 @@ const handleAdditionalWorkSuggestionSelect = (service) => {
   }));
   
   // Extract service description (same logic as subcategory)
- const getServiceDescription = () => {
-    if (["Comprehensive Service", "Standard Service", "Basic Service"].includes(service.title)) {
-      const serviceList = activeViews[service.title] === 'workshop' 
-        ? service.workshopServices 
-        : service.doorstepServices;
+//  const getServiceDescription = () => {
+//     if (["Comprehensive Service", "Standard Service", "Basic Service"].includes(service.title)) {
+//       const serviceList = activeViews[service.title] === 'workshop' 
+//         ? service.workshopServices 
+//         : service.doorstepServices;
       
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(serviceList, 'text/html');
-      const items = doc.querySelectorAll('li');
-      return Array.from(items).map(item => item.textContent.trim()).join(', ');
-    } else {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(service.description, 'text/html');
-      const items = doc.querySelectorAll('li');
-      return Array.from(items).map(item => item.textContent.trim()).join(', ');
-    }
-  };
+//       const parser = new DOMParser();
+//       const doc = parser.parseFromString(serviceList, 'text/html');
+//       const items = doc.querySelectorAll('li');
+//       return Array.from(items).map(item => item.textContent.trim()).join(', ');
+//     } else {
+//       const parser = new DOMParser();
+//       const doc = parser.parseFromString(service.description, 'text/html');
+//       const items = doc.querySelectorAll('li');
+//       return Array.from(items).map(item => item.textContent.trim()).join(', ');
+//     }
+//   };
   
-  // Fill the additional work field with the service description
-  const description = getServiceDescription();
+//   // Fill the additional work field with the service description
+//   const description = getServiceDescription();
  const currentText = formState.arrivalStatus.additionalWork;
   const { start, end } = activeLineInfo;
 
-  // Replace only the active line with the new description
-  const newText = currentText.substring(0, start) + description + currentText.substring(end);
+  // Replace only the active line with the selected service text
+  const newText = currentText.substring(0, start) + serviceText + currentText.substring(end);
   
   // Update the form state with the modified text
   handleInputChange('arrivalStatus', 'additionalWork', newText);
@@ -4913,7 +5216,119 @@ const handleSendEstimate = async () => {
   }
 };
 
+
 // ...existing code...
+
+const handleSendPreEstimate = async () => {
+  if (!formState.customerInfo.whatsappNumber && !formState.customerInfo.mobileNumber) {
+    toast.error('No WhatsApp number found for customer', {
+      position: "top-right",
+      autoClose: 3000,
+    });
+    return;
+  }
+
+  setIsSendingPreEstimate(true);
+  setShowEstimate(true);
+  
+  try {
+    // Wait for component to render
+    await new Promise(resolve => setTimeout(resolve, 4000));
+    
+    if (estimateRef.current) {
+      // Generate PDF blob
+      const pdfBlob = await estimateRef.current.generatePDFBlob();
+      
+      if (!pdfBlob) {
+        throw new Error('Failed to generate pre-estimate PDF');
+      }
+
+      // Get token
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      // Prepare form data
+      const formData = new FormData();
+      
+      // Generate dynamic filename (same logic as JobCard)
+      const sanitizeForFilename = (text) => text ? text.replace(/[^a-zA-Z0-9\-_]/g, '_') : '';
+      const brandPart = sanitizeForFilename(formState.cars[0]?.carBrand || '');
+      const modelPart = sanitizeForFilename(formState.cars[0]?.carModel || '');
+      const orderPart = formState.arrivalStatus.orderId ? `-${sanitizeForFilename(formState.arrivalStatus.orderId)}` : '';
+      
+      const dynamicFilename = `Pre-Estimate-${brandPart}-${modelPart}${orderPart}.pdf`;
+      
+      formData.append('pdf', pdfBlob, dynamicFilename);
+      formData.append('whatsapp_number', formState.customerInfo.whatsappNumber || formState.customerInfo.mobileNumber);
+      formData.append('customer_name', formState.customerInfo.customerName || 'Customer');
+      formData.append('lead_id', id || '');
+      formData.append('car_brand', formState.cars[0]?.carBrand || '');
+      formData.append('car_model', formState.cars[0]?.carModel || '');
+      formData.append('order_id', formState.arrivalStatus.orderId || '');
+
+      // Log details for debugging
+      console.log('Sending Pre-Estimate with details:', {
+        whatsapp_number: formState.customerInfo.whatsappNumber || formState.customerInfo.mobileNumber,
+        customer_name: formState.customerInfo.customerName || 'Customer',
+        lead_id: id || '',
+        car_brand: formState.cars[0]?.carBrand || '',
+        car_model: formState.cars[0]?.carModel || '',
+        order_id: formState.arrivalStatus.orderId || '',
+        pdf_size: pdfBlob.size
+      });
+
+      // Send to backend
+      const response = await axios.post(
+        'https://admin.onlybigcars.com/api/send-pre-estimate/',
+        formData,
+        {
+          headers: {
+            'Authorization': `Token ${token}`,
+            // Don't set Content-Type manually when using FormData
+          }
+        }
+      );
+
+      if (response.data.success) {
+        toast.success(`Pre-Estimate sent successfully! File: ${response.data.filename}`, {
+          position: "top-right",
+          autoClose: 4000,
+        });
+        
+        // Update the statusCounterData state in real-time (using pre_estimate_count)
+        setStatusCounterData(prevData => ({
+          ...prevData,
+          pre_estimate_count: (prevData.pre_estimate_count || 0) + 1
+        }));
+        
+        // Close the reminder popup and proceed with save
+        setShowReminderPopup(false);
+        
+      } else {
+        toast.error(response.data.message || 'Failed to send Pre-Estimate', {
+          position: "top-right",
+          autoClose: 3000,
+        });
+      }
+    } else {
+      throw new Error('Estimate reference not available');
+    }
+  } catch (error) {
+    console.error('Error sending Pre-Estimate:', error);
+    console.error('Error details:', error.response?.data);
+    toast.error('Failed to send Pre-Estimate: ' + (error.response?.data?.message || error.message), {
+      position: "top-right",
+      autoClose: 4000,
+    });
+  } finally {
+    setIsSendingPreEstimate(false);
+    setShowEstimate(false);
+  }
+};
+
+
 
 const handleGenerateBill = async () => {
   setIsGeneratingBill(true);
@@ -5402,6 +5817,14 @@ const handleGenerateEstimate = async () => {
   } 
 };
 
+
+const statusesToHideDateTime = [
+    "At Workshop",
+    "Job Card",
+    "Payment Due",
+    "Commision Due",
+    "Completed"
+];
   return (
     <Layout>
       <ToastContainer />
@@ -5612,60 +6035,50 @@ const handleGenerateEstimate = async () => {
 
 
 <div className="dropdown-container" style={{ marginTop: "15px" }}>
-  <Button
-    onClick={() => setIsOpenLeft(!isOpenLeft)}
-    variant="dark"
-    className={`w-full d-flex justify-content-between align-items-center rounded-bottom-0 ${isOpenLeft ? 'border-bottom-0' : ''}`}
-  >
-    Status History
-    {isOpenLeft ? <FaChevronUp /> : <FaChevronDown />}
-  </Button>
-
-  <Collapse in={isOpenLeft} mountOnEnter={true} unmountOnExit={false}>
-    <div>
-      <Card className="rounded-top-0 border-top-0">
-        <Card.Body>
-          <StatusHistoryDisplay 
-  statusHistory={formState.arrivalStatus.status_history} 
-  statusCounterData={statusCounterData}
-/>
-          {/* Add Status Counter Display */}
-          {/* <div className="mt-4 p-3 bg-gray-50 rounded">
-            <h5 className="mb-3 font-medium">Status Counters</h5>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="flex justify-between">
-                <span>Follow Up:</span>
-                <span className="font-medium">{statusCounterData.follow_up_count}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Dead:</span>
-                <span className="font-medium">{statusCounterData.dead_count}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Job Card:</span>
-                <span className="font-medium">{statusCounterData.job_card_count}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Completed:</span>
-                <span className="font-medium">{statusCounterData.completed_count}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>At Workshop:</span>
-                <span className="font-medium">{statusCounterData.at_workshop_count}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Payment Due:</span>
-                <span className="font-medium">{statusCounterData.payment_due_count}</span>
-              </div>
-           
-            </div>
-          </div> */}
-        </Card.Body>
-      </Card>
-    </div>
-  </Collapse>
-  </div>
+    <Button
+        onClick={() => setIsAssignmentHistoryOpen(!isAssignmentHistoryOpen)}
+        variant="dark"
+        className={`w-full d-flex justify-content-between align-items-center rounded-bottom-0 ${isAssignmentHistoryOpen ? 'border-bottom-0' : ''}`}
+    >
+        CCE History
+        {isAssignmentHistoryOpen ? <FaChevronUp /> : <FaChevronDown />}
+    </Button>
+    <Collapse in={isAssignmentHistoryOpen}>
+        <div>
+            <Card className="rounded-top-0 border-top-0">
+                <Card.Body style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                    {formState.assignment_history && formState.assignment_history.length > 0 ? (
+                        <div className="assignment-history-container p-2">
+                            {formState.assignment_history.map((entry, index) => (
+                                <div key={index} className="mb-3 p-2 border-bottom">
+                                    <p className="mb-1">
+                                        <strong className="text-primary">{entry.changed_by}</strong> changed CCE to <strong className="text-success">{entry.assigned_to}</strong>
+                                    </p>
+                                    <small className="text-muted">
+                                        {new Date(entry.timestamp).toLocaleString('en-IN', {
+                                            day: '2-digit',
+                                            month: 'short',
+                                            year: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                            hour12: true
+                                        })}
+                                    </small>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center text-muted p-3">
+                            No assignment history available.
+                        </div>
+                    )}
+                </Card.Body>
+            </Card>
+        </div>
+    </Collapse>
 </div>
+</div>
+
             {/* <div className="dropdown-container" style={{ marginTop: "15px" }}>
               <Button
                 onClick={() => setIsOpenLeft(!isOpenLeft)}
@@ -5762,7 +6175,7 @@ const handleGenerateEstimate = async () => {
     </div>
 
     {/* Section 2: Amount & Vehicle */}
-    <div className="flex-1 bg-gray-100 p-2 rounded-md space-y-1">
+    {/* <div className="flex-1 bg-gray-100 p-2 rounded-md space-y-1">
       <div>
         <span className="text-gray-500 block">AMOUNT PAID</span>
         <span className="font-semibold text-green-600">₹{formState.overview.finalAmount || 0}</span>
@@ -5775,7 +6188,41 @@ const handleGenerateEstimate = async () => {
             : 'No Car'}
         </span>
       </div>
+    </div> */}
+
+    {/* Section 2: Amount & Vehicle */}
+<div className="flex-1 bg-gray-100 p-2 rounded-md space-y-2">
+  {/* Amounts Section */}
+  <div className="flex">
+    {/* Paid Amount */}
+    <div className="w-1/2 pr-2 border-r border-gray-300">
+      <span className="text-gray-500 block text-xs">PAID</span>
+      <span className="font-semibold text-green-600">
+        ₹{formState.arrivalStatus.paidAmount || 0}
+      </span>
     </div>
+    {/* Pending Amount */}
+    <div className="w-1/2 pl-2">
+      <span className="text-gray-500 block text-xs">PENDING</span>
+      <span className="font-semibold text-red-600">
+        ₹{formState.arrivalStatus.pendingAmount || 0}
+      </span>
+    </div>
+  </div>
+
+  {/* Separator */}
+  <div className="border-t border-gray-300"></div>
+
+  {/* Vehicle Section */}
+  <div>
+    <span className="text-gray-500 block">VEHICLE</span>
+    <span className="font-semibold text-gray-800 truncate">
+      {formState.cars.length > 0 
+        ? `${formState.cars[selectedCarIndex]?.carBrand || ''} ${formState.cars[selectedCarIndex]?.carModel || ''}`
+        : 'No Car'}
+    </span>
+  </div>
+</div>
 
     {/* Section 3: Dates */}
     <div className="flex-1 bg-gray-100 p-2 rounded-md space-y-1">
@@ -5797,17 +6244,41 @@ const handleGenerateEstimate = async () => {
                 {/* Top Section */}
                 {!isMobile && (<div className="flex justify-between">
                   {/* Order Info Box */}
-                  <div className="p-3 border border-gray-200 rounded" style={{ backgroundColor: "#DEE1E6" }}>
+                  {/* <div className="p-3 border border-gray-200 rounded" style={{ backgroundColor: "#DEE1E6" }}>
                     <div style={{ backgroundColor: "white", border: "1px solid black", borderRadius: "4px", padding: "10px" }}>
                       <p className="text-sm m-0"> {formatLeadId(formState.customerInfo.mobileNumber, seqNum) || id || 'No Lead ID'}</p>
                       <p className="text-sm my-1"> Converted By: {formState.basicInfo.cceName || 'Not Assigned'}</p>
                     </div>
-                    {/* Payment Status Box */}
+               
                     <div className="mt-3 p-3 rounded" style={{ background: "#DEE1E6" }}>
-                      {/* <p className="text-sm m-0">Payment Status: Payment Failed</p> */}
+
                       <p className="text-sm my-1">Amount Paid: {formState.overview.finalAmount || 0} Rs.</p>
                     </div>
-                  </div>
+                  </div> */}
+
+    <div className="p-3 border border-gray-200 rounded" style={{ backgroundColor: "#DEE1E6" }}>
+  <div style={{ backgroundColor: "white", border: "1px solid black", borderRadius: "4px", padding: "10px" }}>
+    <p className="text-sm m-0"> {formatLeadId(formState.customerInfo.mobileNumber, seqNum) || id || 'No Lead ID'}</p>
+    <p className="text-sm my-1"> Converted By: {formState.basicInfo.cceName || 'Not Assigned'}</p>
+  </div>
+  {/* Payment Status Box */}
+  <div className="mt-3 p-3 rounded" style={{ background: "#DEE1E6" }}>
+    <div className="flex flex-col space-y-2">
+      <div className="flex items-center">
+        <span className="text-sm mr-2">Paid Amount :</span>
+        <span className="text-sm font-semibold text-green-600">
+          ₹{formState.arrivalStatus.paidAmount || 0}
+        </span>
+      </div>
+      <div className="flex items-center">
+        <span className="text-sm mr-2">Pending Amount :</span>
+        <span className="text-sm font-semibold text-red-600">
+          ₹{formState.arrivalStatus.pendingAmount || 0}
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
 
                   {/* Right Side Info */}
                   <div className="text-left p-2">
@@ -7050,25 +7521,52 @@ const handleGenerateEstimate = async () => {
   className={`w-full p-3 border rounded h-30 resize-none ${isMobile ? 'hidden' : ''}`}
   required={!isAdmin}
 />
-    <div className="flex-1 flex items-center justify-end gap-2">
+     {/* Modified button container for mobile responsiveness */}
+    <div className={`${isMobile ? 'flex flex-col gap-2 w-full' : 'flex-1 flex items-center justify-end gap-2'}`}>
+      
+      {/* Send Pre-Estimate Button */}
+  <Button
+    variant="outline-success"
+    type="button"
+    disabled={isSubmitting || isSendingPreEstimate}
+    onClick={handleSendPreEstimate}
+    className={`position-relative d-flex align-items-center ${isMobile ? 'w-full justify-center' : 'h-fit'}`}
+      >
+    {isSendingPreEstimate ? (
+      <>
+        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+        <span className="animate-pulse">Sending Pre Estimate...</span>
+      </>
+    ) : (
+      <>
+        <span className="me-2">
+          {statusCounterData.pre_estimate_count > 0 ? 'Resend Pre Estimate' : 'Send Pre-Estimate'}
+        </span>
+        <span 
+          className="badge bg-success"
+          title={`Pre-Estimate sent ${statusCounterData.pre_estimate_count || 0} time(s)`}
+        >
+          {statusCounterData.pre_estimate_count || 0}
+        </span>
+      </>
+    )}
+  </Button>
       <Button
         variant="outline-dark"
         type="button"
         onClick={handleGenerateEstimate}
-        className="h-fit"
+        className={`${isMobile ? 'w-full' : 'h-fit'}`}
       >
         Generate Estimate
       </Button>
       
-      {/* Send Estimate Button beside Generate Estimate */}
-      {/* {cards && (['Follow Up','Communicate To Ops','Referred To Ops','Walkin','Pickup','Doorstep','At Workshop','Estimate', 'Job Card', 'Payment Due', 'Commision Due', 'Bill', 'Completed'].includes(formState.arrivalStatus.leadStatus)) && ( */}
   <Button
     variant="outline-success"
     type="button"
     disabled={isSubmitting || isSendingEstimate}
     onClick={handleSendEstimate}
-    className="position-relative d-flex align-items-center h-fit"
-  >
+    className={`position-relative d-flex align-items-center ${isMobile ? 'w-full justify-center' : 'h-fit'}`}
+      >
     {isSendingEstimate ? (
       <>
         <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
@@ -7077,7 +7575,7 @@ const handleGenerateEstimate = async () => {
     ) : (
       <>
         <span className="me-2">
-          {statusCounterData.payment_due_count > 0 ? 'Resend Estimate' : 'Send Estimate'}
+          {statusCounterData.payment_due_count > 0 ? 'Resend Estimate' : 'Send Post Estimate'}
         </span>
         <span 
           className="badge bg-success"
@@ -7088,7 +7586,7 @@ const handleGenerateEstimate = async () => {
       </>
     )}
   </Button>
-{/* )}     */}
+
     </div>
   </div>
 
@@ -7143,7 +7641,7 @@ const handleGenerateEstimate = async () => {
     <select
       value={formState.arrivalStatus.leadStatus}
       onChange={(e) => handleInputChange('arrivalStatus', 'leadStatus', e.target.value)}
-      className={`p-2 border border-gray-300 rounded-md w-full`}
+      className={`border border-gray-300 rounded-md w-full ${isMobile ? 'py-3' : 'p-2'}`}
     >
       <option value="">Lead Status*</option>
       {formState.basicInfo.carType === "Sell/Buy" ? (
@@ -7191,13 +7689,14 @@ const handleGenerateEstimate = async () => {
       placeholder="Date and Time*"
       className={`p-2 border border-gray-300 rounded-md w-full`}
       required={!isAdmin}
+            disabled={statusesToHideDateTime.includes(formState.arrivalStatus.leadStatus)}
     />
 {!['Job Card', 'Payment Due', 'Commision Due', 'Completed'].includes(formState.arrivalStatus.leadStatus) && (
       <>
     <select
       value={formState.arrivalStatus.arrivalMode}
       onChange={(e) => handleInputChange('arrivalStatus', 'arrivalMode', e.target.value)}
-      className="p-2 border border-gray-300 rounded-md"
+      className={`border border-gray-300 rounded-md w-full ${isMobile ? 'py-3' : 'p-2'}`}
       required={!isAdmin}
     >
       <option value="">Arrival Mode*</option>
@@ -7262,9 +7761,26 @@ const handleGenerateEstimate = async () => {
         <div className="relative border border-gray-300 rounded-md bg-white group">
           <input
             type="text"
+            pattern="\d*"
+            inputMode="numeric"
             id="fuelStatus"
             value={formState.arrivalStatus.fuelStatus}
-            onChange={(e) => handleInputChange('arrivalStatus', 'fuelStatus', e.target.value)}
+            onChange={(e) => {
+                const value = e.target.value;
+                // Allow only digits (0-9) and an empty string
+                if (/^\d*$/.test(value)) {
+                  // If the value is not empty, parse it as an integer
+                  let numericValue = value === '' ? '' : parseInt(value, 10);
+                  
+                  // Ensure the value does not exceed 100
+                  if (numericValue > 100) {
+                    numericValue = 100;
+                  }
+                  
+                  // Update the form state with the validated value
+                  handleInputChange('arrivalStatus', 'fuelStatus', numericValue.toString());
+                }
+            }}
             className="w-full p-2 border-0 rounded-md peer"
             placeholder=" "
             required
@@ -7272,6 +7788,9 @@ const handleGenerateEstimate = async () => {
           <label htmlFor="fuelStatus" className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1">
             Fuel Status (e.g., 50%)*
           </label>
+          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
+    %
+    </div>
         </div>
 
         {/* Odometer */}
@@ -7307,7 +7826,7 @@ const handleGenerateEstimate = async () => {
         </div>
 
         {/* Additional Work */}
-        <div className="relative border border-gray-300 rounded-md bg-white group md:col-span-2">
+        {/* <div className="relative border border-gray-300 rounded-md bg-white group md:col-span-2">
   <textarea
     id="additionalWork"
     value={formState.arrivalStatus.additionalWork}
@@ -7350,7 +7869,93 @@ const handleGenerateEstimate = async () => {
     </div>
   )}
 </div>
+      </div> */}
+
+  <div className="relative border border-gray-300 rounded-md bg-white group md:col-span-2">
+  <textarea
+    id="additionalWork"
+    ref={textareaRef}
+    value={formState.arrivalStatus.additionalWork}
+    onChange={handleAdditionalWorkChange}
+    onFocus={handleAdditionalWorkChange}
+    onKeyUp={handleAdditionalWorkChange}
+    onClick={handleAdditionalWorkChange}
+    onBlur={(e) => {
+      const suggestionDropdown = e.currentTarget.parentElement.querySelector('.absolute.z-50');
+      if (!suggestionDropdown || !suggestionDropdown.contains(e.relatedTarget)) {
+        setTimeout(() => {
+          setSuggestionStates(prev => ({ ...prev, 'additionalWork': { ...prev['additionalWork'], isOpen: false } }));
+        }, 300);
+      }
+    }}
+    className="w-full p-2 border-0 rounded-md peer"
+    placeholder=" "
+    rows={4}
+    style={{ resize: 'vertical' }}
+  />
+  <label htmlFor="additionalWork" className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-[15px] peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1">
+    Additional Work (one per line)
+  </label>
+
+  {formState.arrivalStatus.additionalWork && (
+      <button
+          type="button"
+          onClick={() => handleInputChange('arrivalStatus', 'additionalWork', '')}
+          className="absolute top-2 right-2 p-1 text-gray-400 hover:text-red-600 rounded-full transition-colors"
+          title="Clear"
+      >
+          <X size={16} />
+      </button>
+    )}
+
+  {/* Dictation button: placed left of Rephrase (adjust spacing classes if you need) */}
+  <button
+  type="button"
+  // CHANGE THE onClick HANDLER HERE
+  onClick={() => toggleDictation('arrivalStatus', 'additionalWork')}
+  className={`absolute bottom-2 right-24 px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+    // AND CHANGE THE CONDITION HERE
+    dictatingField === 'additionalWork' ? 'bg-red-500 text-white hover:bg-red-600' : 'bg-green-500 text-white hover:bg-green-600'
+  }`}
+  // ALSO CHANGE THE ARIA-PRESSED CONDITION
+  aria-pressed={dictatingField === 'additionalWork'}
+  aria-live="polite"
+>
+  {/* AND THE TEXT CONDITION */}
+  {dictatingField === 'additionalWork' ? '⏹ Stop' : '🎤 Dictate'}
+</button>
+
+  <button
+    type="button"
+    onClick={handleRephraseAdditionalWork}
+    className="absolute bottom-2 right-2 px-3 py-1 bg-yellow-500 text-white text-xs font-semibold rounded-md hover:bg-yellow-600 disabled:bg-yellow-300 transition-colors"
+    disabled={isRephrasingAdditionalWork}
+  >
+    {isRephrasingAdditionalWork ? '...' : 'Rephrase'}
+  </button>
+
+  {dictatingField === 'additionalWork' && (
+    <div className="absolute bottom-10 right-2 text-sm text-green-600 font-medium">
+      Listening... 🎧
+    </div>
+  )}
+
+  {suggestionStates['additionalWork']?.isOpen && suggestionStates['additionalWork']?.suggestions?.length > 0 && (
+  <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+    {suggestionStates['additionalWork'].suggestions.map((service, suggestionIndex) => (
+      <div
+        key={suggestionIndex} // Use index as key since service is a string
+        className="p-2 hover:bg-gray-100 cursor-pointer border-b text-sm"
+        onClick={() => handleAdditionalWorkSuggestionSelect(service)} // Pass the service string directly
+      >
+        {service}
       </div>
+    ))}
+  </div>
+)}
+</div>
+
+ </div> 
     )}
 
     {/* MOBILE VIEW */}
@@ -7399,24 +8004,34 @@ const handleGenerateEstimate = async () => {
     }}
     className="w-full p-2 border-0 rounded-md peer"
     placeholder=" "
-    rows={3}
+    rows={5}
     style={{ resize: 'vertical' }}
   />
   <label htmlFor="additionalWorkMobile" className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-[15px] peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1">
     Additional Work
   </label>
-  <button type="button" onClick={handleRephraseAdditionalWork} className="absolute bottom-2 right-2 px-2 py-1 bg-yellow-500 text-white text-xs font-semibold rounded hover:bg-yellow-600" disabled={isRephrasing}>
-    {isRephrasing ? '...' : 'Rephrase'}
+  {formState.arrivalStatus.additionalWork && (
+      <button
+          type="button"
+          onClick={() => handleInputChange('arrivalStatus', 'additionalWork', '')}
+          className="absolute top-2 right-2 p-1 text-gray-400 hover:text-red-600 rounded-full transition-colors z-10"
+          title="Clear"
+      >
+          <X size={16} />
+      </button>
+    )}
+  <button type="button" onClick={handleRephraseAdditionalWork} className="absolute bottom-2 right-2 px-2 py-1 bg-yellow-500 text-white text-xs font-semibold rounded hover:bg-yellow-600" disabled={isRephrasingAdditionalWork}>
+    {isRephrasingAdditionalWork ? '...' : 'Rephrase'}
   </button>
-  {suggestionStates['additionalWork']?.isOpen && suggestionStates['additionalWork']?.suggestions?.length > 0 && (
+    {suggestionStates['additionalWork']?.isOpen && suggestionStates['additionalWork']?.suggestions?.length > 0 && (
     <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
       {suggestionStates['additionalWork'].suggestions.map((service, suggestionIndex) => (
         <div
-          key={`${service.id}-${service.title}-${suggestionIndex}`}
+          key={suggestionIndex} // Use index for key since service is a string
           className="p-2 hover:bg-gray-100 cursor-pointer border-b text-sm"
-          onClick={() => handleAdditionalWorkSuggestionSelect(service)}
+          onClick={() => handleAdditionalWorkSuggestionSelect(service)} // Pass the service string directly
         >
-          {service.title}
+          {service} {/* Render the service string directly */}
         </div>
       ))}
     </div>
@@ -7430,8 +8045,8 @@ const handleGenerateEstimate = async () => {
 {/* // Around line 7000-7040, replace the Payment Due section with: */}
 {/* // Around line 7000-7100, replace the Payment Due section with: */}
 
-{(formState.arrivalStatus.leadStatus === 'Payment Due' || formState.arrivalStatus.leadStatus === 'Commision Due') && (
-  <div className={`${isMobile ? 'grid grid-cols-1 gap-2 mb-3' : 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-3'}`}>
+{formState.arrivalStatus.leadStatus === 'Payment Due' && (
+  <div className={`${isMobile ? 'grid grid-cols-1 gap-2 mb-3' : 'grid grid-cols-1 md:grid-cols-1 gap-4 mb-3'}`}>
     {(() => {
       const validation = getPaymentValidation();
       return (
@@ -7562,107 +8177,286 @@ const handleGenerateEstimate = async () => {
   )} */}
 
   {/* Commission Due specific fields */}
-  {(formState.arrivalStatus.leadStatus === 'Commision Due') && (
-    <div className={`${isMobile ? 'grid grid-cols-2 gap-2 mb-3' : 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-3'}`}>
-      <div className="relative border border-gray-300 rounded-md bg-white group">
-        <input
-          type="text" 
-          value={formState.arrivalStatus.commissionDue === 0 ? '0' : formState.arrivalStatus.commissionDue}
-          onChange={(e) => handleCommissionChange('commissionDue', e.target.value)}
-          className="w-full p-2 border-0 focus:outline-none rounded-md peer"
-          disabled={location.state?.previousStatus === "Completed"}
-          required
-          id="commissionDue"
-        />
-        <label 
-          htmlFor="commissionDue" 
-          className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
-        >
-          Commision Due
-        </label>
-      </div>
+    {/* Commission Due specific fields */}
+      {formState.arrivalStatus.leadStatus === 'Commision Due' && (
+        <>
+          {/* --- DESKTOP VIEW --- */}
+          {!isMobile && (
+            <>
+              {/* Row 1: Final Amount, Commission Received, Commission Percent */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                {/* Final Amount Field */}
+                {(() => {
+                  const validation = getPaymentValidation();
+                  return (
+                    <div className="relative border border-gray-300 rounded-md bg-white group">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={formState.arrivalStatus.finalAmount ?? ''}
+                        onChange={(e) => handlePaymentFieldChange('finalAmount', e.target.value)}
+                        className={`w-full p-2 border-0 focus:outline-none rounded-md peer ${validation.isInvalid ? 'bg-red-50 text-red-700' : ''}`}
+                        required
+                        id="finalAmount"
+                        placeholder=" "
+                      />
+                      <label
+                        htmlFor="finalAmount"
+                        className={`absolute duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1 ${validation.isInvalid ? 'text-red-600' : 'text-gray-500'}`}
+                      >
+                        Final Amount
+                      </label>
+                    </div>
+                  );
+                })()}
 
-      <div className="relative border border-gray-300 rounded-md bg-white group">
-        <input
-          type="text" 
-          value={formState.arrivalStatus.commissionReceived === 0 ? '0' : formState.arrivalStatus.commissionReceived}
-          onChange={(e) => handleCommissionChange('commissionReceived', e.target.value)}
-          className="w-full p-2 border-0 focus:outline-none rounded-md peer"
-          disabled={location.state?.previousStatus === "Completed"}
-          required
-          id="commissionReceived"
-        />
-        <label 
-          htmlFor="commissionReceived" 
-          className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
-        >
-          Commission Received
-        </label>
-      </div>
+                {/* Commission Received Field */}
+                <div className="relative border border-gray-300 rounded-md bg-white group">
+                  <input
+                    type="text"
+                    value={formState.arrivalStatus.commissionReceived === 0 ? '0' : formState.arrivalStatus.commissionReceived}
+                    onChange={(e) => handleCommissionChange('commissionReceived', e.target.value)}
+                    className="w-full p-2 border-0 focus:outline-none rounded-md peer"
+                    disabled={location.state?.previousStatus === "Completed"}
+                    required
+                    id="commissionReceived"
+                  />
+                  <label
+                    htmlFor="commissionReceived"
+                    className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+                  >
+                    Commission Received
+                  </label>
+                </div>
 
-      <div className="relative">
-        <input
-          type="text"
-          value={formState.arrivalStatus.commissionPercent === 0 ? '0' : formState.arrivalStatus.commissionPercent}
-          onChange={(e) => handleCommissionChange('commissionPercent', e.target.value)}
-          placeholder="Commission Percent"
-          className="p-2 pr-7 border border-gray-300 rounded-md w-full"
-          disabled={location.state?.previousStatus === "Completed"}
-          required
-        />
-        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
-          %
-        </div>
+                {/* Commission Percent Field */}
+                <div className="relative border border-gray-300 rounded-md bg-white group">
+                  <input
+                    type="text"
+                    id="commissionPercent"
+                    value={formState.arrivalStatus.commissionPercent === 0 ? '0' : formState.arrivalStatus.commissionPercent}
+                    onChange={(e) => handleCommissionChange('commissionPercent', e.target.value)}
+                    className="w-full p-2 pr-7 border-0 focus:outline-none rounded-md peer"
+                    placeholder=" "
+                    disabled={location.state?.previousStatus === "Completed"}
+                    required
+                  />
+                  <label
+                    htmlFor="commissionPercent"
+                    className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+                  >
+                    Commission Percent
+                  </label>
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
+                    %
+                  </div>
+                </div>
+              </div>
 
-      </div>
-      {/* <select
-          value={formState.arrivalStatus.commissionModeOfPayment}
-          onChange={(e) => handleInputChange('arrivalStatus', 'commissionModeOfPayment', e.target.value)}
-          className="p-2 border border-gray-300 rounded-md"
-          required
-        >
-          <option value="">Commission Mode of Payment</option>
-          <option value="Cash">Cash</option>
-          <option value="UPI">UPI (Gokul)</option>
-          <option value="UPI Loknath">UPI (Loknath)</option>
-          <option value="Net Banking">Net Banking (OnlyBigCars)</option>
-        </select> */}
+              {/* Row 2: Commission Due, GST Percent */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                {/* Commission Due Field */}
+                <div className="relative border border-gray-300 rounded-md bg-white group">
+                  <input
+                    type="text"
+                    value={formState.arrivalStatus.commissionDue === 0 ? '0' : formState.arrivalStatus.commissionDue}
+                    onChange={(e) => handleCommissionChange('commissionDue', e.target.value)}
+                    className="w-full p-2 border-0 focus:outline-none rounded-md peer"
+                    disabled={location.state?.previousStatus === "Completed"}
+                    required
+                    id="commissionDue"
+                  />
+                  <label
+                    htmlFor="commissionDue"
+                    className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+                  >
+                    Commission Due
+                  </label>
+                </div>
 
-      <div className={`relative border border-gray-300 rounded-md bg-white group ${isMobile ? 'col-span-2' : ''}`}>
-        <input
-          type="number"
-          min="0"
-          max="100"
-          step="0.01"
-          value={formState.arrivalStatus.gst === 0 ? '' : (formState.arrivalStatus.gst || '')}
-          onChange={(e) => {
-            const value = e.target.value;
-            if (value === '' || (!isNaN(value) && parseFloat(value) >= 0 && parseFloat(value) <= 100)) {
-              handleInputChange('arrivalStatus', 'gst', value);
-            }
-          }}
-          onKeyPress={(e) => {
-            if (!/[0-9.]/.test(e.key) && !['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-              e.preventDefault();
-            }
-          }}
-          className="w-full p-2 pr-7 border-0 focus:outline-none rounded-md peer placeholder-transparent"
-          disabled={location.state?.previousStatus === "Completed"}
-          id="gstField"
-          placeholder=" "
-        />
-        <label 
-          htmlFor="gstField" 
-          className="absolute text-gray-500 duration-300 transform scale-75 -translate-y-4 top-2 z-10 origin-[0] bg-white px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:scale-75 peer-focus:-translate-y-4 peer-focus:top-2 left-1"
-        >
-          GST % (Suggested: {calculateAverageGST(formState.overview.tableData)}%)
-        </label>
-        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
-          %
-        </div>
-      </div>
-    </div>
-  )}
+                {/* GST % Field */}
+                <div className="relative border border-gray-300 rounded-md bg-white group">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={formState.arrivalStatus.gst === 0 ? '' : (formState.arrivalStatus.gst || '')}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || (!isNaN(value) && parseFloat(value) >= 0 && parseFloat(value) <= 100)) {
+                        handleInputChange('arrivalStatus', 'gst', value);
+                      }
+                    }}
+                    onKeyPress={(e) => {
+                      if (!/[0-9.]/.test(e.key) && !['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                        e.preventDefault();
+                      }
+                    }}
+                    className="w-full p-2 pr-7 border-0 focus:outline-none rounded-md peer placeholder-transparent"
+                    disabled={location.state?.previousStatus === "Completed"}
+                    id="gstField"
+                    placeholder=" "
+                  />
+                  <label
+                    htmlFor="gstField"
+                    className="absolute text-gray-500 duration-300 transform scale-75 -translate-y-4 top-2 z-10 origin-[0] bg-white px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:scale-75 peer-focus:-translate-y-4 peer-focus:top-2 left-1"
+                  >
+                    GST % (Suggested: {calculateAverageGST(formState.overview.tableData)}%)
+                  </label>
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
+                    %
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* --- MOBILE VIEW --- */}
+          {isMobile && (
+            <>
+              {/* Final Amount (Original Layout for Mobile) */}
+              <div className="grid grid-cols-1 gap-2 mb-3">
+                {(() => {
+                  const validation = getPaymentValidation();
+                  return (
+                    <div className="relative border border-gray-300 rounded-md bg-white group">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={formState.arrivalStatus.finalAmount ?? ''}
+                        onChange={(e) => handlePaymentFieldChange('finalAmount', e.target.value)}
+                        className={`w-full p-2 border-0 focus:outline-none rounded-md peer ${validation.isInvalid ? 'bg-red-50 text-red-700' : ''}`}
+                        required
+                        id="finalAmountMobile"
+                        placeholder=" "
+                      />
+                      <label
+                        htmlFor="finalAmountMobile"
+                        className={`absolute duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1 ${validation.isInvalid ? 'text-red-600' : 'text-gray-500'}`}
+                      >
+                        Final Amount
+                      </label>
+                    </div>
+                  );
+                })()}
+              </div>
+              {/* Commission and GST Fields (Original Layout for Mobile) */}
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <div className="relative border border-gray-300 rounded-md bg-white group">
+                  <input
+                    type="text"
+                    value={formState.arrivalStatus.commissionDue === 0 ? '0' : formState.arrivalStatus.commissionDue}
+                    onChange={(e) => handleCommissionChange('commissionDue', e.target.value)}
+                    className="w-full p-2 border-0 focus:outline-none rounded-md peer"
+                    disabled={location.state?.previousStatus === "Completed"}
+                    required
+                    id="commissionDueMobile"
+                  />
+                  <label
+                    htmlFor="commissionDueMobile"
+                    className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+                  >
+                    Commision Due
+                  </label>
+                </div>
+
+                <div className="relative border border-gray-300 rounded-md bg-white group">
+                  <input
+                    type="text"
+                    value={formState.arrivalStatus.commissionReceived === 0 ? '0' : formState.arrivalStatus.commissionReceived}
+                    onChange={(e) => handleCommissionChange('commissionReceived', e.target.value)}
+                    className="w-full p-2 border-0 focus:outline-none rounded-md peer"
+                    disabled={location.state?.previousStatus === "Completed"}
+                    required
+                    id="commissionReceivedMobile"
+                  />
+                  <label
+                    htmlFor="commissionReceivedMobile"
+                    className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+                  >
+                    Commission Received
+                  </label>
+                </div>
+
+                {/* <div className="relative">
+                  <input
+                    type="text"
+                    value={formState.arrivalStatus.commissionPercent === 0 ? '0' : formState.arrivalStatus.commissionPercent}
+                    onChange={(e) => handleCommissionChange('commissionPercent', e.target.value)}
+                    placeholder="Commission Percent"
+                    className="p-2 pr-7 border border-gray-300 rounded-md w-full"
+                    disabled={location.state?.previousStatus === "Completed"}
+                    required
+                  />
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
+                    %
+                  </div>
+                </div> */}
+
+                 <div className="relative border border-gray-300 rounded-md bg-white group">
+                  <input
+                    type="text"
+                    id="commissionPercent"
+                    value={formState.arrivalStatus.commissionPercent === 0 ? '0' : formState.arrivalStatus.commissionPercent}
+                    onChange={(e) => handleCommissionChange('commissionPercent', e.target.value)}
+                    className="w-full p-2 pr-7 border-0 focus:outline-none rounded-md peer"
+                    placeholder=" "
+                    disabled={location.state?.previousStatus === "Completed"}
+                    required
+                  />
+                  <label
+                    htmlFor="commissionPercent"
+                    className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+                  >
+                    Commission Percent
+                  </label>
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
+                    %
+                  </div>
+                </div>
+              {/* </div> */}
+
+                <div className={`relative border border-gray-300 rounded-md bg-white group`}>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={formState.arrivalStatus.gst === 0 ? '' : (formState.arrivalStatus.gst || '')}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || (!isNaN(value) && parseFloat(value) >= 0 && parseFloat(value) <= 100)) {
+                        handleInputChange('arrivalStatus', 'gst', value);
+                      }
+                    }}
+                    onKeyPress={(e) => {
+                      if (!/[0-9.]/.test(e.key) && !['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                        e.preventDefault();
+                      }
+                    }}
+                    className="w-full p-2 pr-7 border-0 focus:outline-none rounded-md peer placeholder-transparent"
+                    disabled={location.state?.previousStatus === "Completed"}
+                    id="gstFieldMobile"
+                    placeholder=" "
+                  />
+                  <label
+                    htmlFor="gstFieldMobile"
+                    className="absolute text-gray-500 duration-300 transform scale-75 -translate-y-4 top-2 z-10 origin-[0] bg-white px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:scale-75 peer-focus:-translate-y-4 peer-focus:top-2 left-1"
+                  >
+                    GST % (Suggested: {calculateAverageGST(formState.overview.tableData)}%)
+                  </label>
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
+                    %
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </>
+      )}
 
   
 {/* Find the end of Vehicle Images section and add these RIGHT AFTER: */}
@@ -8381,9 +9175,17 @@ const handleGenerateEstimate = async () => {
           required={!isAdmin}
         >
           <option value="">Select Technician</option>
-          {users.map(user => (
+          <option value="Ritu">Ritu</option>
+          <option value="obcamarjeet">obcamarjeet</option>
+          <option value="Sahil">Sahil</option>
+          <option value="Gokul">Gokul</option>
+          <option value="Anjali">Anjali</option>
+          <option value="Loknath">Loknath</option>
+          
+          
+          {/* {users.map(user => (
               <option key={user.id} value={user.username}>{user.username}</option>
-            ))}
+            ))} */}
         </Form.Select>
       </div>
     </Col>
@@ -8400,9 +9202,17 @@ const handleGenerateEstimate = async () => {
             className="bg-light"
           >
             <option value="">Select CCE</option>
-            {users.map(user => (
+            <option value="Anjali">Anjali</option>
+            <option value="shreyans">shreyans</option>
+            <option value="himanshu">himanshu</option>
+            <option value="Ritu">Ritu</option>
+            <option value="Gokul">Gokul</option>
+            <option value="Sahil">Sahil</option>
+            <option value="Loknath">Loknath</option>
+            <option value="obcamarjeet">obcamarjeet</option>
+            {/* {users.map(user => (
               <option key={user.id} value={user.username}>{user.username}</option>
-            ))}
+            ))} */}
           </Form.Select>
         ) : (
           <Form.Control
@@ -8418,7 +9228,7 @@ const handleGenerateEstimate = async () => {
 </Row>
 
                 {/* Comments Section */}
-                <Form.Group>
+                {/* <Form.Group>
                   <Form.Control
                     as="textarea"
                     value={formState.basicInfo.cceComments}
@@ -8427,7 +9237,42 @@ const handleGenerateEstimate = async () => {
                     required={!isAdmin}
                     style={{ height: '120px', resize: 'none' }}
                   />
-                </Form.Group>
+                </Form.Group> */}
+
+                <Form.Group className="relative">
+                  <div className="relative">
+  <Form.Control
+    as="textarea"
+    value={formState.basicInfo.cceComments}
+    onChange={(e) => handleInputChange('basicInfo', 'cceComments', e.target.value)}
+    placeholder={`Comments From ${formState.basicInfo.cceName || user?.username || 'CCE'}*`}
+    required={!isAdmin}
+    style={{ height: '120px', resize: 'none', paddingRight: '85px' }} // Add padding to avoid text under the button
+    />
+{!isMobile && (
+  <button
+    type="button"
+    onClick={() => toggleDictation('basicInfo', 'cceComments')}
+    className={`absolute bottom-2 right-24 p-2 rounded-full transition-colors ${
+      dictatingField === 'cceComments' 
+        ? 'bg-red-500 text-white' 
+        : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+    }`}
+    title="Dictate CCE Comments"
+  >
+    <FaMicrophone />
+  </button>
+)}
+   <button
+      type="button"
+      onClick={handleRephraseCceComments}
+      className="absolute bottom-2 right-2 px-3 py-1 bg-yellow-500 text-white text-xs font-semibold rounded-md hover:bg-yellow-600 disabled:bg-yellow-300 transition-colors"
+      disabled={isRephrasingCceComments}
+    >
+      {isRephrasingCceComments ? '...' : 'Rephrase'}
+    </button>
+  </div>
+</Form.Group>
               </div>
 
             </div>
@@ -8713,7 +9558,8 @@ Generate Bill
                   <Button 
   variant="danger"
   type="submit" 
-  disabled={isSubmitting}
+  disabled={isSubmitting || (formState.basicInfo.cceName !== user?.username  && originalCaName !==user?.username && formState.basicInfo.cceName !== "workshop" && !isAdmin)}
+  title={formState.basicInfo.cceName !== user?.username && formState.basicInfo.cceName !== "workshop" && !isAdmin ? "You can only save leads assigned to you or from workshop" : ""}
   className="relative flex items-center justify-center min-w-[120px]"
   onClick={(e) => {
     e.preventDefault();
@@ -9465,7 +10311,7 @@ Generate Bill
   ) : (
     <>
       <span className="me-2">
-        {statusCounterData.payment_due_count > 0 ? 'Resend Estimate' : 'Send Estimate'}
+        {statusCounterData.payment_due_count > 0 ? 'Resend Estimate' : 'Send Post Estimate'}
       </span>
       <span 
         className="badge bg-dark"

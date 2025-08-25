@@ -156,27 +156,52 @@ const styles = StyleSheet.create({
   //   marginTop: 7.5,
   // },
   workshopCard: {
-  backgroundColor: '#fee2e2', // A very light red background
-  borderColor: '#fca5a5',     // A soft red border color
-  borderWidth: 1,
-  borderRadius: 5,
-  padding: 10,
-  width: '32%',
-  alignItems: 'center',
-  justifyContent: 'center',
-},
-workshopLabel: {
-  fontSize: 8,
-  fontFamily: 'OpenSans',
-  fontWeight: 700,
-  color: '#b91c1c', // A deep red for the label text
-  marginBottom: 4,
-},
-workshopItem: {
-  textAlign: 'center',
-},
-
-
+    backgroundColor: '#fff5f5',
+    borderColor: '#fca5a5',
+    borderWidth: 1,
+    borderRadius: 6,
+    padding: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '32%',
+    minHeight: 55,
+  },
+  workshopIconWrapper: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#fecaca',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  workshopIcon: {
+    width: 18,
+    height: 18,
+  },
+  workshopTextBlock: {
+    flexDirection: 'column',
+    flex: 1,
+  },
+  workshopLabel: {
+    fontSize: 7,
+    fontFamily: 'OpenSans',
+    fontWeight: 700,
+    letterSpacing: 0.5,
+    color: '#b91c1c',
+    marginBottom: 2,
+  },
+  workshopValue: {
+    fontSize: 9,
+    fontFamily: 'OpenSans',
+    fontWeight: 400,
+    color: '#111827',
+  },
+  workshopCardsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    break: 'avoid',
+  },
   termsHeader: {
     backgroundColor: '#f3f4f6',
     padding: 7.5,
@@ -235,6 +260,16 @@ const PDFDocument = ({ data }) => {
     images:[],
   };
   const mergedData = { ...defaultData, ...data };
+
+  const rawInventory = mergedData.inventory;
+  const normalizedInventoryArray = Array.isArray(rawInventory)
+    ? rawInventory
+    : (rawInventory || '').split('\n');
+  const cleanedInventoryItems = normalizedInventoryArray
+    .map(item => (item ?? '').toString().trim())
+    .filter(item => item && item.toLowerCase() !== 'na' && item.toLowerCase() !== 'n/a');
+
+
 
   const terms = [
     "1. Pickup & Drop Service - OnlyBigCars offers FREE pickup and drop service, subject to driver availability (hereafter referred to as \"Valet\").",
@@ -304,7 +339,7 @@ const PDFDocument = ({ data }) => {
                 </View>
                 <View style={styles.row}>
                   <Text style={styles.label}>Fuel Status</Text>
-                  <Text style={styles.value}>{mergedData.fuelStatus}</Text>
+                  <Text style={styles.value}>{mergedData.fuelStatus}%</Text>
                 </View>
                 <View style={styles.row}>
                   <Text style={styles.label}>Odometer</Text>
@@ -313,29 +348,29 @@ const PDFDocument = ({ data }) => {
               </View>
             </View>
           </View>
-
-          {/* Inventory Section */}
-          <View style={styles.section}>
-            <Text style={styles.redHeader}>INVENTORY LIST</Text>
-            <View style={styles.grid3}>
-              {mergedData.inventory.split('\n').filter(item => item.trim()).reduce((columns, item, index) => {
-                const colIndex = index % 3;
-                if (!columns[colIndex]) columns[colIndex] = [];
-                columns[colIndex].push({ text: item, number: index + 1 });
-                return columns;
-              }, []).map((column, colIndex) => (
-                <View key={colIndex} style={{ width: '33%' }}>
-                  {column.map(item => (
-                    <View key={item.number} style={styles.inventoryItem}>
-                      <Text style={styles.number}>{item.number}.</Text>
-                      <Text>{item.text}</Text>
-                    </View>
-                  ))}
-                </View>
-              ))}
+  {/* Inventory Section */}
+         {cleanedInventoryItems.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.redHeader}>INVENTORY LIST</Text>
+              <View style={styles.grid3}>
+                {cleanedInventoryItems.reduce((columns, item, index) => {
+                  const colIndex = index % 3;
+                  if (!columns[colIndex]) columns[colIndex] = [];
+                  columns[colIndex].push({ text: item, number: index + 1 });
+                  return columns;
+                }, []).map((column, colIndex) => (
+                  <View key={colIndex} style={{ width: '33%' }}>
+                    {column.map(item => (
+                      <View key={item.number} style={styles.inventoryItem}>
+                        <Text style={styles.number}>{item.number}.</Text>
+                        <Text>{item.text}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ))}
+              </View>
             </View>
-          </View>
-
+          )}
           {/* Work Summary */}
           <View style={styles.section}>
             <Text style={styles.redHeader}>WORK SUMMARY</Text>
@@ -361,34 +396,42 @@ const PDFDocument = ({ data }) => {
             </Text>
           </View>
 
+         
           {/* Workshop Details */}
-           <View style={styles.section}>
+          <View style={styles.section}>
             <Text style={styles.redHeader}>WORKSHOP DETAILS</Text>
-            <View style={styles.grid3}>
-              {/* Card 1: Workshop */}
+            <View style={styles.workshopCardsRow}>
               <View style={styles.workshopCard}>
-                <View style={styles.workshopItem}>
+                <View style={styles.workshopIconWrapper}>
+                  <Image src={garageIcon} style={styles.workshopIcon} />
+                </View>
+                <View style={styles.workshopTextBlock}>
                   <Text style={styles.workshopLabel}>WORKSHOP</Text>
-                  <Text>{mergedData.workshop}</Text>
+                  <Text style={styles.workshopValue}>{mergedData.workshop || 'N/A'}</Text>
                 </View>
               </View>
-              {/* Card 2: Date & Time */}
+
               <View style={styles.workshopCard}>
-                <View style={styles.workshopItem}>
+                <View style={styles.workshopIconWrapper}>
+                  <Image src={timeTableIcon} style={styles.workshopIcon} />
+                </View>
+                <View style={styles.workshopTextBlock}>
                   <Text style={styles.workshopLabel}>DATE & TIME</Text>
-                  <Text>{mergedData.arrival_time}</Text>
+                  <Text style={styles.workshopValue}>{mergedData.arrival_time || 'N/A'}</Text>
                 </View>
               </View>
-              {/* Card 3: QA By */}
+
               <View style={styles.workshopCard}>
-                <View style={styles.workshopItem}>
+                <View style={styles.workshopIconWrapper}>
+                  <Image src={qaIcon} style={styles.workshopIcon} />
+                </View>
+                <View style={styles.workshopTextBlock}>
                   <Text style={styles.workshopLabel}>QA BY</Text>
-                  <Text>ONLYBIGCARS ENGINEER</Text>
+                  <Text style={styles.workshopValue}>ONLYBIGCARS ENGINEER</Text>
                 </View>
               </View>
             </View>
           </View>
-          
 
           {/* Vehicle Images */}
           <View style={styles.section}>

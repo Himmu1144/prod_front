@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useContext, useRef, useCallback } from 'react';
 import Layout from '../components/layout';
 import axios from 'axios';
-import { Edit, Copy, Search, Plus, FileDown } from 'lucide-react';
+import { Edit, Copy, Search, Plus, FileDown, X, FileUp } from 'lucide-react';
 import { AuthContext } from '../context/AuthContext';
 import { useLocation } from 'react-router-dom';
 import { Alert } from 'react-bootstrap';
@@ -11,6 +11,7 @@ import StatusTimer from '../components/StatusTimer';
 import './homepage.css';
 import * as XLSX from 'xlsx';
 import { Link } from 'react-router-dom';
+import ExcelImport from '../components/ExcelImport';
 
 const HomePage = () => {
     const dateRangeSelectorRef = useRef();
@@ -22,10 +23,14 @@ const HomePage = () => {
     const [garages, setGarages] = useState([]);
     const [garageSearchQuery, setGarageSearchQuery] = useState('');
     const [isGarageDropdownOpen, setIsGarageDropdownOpen] = useState(false);
+    const [isWx, setIsWx] = useState(false);
     const [newCallNotification, setNewCallNotification] = useState(null);
     const [cities, setCities] = useState([]);
     const [locationSearchQuery, setLocationSearchQuery] = useState('');
     const [isLocationDropdownOpen, setIsLocationDropdownOpen] = useState(false);
+    const [showImportModal, setShowImportModal] = useState(false);
+    // Add this with your other state declarations
+    const [showImportButton, setShowImportButton] = useState(true);
     
     const locationDropdownRef = useRef(null);
     const garageDropdownRef = useRef(null);
@@ -182,7 +187,9 @@ const [expandedLeadId, setExpandedLeadId] = useState(null);
                 setTimeout(() => setShowSuccessAlert(false), 3000);
             }
         };
-    
+    const handleDeselectAll = () => {
+    setSelectedLeads([]);
+};
 
     // const fetchLeads = async () => {
     //     try {
@@ -593,6 +600,7 @@ const handleDateRangeChange = (range) => {
         setCurrentPage(1);
         setTotalPages(1);
         setIsLoading(true); // Add loading state here
+        setShowImportButton(false); // Add this line to hide import button
         try {
              const pageSize = isMobile ? 20 : 5; // Add this line
         
@@ -769,6 +777,7 @@ formatColumns('Date:', lead.arrival_time ?
         // Reset dependent UI states
         setDataFromFilter(false);
         setShowStatsContainer(false);
+        setShowImportButton(true); // Add this line to show import button
         if (dateRangeSelectorRef.current && typeof dateRangeSelectorRef.current.reset === 'function') {
             dateRangeSelectorRef.current.reset(); // Reset the DateRangeSelector component
         }
@@ -845,6 +854,7 @@ useEffect(() => {
                 setGarages(response.data.garages); // Store garages data
                 setCities(response.data.cities || []);
                 setIsAdmin(response.data.is_admin || false); // Add this line
+                setIsWx(response.data.is_wx || false);
                 // If not admin, set the user field in filterFormData
             if (!response.data.is_admin && response.data.current_username) {
                 setcUser(response.data.current_username);
@@ -1554,7 +1564,7 @@ const excelData = response.data.leads.map(lead => ({
                             </div>
 
                             {isLocationDropdownOpen && (
-                                <div className="absolute z-30 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-100 overflow-auto">
+                                <div className="absolute z-30 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-80 overflow-auto">
                                     <div className="sticky z-30 top-0 bg-white p-2 border-b border-gray-200">
                                         <input
                                             type="text"
@@ -1907,6 +1917,46 @@ const excelData = response.data.leads.map(lead => ({
     </div>
 </div>
 )}
+{/* Import Modal */}
+{showImportModal && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+    <div className="w-full max-w-2xl">
+      <div className="relative bg-white rounded-lg shadow-xl">
+        <div className="absolute top-0 right-0 p-4">
+          <button 
+            onClick={() => setShowImportModal(false)}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <div className="p-6">
+          <ExcelImport 
+            onImportComplete={() => {
+              setShowImportModal(false);
+              fetchLeads();
+            }} 
+            onClose={() => setShowImportModal(false)}
+          />
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
+{/* Conditionally render Import Excel button */}
+{showImportButton && isAdmin && !isMobile && (
+  <div className="mb-6">
+    <button 
+      onClick={() => setShowImportModal(true)}
+      className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-md flex items-center"
+    >
+      <FileUp size={18} className="mr-1" />
+      Import from Excel
+    </button>
+  </div>
+)}
+
 
                 <div className="flex items-center justify-center flex-1">
                     <div className="relative w-96"> {/* Fixed width for search field */}
@@ -1968,6 +2018,14 @@ const excelData = response.data.leads.map(lead => ({
                     >
                         Update CCE
                     </button>
+                    <button
+                                type="button"
+                                onClick={handleDeselectAll}
+                                className="p-2 text-gray-600 bg-gray-200 rounded-full hover:bg-red-200 hover:text-red-700 transition-colors"
+                                title="Deselect all"
+                            >
+                                <X size={16} />
+                            </button>
                 </div>
             )}
 
@@ -2103,7 +2161,7 @@ const excelData = response.data.leads.map(lead => ({
         </span> */}
         <td className="p-2 text-center">
     <div className="flex flex-col items-center gap-2">
-        <span className={`${(lead.status === "Assigned" || (isMobile && lead.status === "Referred To Ops")) ? "font-bold text-red-500" : "text-gray-600"}`}>
+        <span className={`${(lead.status === "Assigned" || (isWx && lead.status === "Referred To Ops")) ? "font-bold text-red-500" : "text-gray-600"}`}>
             {lead.status}
         </span>
         
@@ -2141,7 +2199,7 @@ const excelData = response.data.leads.map(lead => ({
                                                         year: 'numeric',
                                                         hour: '2-digit',
                                                         minute: '2-digit',
-                                                        hour12: true
+                                                        hour12: false
                                                     }) : 'Not Set'}
                                                 </div>
                                             </td>
@@ -2153,7 +2211,7 @@ const excelData = response.data.leads.map(lead => ({
                                                         year: 'numeric',
                                                         hour: '2-digit',
                                                         minute: '2-digit',
-                                                        hour12: true
+                                                        hour12: false
                                                     }) : 'NA'}
                                                     <br />
                                                     {lead.updated_at ? new Date(lead.updated_at).toLocaleString('en-IN', {
@@ -2162,7 +2220,7 @@ const excelData = response.data.leads.map(lead => ({
                                                         year: 'numeric',
                                                         hour: '2-digit',
                                                         minute: '2-digit',
-                                                        hour12: true
+                                                        hour12: false
                                                     }) : 'NA'}
                                                 </div>
                                             </td>}
