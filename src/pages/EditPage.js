@@ -187,6 +187,8 @@ const [hasShownEstimateReminder, setHasShownEstimateReminder] = useState(false);
 const [hasShownCompletionReminder, setHasShownCompletionReminder] = useState(false);
 const [showReminderPopup, setShowReminderPopup] = useState(false);
 const [reminderType, setReminderType] = useState(''); // 'jobcard' or 'estimate'
+const [showPaymentMismatchPopup, setShowPaymentMismatchPopup] = useState(false);
+const [showCommissionErrorPopup, setShowCommissionErrorPopup] = useState(false);
   // const [showEstimate, setShowEstimate] = useState(false);
 const [showWarrantyPopup, setShowWarrantyPopup] = useState(false);
 const [warrantyDetails, setWarrantyDetails] = useState({
@@ -2115,6 +2117,36 @@ const handleTotalChange = (index, value) => {
   const [error, setError] = useState(null);
 
   const handleInputChange = async (section, field, value) => {
+
+
+     if (section === 'arrivalStatus' && field === 'leadStatus' && value === 'Commision Due') {
+      // Check if the *current* status is 'Payment Due'
+      if (formState.arrivalStatus.leadStatus === 'Payment Due') {
+        const finalAmount = parseFloat(formState.arrivalStatus.finalAmount) || 0;
+        const paidAmount = parseFloat(formState.arrivalStatus.paidAmount) || 0;
+
+        // If amounts are not equal, show the popup and stop the function
+        if (finalAmount !== paidAmount) {
+          setShowPaymentMismatchPopup(true);
+          return; // This is crucial - it stops the status from changing
+        }
+      }
+    }
+
+        // Add this new validation block
+    if (section === 'arrivalStatus' && field === 'leadStatus' && value === 'Completed') {
+      // Check if the *current* status is 'Commision Due'
+      if (formState.arrivalStatus.leadStatus === 'Commision Due') {
+        const commissionReceived = parseFloat(formState.arrivalStatus.commissionReceived) || 0;
+
+        // If commission received is not greater than 0, show the popup and stop
+        if (commissionReceived <= 0) {
+          setShowCommissionErrorPopup(true);
+          return; // This stops the status from changing
+        }
+      }
+    }
+
     setFormState(prev => ({
       ...prev,
       [section]: {
@@ -6033,6 +6065,62 @@ const statusesToHideDateTime = [
   </Collapse>
 </div> */}
 
+
+<div className="dropdown-container" style={{ marginTop: "15px" }}>
+  <Button
+    onClick={() => setIsOpenLeft(!isOpenLeft)}
+    variant="dark"
+    className={`w-full d-flex justify-content-between align-items-center rounded-bottom-0 ${isOpenLeft ? 'border-bottom-0' : ''}`}
+  >
+    Status History
+    {isOpenLeft ? <FaChevronUp /> : <FaChevronDown />}
+  </Button>
+
+  <Collapse in={isOpenLeft} mountOnEnter={true} unmountOnExit={false}>
+    <div>
+      <Card className="rounded-top-0 border-top-0">
+        <Card.Body>
+          <StatusHistoryDisplay 
+  statusHistory={formState.arrivalStatus.status_history} 
+  statusCounterData={statusCounterData}
+/>
+          {/* Add Status Counter Display */}
+          {/* <div className="mt-4 p-3 bg-gray-50 rounded">
+            <h5 className="mb-3 font-medium">Status Counters</h5>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="flex justify-between">
+                <span>Follow Up:</span>
+                <span className="font-medium">{statusCounterData.follow_up_count}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Dead:</span>
+                <span className="font-medium">{statusCounterData.dead_count}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Job Card:</span>
+                <span className="font-medium">{statusCounterData.job_card_count}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Completed:</span>
+                <span className="font-medium">{statusCounterData.completed_count}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>At Workshop:</span>
+                <span className="font-medium">{statusCounterData.at_workshop_count}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Payment Due:</span>
+                <span className="font-medium">{statusCounterData.payment_due_count}</span>
+              </div>
+           
+            </div>
+          </div> */}
+        </Card.Body>
+      </Card>
+    </div>
+  </Collapse>
+  </div>
+{/* </div> */}
 
 <div className="dropdown-container" style={{ marginTop: "15px" }}>
     <Button
@@ -10402,6 +10490,62 @@ Generate Bill
     </div>
   </div>
 )}
+
+
+{showPaymentMismatchPopup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.57)" }}>
+            <div className="bg-white rounded-lg shadow-lg p-8 w-96 flex flex-col items-center relative">
+              <div className="text-center mb-6">
+                <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                  <span className="text-red-600 text-2xl">!</span>
+                </div>
+                <h2 className="text-lg font-bold text-gray-800 mb-2">Payment Not Settled</h2>
+                <p className="text-gray-600">
+                  The Final Amount and Paid Amount are not equal. Please settle the full payment before moving the lead to "Commision Due".
+                </p>
+              </div>
+              
+              <div className="flex gap-3 w-full">
+                <Button
+                  variant="danger"
+                  type="button"
+                  onClick={() => setShowPaymentMismatchPopup(false)}
+                  className="flex-1 py-2"
+                >
+                  Okay, I understand
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+
+        {showCommissionErrorPopup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.57)" }}>
+            <div className="bg-white rounded-lg shadow-lg p-8 w-96 flex flex-col items-center relative">
+              <div className="text-center mb-6">
+                <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                  <span className="text-red-600 text-2xl">!</span>
+                </div>
+                <h2 className="text-lg font-bold text-gray-800 mb-2">Cannot Complete Lead</h2>
+                <p className="text-gray-600">
+                  Cannot move from "Commision Due" to "Completed" unless the "Commission Received" amount is filled properly.
+                </p>
+              </div>
+              
+              <div className="flex gap-3 w-full">
+                <Button
+                  variant="danger"
+                  type="button"
+                  onClick={() => setShowCommissionErrorPopup(false)}
+                  className="flex-1 py-2"
+                >
+                  Okay, I understand
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
 
 {/* // Replace the existing showDesignerPopup block with this */}
