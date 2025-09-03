@@ -8016,11 +8016,27 @@ const statusesToHideDateTime = [
   <button
     type="button"
     onClick={handleRephraseAdditionalWork}
+    className="absolute bottom-2 right-2 px-3 py-1 bg-yellow-500 text-white text-xs font-semibold rounded-md hover:bg-yellow-600 disabled:bg-yellow-300 transition-colors flex items-center justify-center min-w-[80px]"
+    disabled={isRephrasingAdditionalWork}
+  >
+    {isRephrasingAdditionalWork ? (
+      <>
+        <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+        <span className="sr-only">Loading...</span>
+      </>
+    ) : (
+      'Rephrase'
+    )}
+  </button>
+
+  {/* <button
+    type="button"
+    onClick={handleRephraseAdditionalWork}
     className="absolute bottom-2 right-2 px-3 py-1 bg-yellow-500 text-white text-xs font-semibold rounded-md hover:bg-yellow-600 disabled:bg-yellow-300 transition-colors"
     disabled={isRephrasingAdditionalWork}
   >
     {isRephrasingAdditionalWork ? '...' : 'Rephrase'}
-  </button>
+  </button> */}
 
   {dictatingField === 'additionalWork' && (
     <div className="absolute bottom-10 right-2 text-sm text-green-600 font-medium">
@@ -9337,7 +9353,7 @@ const statusesToHideDateTime = [
     required={!isAdmin}
     style={{ height: '120px', resize: 'none', paddingRight: '85px' }} // Add padding to avoid text under the button
     />
-{!isMobile && (
+{/* {!isMobile && (
   <button
     type="button"
     onClick={() => toggleDictation('basicInfo', 'cceComments')}
@@ -9350,15 +9366,63 @@ const statusesToHideDateTime = [
   >
     <FaMicrophone />
   </button>
+)} */}
+
+  {formState.basicInfo.cceComments && (
+      <button
+        type="button"
+        onClick={() => handleInputChange('basicInfo', 'cceComments', '')}
+        className="absolute top-2 right-2 text-gray-500 hover:text-gray-800 z-10"
+        title="Clear comments"
+      >
+        <X size={16} />
+      </button>
+    )}
+
+{!isMobile && (
+  <button
+    type="button"
+    onClick={() => toggleDictation('basicInfo', 'cceComments')}
+    className={`absolute bottom-2 right-24 px-3 py-1 text-xs font-semibold rounded-md transition-colors ${
+      dictatingField === 'cceComments' 
+        ? 'bg-red-500 text-white hover:bg-red-600' 
+        : 'bg-green-500 text-white hover:bg-green-600'
+    }`}
+    title="Dictate CCE Comments"
+  >
+    {dictatingField === 'cceComments' ? '⏹ Stop' : '🎤 Dictate'}
+  </button>
 )}
-   <button
+   {/* <button
       type="button"
       onClick={handleRephraseCceComments}
       className="absolute bottom-2 right-2 px-3 py-1 bg-yellow-500 text-white text-xs font-semibold rounded-md hover:bg-yellow-600 disabled:bg-yellow-300 transition-colors"
       disabled={isRephrasingCceComments}
     >
       {isRephrasingCceComments ? '...' : 'Rephrase'}
+    </button> */}
+    <button
+      type="button"
+      onClick={handleRephraseCceComments}
+      className="absolute bottom-2 right-2 px-3 py-1 bg-yellow-500 text-white text-xs font-semibold rounded-md hover:bg-yellow-600 disabled:bg-yellow-300 transition-colors flex items-center justify-center min-w-[80px]"
+      disabled={isRephrasingCceComments}
+    >
+      {isRephrasingCceComments ? (
+        <>
+          <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+          <span className="sr-only">Loading...</span>
+        </>
+      ) : (
+        'Rephrase'
+      )}
+
     </button>
+
+    {dictatingField === 'cceComments' && (
+      <div className="absolute bottom-10 right-2 text-sm text-green-600 font-medium">
+        Listening... 🎧
+      </div>
+    )}
   </div>
 </Form.Group>
               </div>
@@ -9991,7 +10055,7 @@ Generate Bill
         customerGSTIN: '',
         commissionReceived: formState.arrivalStatus.commissionReceived || 0,
         commissionDue: formState.arrivalStatus.commissionDue || 0,
-        // wxgst:formState.arrivalStatus.gst || 0,
+        wxgst:formState.arrivalStatus.gst || 0,
         // workshopDetailName: formState.gstDetail.wx_name || formState.workshop.name,
         // workshopDetailAddress: formState.gstDetail.wx_address || formState.workshop.locality,
         // workshopDetailGSTIN: formState.gstDetail.wx_gstin || 'N/A',

@@ -654,7 +654,7 @@ const ExcelImport = ({ onImportComplete, onClose }) => {
       return;
     }
     
-    fetch(`https://0pcdlz8k-8000.inc1.devtunnels.ms/api/import/template/?type=leads`, {
+    fetch(`https://admin.onlybigcars.com/api/import/template/?type=leads`, {
       headers: { 'Authorization': `Token ${token}` }
     })
     .then(response => {
@@ -708,7 +708,7 @@ const ExcelImport = ({ onImportComplete, onClose }) => {
     formData.append('assigned_only_mode', isAssignedOnly);
 
     try {
-      const response = await fetch('https://0pcdlz8k-8000.inc1.devtunnels.ms/api/import/excel/', {
+      const response = await fetch('https://admin.onlybigcars.com/api/import/excel/', {
         method: 'POST',
         headers: { 'Authorization': `Token ${token}` },
         body: formData
