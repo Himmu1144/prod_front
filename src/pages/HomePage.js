@@ -1364,6 +1364,8 @@ const excelData = response.data.leads.map(lead => ({
                             <option value="Google Ads">Google Ads</option>
                             <option value="Whatsapp">Whatsapp</option>
                             <option value="Instagram">Instagram</option>
+                            <option value="Meta">Meta</option>
+                            <option value="Meta Ads">Meta Ads</option>
                             <option value="Facebook">Facebook</option>
                             <option value="Reference">Reference</option>
                             <option value="Repeat">Repeat</option>

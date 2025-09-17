@@ -152,6 +152,7 @@ const EditPage = () => {
   const [existingCommissionImageUrls, setExistingCommissionImageUrls] = useState([]);
   const [paymentImageTooltipText, setPaymentImageTooltipText] = useState('');
   const [commissionImageTooltipText, setCommissionImageTooltipText] = useState('');
+  const [isPaymentLinksOpen, setIsPaymentLinksOpen] = useState(false);
 
   // Add these state variables after your existing state declarations
   const [showGSTPopup, setShowGSTPopup] = useState(false);
@@ -206,6 +207,14 @@ const [maxGstTime] = useState(120); // 2 minutes in seconds
 const [editableGstData, setEditableGstData] = useState(null);
 const [gstChanges, setGstChanges] = useState({});
 const [activeLineInfo, setActiveLineInfo] = useState({ text: '', start: 0, end: 0 });
+
+const [paymentLinkAmount, setPaymentLinkAmount] = useState('');
+const [paymentLinkData, setPaymentLinkData] = useState(null);
+const [paymentLinkLoading, setPaymentLinkLoading] = useState(false);
+// Add these after the existing payment link state variables
+const [existingPaymentLinks, setExistingPaymentLinks] = useState([]);
+const [loadingPaymentLinks, setLoadingPaymentLinks] = useState(false);
+
 
 // Add these with your other state declarations
 // const [isSubmitInProgress, setIsSubmitInProgress] = useState(false);
@@ -375,6 +384,95 @@ const handleRemoveExistingCommissionImage = (index) => {
   const updatedExistingImages = [...existingCommissionImageUrls];
   updatedExistingImages.splice(index, 1);
   setExistingCommissionImageUrls(updatedExistingImages);
+};
+
+
+const fetchPaymentLinks = async () => {
+  if (!id) return; // Only fetch for existing leads
+  
+  setLoadingPaymentLinks(true);
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://admin.onlybigcars.com'}/api/leads/${id}/payment-links/`, {
+      headers: {
+        'Authorization': `Token ${token}`,
+      },
+    });
+
+    const data = await response.json();
+    
+    if (response.ok) {
+      setExistingPaymentLinks(data.payment_links || []);
+    } else {
+      console.error('Error fetching payment links:', data.error);
+    }
+  } catch (error) {
+    console.error('Error fetching payment links:', error);
+  } finally {
+    setLoadingPaymentLinks(false);
+  }
+};
+
+const createPaymentLink = async () => {
+  if (!paymentLinkAmount || parseFloat(paymentLinkAmount) <= 0) {
+    toast.error('Please enter a valid amount');
+    return;
+  }
+
+  // // Check if we have a valid numeric ID
+  // if (!id || isNaN(parseInt(id))) {
+  //   toast.error('Cannot create payment link: Invalid lead ID');
+  //   return;
+  // }
+
+  setPaymentLinkLoading(true);
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${process.env.REACT_APP_API_URL || 'https://admin.onlybigcars.com'}/api/leads/${id}/create-payment-link/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Token ${token}`,
+      },
+      body: JSON.stringify({ amount: paymentLinkAmount })
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to create payment link');
+    }
+
+    setPaymentLinkData(data);
+    toast.success('Payment link created successfully!');
+    
+    // Refresh the payment links list
+    fetchPaymentLinks();
+    
+    // Clear the amount input
+    setPaymentLinkAmount('');
+  } catch (error) {
+    console.error('Error creating payment link:', error);
+    toast.error('Error creating payment link: ' + error.message);
+  } finally {
+    setPaymentLinkLoading(false);
+  }
+};
+
+const copyPaymentLink = () => {
+  if (paymentLinkData?.short_url) {
+    navigator.clipboard.writeText(paymentLinkData.short_url).then(() => {
+      toast.success('Payment link copied to clipboard!');
+    });
+  }
+};
+
+const sharePaymentLinkWhatsApp = () => {
+  if (paymentLinkData?.short_url && formState.customerInfo.whatsappNumber) {
+    const message = `Hi ${formState.customerInfo.customerName || 'Customer'}, here is your payment link: ${paymentLinkData.short_url}`;
+    const whatsappUrl = `https://wa.me/+91${formState.customerInfo.whatsappNumber}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+  }
 };
 
 
@@ -1786,6 +1884,13 @@ useEffect(() => {
 }, [isProcessingGST, gstTimer, maxGstTime]);
 
 
+
+// Fetch payment links when component loads
+useEffect(() => {
+  if (id) {
+    fetchPaymentLinks();
+  }
+}, [id]);
 // Cleanup timeout on component unmount
 // useEffect(() => {
 //   return () => {
@@ -6631,6 +6736,7 @@ const statusesToHideDateTime = [
                     <option value="Google Ads">Google Ads</option>
                     <option value="Whatsapp">Whatsapp</option>
                     <option value="Instagram">Instagram</option>
+                    <option value="Meta">Meta</option>
                     <option value="Facebook">Facebook</option>
                     <option value="Reference">Reference</option>
                     <option value="Repeat">Repeat</option>
@@ -9213,7 +9319,190 @@ const statusesToHideDateTime = [
 
             {/* </div> */}
 
+{/* Payment Link Section - Now Collapsible and Conditional */}
+{['Job Card', 'Payment Due', 'Commision Due', 'Completed'].includes(formState.arrivalStatus.leadStatus) && (
+  <div className="w-full p-2 rounded-lg">
+    {/* Updated Header with Toggle Button */}
+    <div 
+      className="text-white bg-gray-800 font-bold text-lg mb-2 p-3 rounded-md flex justify-between items-center cursor-pointer"
+      onClick={() => setIsPaymentLinksOpen(!isPaymentLinksOpen)}
+    >
+      <span>Payment Links</span>
+      <button 
+        type="button" 
+        className="text-white text-sm font-semibold flex items-center"
+      >
+        {isPaymentLinksOpen ? 'Show Less' : 'Show More'}
+        {isPaymentLinksOpen ? <FaChevronUp className="ml-2" /> : <FaChevronDown className="ml-2" />}
+      </button>
+    </div>
+    
+    {/* Collapsible Content */}
+    <Collapse in={isPaymentLinksOpen}>
+      <div>
+        <div className="p-4 border border-gray-200 rounded-md bg-gray-50">
+          {/* Create New Payment Link */}
+          <div className="mb-6">
+            <h3 className="text-lg font-medium mb-3">Create New Payment Link</h3>
+            
+            <div className="flex gap-2 mb-3">
+              <div className="flex-1">
+                <input
+                  type="number"
+                  placeholder="Enter amount in INR"
+                  value={paymentLinkAmount}
+                  onChange={(e) => setPaymentLinkAmount(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min="1"
+                  step="0.01"
+                />
+              </div>
+              <button
+                onClick={createPaymentLink}
+                disabled={paymentLinkLoading || !paymentLinkAmount}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              >
+                {paymentLinkLoading ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Creating...
+                  </>
+                ) : (
+                  'Create Payment Link'
+                )}
+              </button>
+            </div>
+            
+            {/* {existingPaymentLinks.length > 0 && (
+              <div className="text-sm text-orange-600 bg-orange-50 p-2 rounded border border-orange-200">
+                <strong>Note:</strong> Creating a new payment link will replace any existing payment links for this lead.
+              </div>
+            )} */}
+          </div>
 
+          {/* Existing Payment Links */}
+          {loadingPaymentLinks ? (
+            <div className="text-center py-4">
+              <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+              Loading payment links...
+            </div>
+          ) : existingPaymentLinks.length > 0 ? (
+            <div>
+              <h3 className="text-lg font-medium mb-3">Existing Payment Links</h3>
+              <div className="space-y-3">
+                {existingPaymentLinks.map((link, index) => (
+                  <div key={link.id} className="bg-white border border-gray-200 rounded-md p-4">
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-sm font-medium text-gray-700">Payment Link #{index + 1}</span>
+                          <span className={`px-2 py-1 text-xs rounded ${
+                            link.status === 'created' ? 'bg-blue-100 text-blue-800' :
+                            link.status === 'paid' ? 'bg-green-100 text-green-800' :
+                            link.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {link.status.toUpperCase()}
+                          </span>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                          <div>
+                            <span className="text-gray-500">Amount:</span>
+                            <span className="font-medium ml-2">₹{link.amount_rupees}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">Created:</span>
+                            <span className="ml-2">{new Date(link.created_at).toLocaleDateString('en-IN')}</span>
+                          </div>
+                          <div className="md:col-span-2">
+                            <span className="text-gray-500">ID:</span>
+                            <span className="ml-2 font-mono text-xs">{link.razorpay_id}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 mt-3">
+                      <input
+                        type="text"
+                        value={link.short_url}
+                        readOnly
+                        className="flex-1 p-2 text-sm bg-gray-100 border border-gray-200 rounded"
+                      />
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(link.short_url);
+                          toast.success('Payment link copied to clipboard!');
+                        }}
+                        className="px-3 py-2 text-sm bg-gray-600 text-white rounded hover:bg-gray-700"
+                      >
+                        Copy
+                      </button>
+                      <a
+                        href={link.short_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                      >
+                        Open
+                      </a>
+                      {formState.customerInfo.whatsappNumber && (
+                        <button
+                          onClick={() => {
+                            const message = `Hi ${formState.customerInfo.customerName || 'Customer'}, here is your payment link: ${link.short_url}`;
+                            const whatsappUrl = `https://wa.me/+91${formState.customerInfo.whatsappNumber}?text=${encodeURIComponent(message)}`;
+                            window.open(whatsappUrl, '_blank');
+                          }}
+                          className="px-3 py-2 text-sm bg-green-500 text-white rounded hover:bg-green-600"
+                        >
+                          <FaWhatsapp className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-6 text-gray-500">
+              <div className="text-4xl mb-2">💳</div>
+              <p className="text-lg font-medium">No Payment Links Created</p>
+              <p className="text-sm">Create your first payment link above to get started.</p>
+            </div>
+          )}
+
+          {/* Most Recent Payment Link (if exists) */}
+          {paymentLinkData && (
+            <div className="mt-6 p-3 bg-green-50 border border-green-200 rounded-md">
+              <h4 className="text-green-800 font-medium mb-2">✅ Latest Payment Link Created</h4>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={paymentLinkData.short_url}
+                  readOnly
+                  className="flex-1 p-2 text-sm bg-white border border-green-300 rounded"
+                />
+                <button
+                  onClick={copyPaymentLink}
+                  className="px-3 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+                >
+                  Copy
+                </button>
+              </div>
+              <div className="mt-2 text-xs text-green-600">
+                Amount: ₹{paymentLinkData.amount_rupees} | Status: {paymentLinkData.status}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </Collapse>
+  </div>
+)}
 
             {/* Garage Details */}
 
