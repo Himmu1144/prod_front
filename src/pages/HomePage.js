@@ -12,6 +12,7 @@ import './homepage.css';
 import * as XLSX from 'xlsx';
 import { Link } from 'react-router-dom';
 import ExcelImport from '../components/ExcelImport';
+import { State, City } from 'country-state-city';
 
 const HomePage = () => {
     const dateRangeSelectorRef = useRef();
@@ -30,6 +31,10 @@ const HomePage = () => {
     const [isLocationDropdownOpen, setIsLocationDropdownOpen] = useState(false);
     const [showImportModal, setShowImportModal] = useState(false);
     // Add this with your other state declarations
+    const [selectedStates, setSelectedStates] = useState([]);
+    const [stateSearchQuery, setStateSearchQuery] = useState('');
+    const [stateCityMap, setStateCityMap] = useState({}); // { [stateName]: [city1, city2, ...] }
+    const [cityToState, setCityToState] = useState({});
     const [showImportButton, setShowImportButton] = useState(true);
     
     const locationDropdownRef = useRef(null);
@@ -62,7 +67,7 @@ const initialFilterState = {
     user: '', // Will be set based on isAdmin/cUser later
     source: '',
     status: '',
-    location: '',
+    location: [],
     arrivalMode: '',
     language_barrier: false,
     dateField: 'created_at',
@@ -75,11 +80,20 @@ const [filterFormData, setFilterFormData] = useState(() => {
     const savedFilters = localStorage.getItem('homePageFilters');
     if (savedFilters) {
         try {
-            // Merge saved filters with defaults to ensure all keys exist
-            return { ...initialFilterState, ...JSON.parse(savedFilters) };
+            const parsed = JSON.parse(savedFilters);
+            // Coerce types to avoid old/corrupt data
+            const coerced = {
+                ...initialFilterState,
+                ...parsed,
+                location: Array.isArray(parsed.location)
+                    ? parsed.location
+                    : (parsed.location ? [parsed.location] : []),
+                garage: Array.isArray(parsed.garage) ? parsed.garage : [],
+            };
+            return coerced;
         } catch (e) {
             console.error("Failed to parse saved filters, using defaults.", e);
-            localStorage.removeItem('homePageFilters'); // Clear corrupted data
+            localStorage.removeItem('homePageFilters');
             return initialFilterState;
         }
     }
@@ -449,26 +463,66 @@ const handleGarageChange = (garageName) => {
 };
    
 
-
 const handleLocationChange = (cityName) => {
+     const isSelecting = !filterFormData.location.includes(cityName);
     setFilterFormData(prev => {
         const updatedLocations = prev.location.includes(cityName)
             ? prev.location.filter(c => c !== cityName)
             : [...prev.location, cityName];
-        
-        return {
-            ...prev,
-            location: updatedLocations
-        };
+        return { ...prev, location: updatedLocations };
     });
+    if (isSelecting) {
+        const st = cityToState[cityName];
+        if (st) {
+            setSelectedStates(prev => (prev.includes(st) ? prev : [...prev, st]));
+            
+        }
+    }
 };
 
-// Add this function after handleGarageChange
-const toggleAllLocations = () => {
-    const filteredCities = cities.filter(city =>
-        city.toLowerCase().includes(locationSearchQuery.toLowerCase())
+const handleStateToggle = (stateName) => {
+    setSelectedStates(prev => 
+        prev.includes(stateName)
+            ? prev.filter(s => s !== stateName)
+            : [...prev, stateName]
     );
+};
 
+// NEW: get cities visible in the right pane (union of selected states, filtered by city search)
+const getVisibleCities = () => {
+    const addIfMatches = (acc, list) => {
+        list.forEach(c => {
+            if (c.toLowerCase().includes(locationSearchQuery.toLowerCase())) acc.add(c);
+        });
+    };
+    const union = new Set();
+    if (!selectedStates.length) {
+        // Union of all available cities (across all states)
+        Object.values(stateCityMap).forEach(list => addIfMatches(union, list || []));
+    } else {
+        selectedStates.forEach(st => addIfMatches(union, stateCityMap[st] || []));
+    }
+    return Array.from(union).sort((a, b) => a.localeCompare(b));
+};
+
+// NEW: select/unselect all visible states (respecting stateSearchQuery)
+const toggleAllStates = () => {
+    const allStates = Object.keys(stateCityMap);
+    const filteredStates = allStates.filter(s =>
+        s.toLowerCase().includes(stateSearchQuery.toLowerCase())
+    );
+    const allSelected = filteredStates.every(s => selectedStates.includes(s));
+    if (allSelected) {
+        setSelectedStates(prev => prev.filter(s => !filteredStates.includes(s)));
+    } else {
+        const merged = new Set([...selectedStates, ...filteredStates]);
+        setSelectedStates(Array.from(merged));
+    }
+};
+
+// UPDATED: select/unselect all visible cities (respecting selected states + city search)
+const toggleAllLocations = () => {
+    const filteredCities = getVisibleCities(); // now from right pane
     const allSelected = filteredCities.every(city =>
         filterFormData.location.includes(city)
     );
@@ -485,7 +539,6 @@ const toggleAllLocations = () => {
         }));
     }
 };
-    
 
 // Add this function after handleGarageChange
 const getCityVariations = (cityName) => {
@@ -773,6 +826,9 @@ formatColumns('Date:', lead.arrival_time ?
             user: isAdmin ? '' : (cUser || '') // Set user based on current context
         };
         setFilterFormData(defaultFilters);
+        setSelectedStates([]);
+        setStateSearchQuery('');
+        setLocationSearchQuery('');
     
         // Reset dependent UI states
         setDataFromFilter(false);
@@ -839,23 +895,21 @@ useEffect(() => {
     }, [isLocationDropdownOpen, isGarageDropdownOpen]); 
 
     useEffect(() => {
-        console.log('Here we are - ')
-        // Fetch welcome message and users
-        axios.get('https://admin.onlybigcars.com/', {
-            headers: {
-                Authorization: `Token ${token}`
-            }
-        })
-            .then(response => {
-                setWelcomeData(response.data.message);
-                setUsers(response.data.users); // Set users data
-                // Add this line to set user stats
-                setUserStats(response.data.user_stats || {});
-                setGarages(response.data.garages); // Store garages data
-                setCities(response.data.cities || []);
-                setIsAdmin(response.data.is_admin || false); // Add this line
-                setIsWx(response.data.is_wx || false);
-                // If not admin, set the user field in filterFormData
+    console.log('Here we are - ')
+    // Fetch welcome message and users
+    axios.get('https://admin.onlybigcars.com/', {
+        headers: {
+            Authorization: `Token ${token}`
+        }
+    })
+        .then(response => {
+            setWelcomeData(response.data.message);
+            setUsers(response.data.users);
+            setUserStats(response.data.user_stats || {});
+            setGarages(response.data.garages);
+            setCities(response.data.cities || []);
+            setIsAdmin(response.data.is_admin || false); 
+            setIsWx(response.data.is_wx || false);
             if (!response.data.is_admin && response.data.current_username) {
                 setcUser(response.data.current_username);
                 setFilterFormData(prev => ({
@@ -863,28 +917,82 @@ useEffect(() => {
                 user: response.data.current_username
                 }));
             }
-
             console.log('the admin is set - ', response.data.is_admin)
-            
-            })
-            .catch(error => console.error('Error fetching home data through hom view:', error));
-    }, [token]);
+        })
+        .catch(error => console.error('Error fetching home data through hom view:', error));
+}, [token]);
+
+// NEW: derive state -> available cities from `cities`
+useEffect(() => {
+    // normalize with alias handling
+    const normalizeCityName = (name) => {
+        if (!name) return '';
+        const s = String(name).trim().toLowerCase();
+        const alias = {
+            'bengaluru': 'bangalore',
+            'bangalore': 'bangalore',
+            'bombay': 'mumbai',
+            'mumbai': 'mumbai',
+            'new delhi': 'delhi',
+            'delhi': 'delhi',
+            'calcutta': 'kolkata',
+            'kolkata': 'kolkata',
+            'madras': 'chennai',
+            'chennai': 'chennai',
+            'gurgaon': 'gurugram',
+            'gurugram': 'gurugram'
+        };
+        return alias[s] || s;
+    };
+
+    if (!cities || !cities.length) {
+        setStateCityMap({});
+        return;
+    }
+
+    // Map normalized -> Set of original city names from API (preserve original labels)
+    const normalizedToOriginals = new Map();
+    cities.forEach(orig => {
+        const norm = normalizeCityName(orig);
+        if (!normalizedToOriginals.has(norm)) normalizedToOriginals.set(norm, new Set());
+        normalizedToOriginals.get(norm).add(orig);
+    });
+
+    const statesInIndia = State.getStatesOfCountry('IN') || [];
+    const nextMap = {};
+
+    statesInIndia.forEach(st => {
+        const cscCities = City.getCitiesOfState('IN', st.isoCode) || [];
+        const matchedOriginals = new Set();
+
+        cscCities.forEach(csc => {
+            const norm = normalizeCityName(csc.name);
+            const originals = normalizedToOriginals.get(norm);
+            if (originals && originals.size) {
+                originals.forEach(o => matchedOriginals.add(o));
+            }
+        });
+
+        if (matchedOriginals.size > 0) {
+            nextMap[st.name] = Array.from(matchedOriginals).sort((a, b) =>
+                String(a).localeCompare(String(b))
+            );
+        }
+    });
+    const reverse = {};
+    Object.keys(nextMap).forEach(stName => {
+        nextMap[stName].forEach(city => {
+            reverse[city] = stName;
+        });
+    });
+
+    setStateCityMap(nextMap);
+    setCityToState(reverse);
+}, [cities]);
 
     useEffect(() => {
         fetchLeads();
     }, [token]);
-
-
-//     useEffect(() => {
-//     const checkIfMobile = () => {
-//         setIsMobile(window.innerWidth <= 768); // 768px is common mobile breakpoint
-//     };
-    
-//     checkIfMobile(); // Check on initial load
-//     window.addEventListener('resize', checkIfMobile); // Check on window resize
-    
-//     return () => window.removeEventListener('resize', checkIfMobile);
-// }, []);
 
     useEffect(() => {
         if (location.state?.message) {
@@ -1566,52 +1674,126 @@ const excelData = response.data.leads.map(lead => ({
                             </div>
 
                             {isLocationDropdownOpen && (
-                                <div className="absolute z-30 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg max-h-80 overflow-auto">
-                                    <div className="sticky z-30 top-0 bg-white p-2 border-b border-gray-200">
-                                        <input
-                                            type="text"
-                                            value={locationSearchQuery}
-                                            onChange={(e) => setLocationSearchQuery(e.target.value)}
-                                            placeholder="Search cities..."
-                                            className="w-full p-2 text-sm border border-gray-300 rounded"
-                                            onClick={(e) => e.stopPropagation()}
-                                            autoFocus
-                                        />
-                                    </div>
-                                    <div className="px-3 py-2 border-b border-gray-200">
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); toggleAllLocations(); }}
-                                            className="w-full py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium"
-                                        >
-                                            {cities.filter(c => c.toLowerCase().includes(locationSearchQuery.toLowerCase())).every(c => filterFormData.location.includes(c))
-                                                ? "Unselect All"
-                                                : "Select All"
-                                            }
-                                        </button>
-                                    </div>
-                                    {cities
-                                        .filter(city => city.toLowerCase().includes(locationSearchQuery.toLowerCase()))
-                                        .map(city => (
-                                            <div
-                                                key={city}
-                                                className="flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer"
-                                                onClick={(e) => { e.stopPropagation(); handleLocationChange(city); }}
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    id={`city-${city}`}
-                                                    checked={filterFormData.location.includes(city)}
-                                                    onChange={() => handleLocationChange(city)}
-                                                    className="mr-2"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                />
-                                                <label htmlFor={`city-${city}`} className="w-full cursor-pointer">
-                                                    {city}
-                                                </label>
-                                            </div>
-                                        ))}
+        // NEW two-pane selector
+        <div className="absolute z-30 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg">
+            <div className="grid grid-cols-2 divide-x min-h-0" style={{ height: '20rem' }}>
+                {/* Left: States */}
+                 <div className="flex flex-col h-full min-h-0">
+                    <div className="sticky top-0 bg-white p-2 border-b border-gray-200">
+                        <input
+                            type="text"
+                            value={stateSearchQuery}
+                            onChange={(e) => setStateSearchQuery(e.target.value)}
+                            placeholder="Search states..."
+                            className="w-full p-2 text-sm border border-gray-300 rounded"
+                            onClick={(e) => e.stopPropagation()}
+                            autoFocus
+                        />
+                        <div className="mt-2">
+                            <button
+                                onClick={(e) => { e.stopPropagation(); toggleAllStates(); }}
+                                className="w-full py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium"
+                            >
+                                {Object.keys(stateCityMap)
+                                    .filter(s => s.toLowerCase().includes(stateSearchQuery.toLowerCase()))
+                                    .every(s => selectedStates.includes(s))
+                                    ? "Unselect All"
+                                    : "Select All"
+                                }
+                            </button>
+                        </div>
+                    </div>
+                    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+                        {Object.keys(stateCityMap)
+                            .filter(state => state.toLowerCase().includes(stateSearchQuery.toLowerCase()))
+                            .sort((a, b) => a.localeCompare(b))
+                            .map(state => (
+                                <div
+                                    key={state}
+                                    className="flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                                    onClick={(e) => { e.stopPropagation(); handleStateToggle(state); }}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        id={`state-${state}`}
+                                        checked={selectedStates.includes(state)}
+                                        onChange={() => handleStateToggle(state)}
+                                        className="mr-2"
+                                        onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <label htmlFor={`state-${state}`} className="w-full cursor-pointer">
+                                        {state}
+                                    </label>
                                 </div>
-                            )}
+                            ))
+                        }
+                        {Object.keys(stateCityMap)
+                            .filter(state => state.toLowerCase().includes(stateSearchQuery.toLowerCase()))
+                            .length === 0 && (
+                                <div className="px-3 py-2 text-gray-500 text-center">
+                                    No states match your search
+                                </div>
+                            )
+                        }
+                    </div>
+                </div>
+
+                {/* Right: Cities of selected states */}
+                 <div className="flex flex-col h-full min-h-0">
+                    <div className="sticky top-0 bg-white p-2 border-b border-gray-200">
+                        <input
+                            type="text"
+                            value={locationSearchQuery}
+                            onChange={(e) => setLocationSearchQuery(e.target.value)}
+                            placeholder="Search cities..."
+                            className="w-full p-2 text-sm border border-gray-300 rounded"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                        <div className="mt-2">
+                            <button
+                                onClick={(e) => { e.stopPropagation(); toggleAllLocations(); }}
+                                className="w-full py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-sm font-medium"
+                                disabled={getVisibleCities().length === 0}
+                                title={getVisibleCities().length === 0 ? "No cities to select" : ""}
+                            >
+                                {getVisibleCities().every(c => filterFormData.location.includes(c)) && getVisibleCities().length
+                                    ? "Unselect All"
+                                    : "Select All"
+                                }
+                            </button>
+                        </div>
+                    </div>
+                     <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+                        {getVisibleCities().map(city => (
+                            <div
+                                key={city}
+                                className="flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                                onClick={(e) => { e.stopPropagation(); handleLocationChange(city); }}
+                            >
+                                <input
+                                    type="checkbox"
+                                    id={`city-${city}`}
+                                    checked={filterFormData.location.includes(city)}
+                                    onChange={() => handleLocationChange(city)}
+                                    className="mr-2"
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                                <label htmlFor={`city-${city}`} className="w-full cursor-pointer">
+                                    {city}
+                                </label>
+                            </div>
+                        ))}
+                        
+                        {getVisibleCities().length === 0 && (
+         <div className="px-3 py-2 text-gray-500 text-center">
+             No cities match your search
+         </div>
+     )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    )}
                         </div>
 
 <div className="relative w-full" ref={garageDropdownRef}>

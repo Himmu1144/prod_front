@@ -24,7 +24,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import Estimate from './estimate.js';
 import { FaCheckCircle, FaTimesCircle } from 'react-icons/fa';
 import { X } from 'lucide-react';
-
+import VoiceBotDisplay from '../components/VoiceBotDisplay';
 // import { toast } from 'react-toastify';
 
 
@@ -47,7 +47,8 @@ const initialFormState = {
     source: '',
     whatsappNumber: '',
     customerEmail: '',
-    languageBarrier: false
+    languageBarrier: false,
+    marketing: false,
   },
   location: {
     address: '',
@@ -112,6 +113,7 @@ const initialFormState = {
     wx_gstin: '',
     wx_state: ''
   },
+  callerdesk_recording_url: null,
 
 };
 
@@ -126,6 +128,7 @@ const EditPage = () => {
   const [validationErrors, setValidationErrors] = useState({});
   const [showPopup, setShowPopup] = useState(false);
   const [discount, setDiscount] = useState(0);
+  const [hasMarketingConflict, setHasMarketingConflict] = useState(false);
 
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 790);
@@ -201,7 +204,7 @@ const [isRephrasingCceComments, setIsRephrasingCceComments] = useState(false);
 const [imageToPreview, setImageToPreview]=useState(null);
 const [gstTimer, setGstTimer] = useState(0);
 const [maxGstTime] = useState(120); // 2 minutes in seconds
-
+const [isCallerDeskOpen, setIsCallerDeskOpen] = useState(false);
 
 // Add these state variables after your existing state declarations (around line 151)
 const [editableGstData, setEditableGstData] = useState(null);
@@ -214,7 +217,7 @@ const [paymentLinkLoading, setPaymentLinkLoading] = useState(false);
 // Add these after the existing payment link state variables
 const [existingPaymentLinks, setExistingPaymentLinks] = useState([]);
 const [loadingPaymentLinks, setLoadingPaymentLinks] = useState(false);
-
+const [isVoiceBotOpen, setIsVoiceBotOpen] = useState(false);
 
 // Add these with your other state declarations
 // const [isSubmitInProgress, setIsSubmitInProgress] = useState(false);
@@ -1064,7 +1067,8 @@ const StatusHistoryDisplay = ({ statusHistory, statusCounterData = {} }) => {
       source: '',
       whatsappNumber: '',
       customerEmail: '',
-      languageBarrier: false
+      languageBarrier: false,
+      marketing:false,
     },
     location: {
       address: '',
@@ -1148,6 +1152,153 @@ const StatusHistoryDisplay = ({ statusHistory, statusCounterData = {} }) => {
     wx_state: ''
   },
   });
+
+
+  const handleToggleMarketing = async (checked) => {
+  setFormState(prev => ({
+    ...prev,
+    customerInfo: { ...prev.customerInfo, marketing: checked }
+  }));
+  
+  const mobile = formState.customerInfo.mobileNumber?.trim();
+  if (!mobile) return;
+
+  // Only persist when turning ON; do not flip customer marketing OFF from here
+  if (checked !== true) return;
+
+  try {
+    await axios.post(
+      `https://admin.onlybigcars.com/api/marketing/set/`,
+      { mobile, marketing: true },  // ← This is the body/data
+      {
+        headers: {
+          'Authorization': `Token ${token}`,
+        }
+      }
+    );
+    console.log('✅ Marketing status updated successfully');
+  } catch (error) {
+    console.error('❌ Error updating marketing status:', error);
+    // Revert local UI if ON failed
+    setFormState(prev => ({
+      ...prev,
+      customerInfo: { ...prev.customerInfo, marketing: false }
+    }));
+  }
+};
+
+  // FETCH MARKETING STATUS WHEN MOBILE CHANGES
+  useEffect(() => {
+  const mobile = formState.customerInfo.mobileNumber?.trim();
+  if (!mobile) {
+    console.log('Skipping marketing check - no mobile number');
+    return;
+  }
+
+  // Only check if mobile number has at least 10 digits
+  if (mobile.length < 10) {
+    console.log('Skipping marketing check - mobile number too short');
+    return;
+  }
+
+  let abort = false;
+  console.log('Checking marketing status for:', mobile);
+  
+  (async () => {
+    try {
+      const url = `https://admin.onlybigcars.com/api/marketing/status/?mobile=${encodeURIComponent(mobile)}`;
+      console.log('Fetching from URL:', url);
+      
+      const res = await fetch(url, {
+        headers: { 
+          'Authorization': `Token ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      console.log('Response status:', res.status);
+      console.log('Response OK:', res.ok);
+      
+      if (!res.ok) {
+        const text = await res.text();
+        console.log('Error response body:', text);
+        return;
+      }
+      
+      const data = await res.json();
+      console.log('Marketing status response:', data);
+      console.log('Marketing value:', data.marketing);
+      console.log('Customer exists:', data.customer_exists);
+      
+      if (abort) {
+        console.log('Aborted - component unmounted');
+        return;
+      }
+      
+      // Set checkbox to TRUE if customer has marketing enabled
+      if (data.marketing === true) {
+        console.log('✅ Setting marketing checkbox to TRUE');
+        setFormState(prev => ({
+          ...prev,
+          customerInfo: { ...prev.customerInfo, marketing: true }
+        }));
+        console.log('Marketing state updated');
+      } else {
+        console.log('❌ Customer marketing is FALSE, keeping checkbox unchecked');
+      }
+    } catch (error) {
+      console.error('❌ Error fetching marketing status:', error);
+      console.error('Error details:', error.message);
+    }
+  })();
+
+  return () => { 
+    console.log('Cleanup: aborting marketing check');
+    abort = true; 
+  };
+}, [formState.customerInfo.mobileNumber, token, id]);
+
+
+  useEffect(() => {
+  // Only check for NEW leads
+  if (id) {
+    setHasMarketingConflict(false);
+    return;
+  }
+
+  const phone = formState?.customerInfo?.mobileNumber?.trim();
+  if (!phone || phone.length < 10) {
+    setHasMarketingConflict(false);
+    return;
+  }
+
+  let cancelled = false;
+
+  async function checkConflict() {
+    try {
+      const response = await axios.get(
+        `https://admin.onlybigcars.com/api/marketing/status/?mobile=${encodeURIComponent(phone)}`,
+        {
+          headers: { Authorization: `Token ${token}` }
+        }
+      );
+      
+      if (!cancelled) {
+        // Conflict = customer exists AND already has marketing ON
+        const hasConflict = response.data.customer_exists && response.data.marketing === true;
+        setHasMarketingConflict(hasConflict);
+        console.log('Submit will be blocked:', hasConflict);
+      }
+    } catch (error) {
+      if (!cancelled) setHasMarketingConflict(false);
+    }
+  }
+
+  checkConflict();
+  return () => {
+    cancelled = true;
+  };
+}, [id, formState?.customerInfo?.mobileNumber, token]);
 
   const fetchPreviousLeads = async (phoneNumber) => {
     if (!phoneNumber) return;
@@ -1290,6 +1441,7 @@ useEffect(() => {
                 cceComments: `${prevState.basicInfo.cceComments || ''}\n[AUTO] Data copied from previous lead ${previousLead.id || previousLead.lead_id} on ${new Date().toLocaleString()}`.trim(),
                 caComments: `${prevState.basicInfo.caComments || ''}\n[AUTO] Data copied from previous lead ${previousLead.id || previousLead.lead_id} on ${new Date().toLocaleString()}`.trim(),
               },
+              
               arrivalStatus: {
                 ...prevState.arrivalStatus,
                 leadStatus: 'Duplicate',
@@ -1430,8 +1582,6 @@ useEffect(() => {
 
           setOriginalCaName(leadData.caName || null);
 
-        
-
            // If the lead has images, store them in state
         if (leadData.images && Array.isArray(leadData.images)) {
           setExistingImageUrls(leadData.images);
@@ -1483,6 +1633,7 @@ if (leadData.commission_images && Array.isArray(leadData.commission_images)) {
 
          setFormState({
   ...formState, //14-2
+  callerdesk_recording_url: leadData.callerdesk_recording_url || null,
   overview: {
     tableData: (leadData.products || []).map(row => ({
       ...row,
@@ -2317,47 +2468,36 @@ const getAllServices = () => {
   return Object.values(serviceCards).flat();
 };
 
-// Function to filter services based on search query
-// Function to filter services based on search query (now searches details)
-const getFilteredSuggestions = (query) => {
+const getFilteredServicePackages = (query) => {
   if (!query || query.length < 2) return [];
-
-  const queryLC = query.toLowerCase();
-
-  const results = allIndividualServices
-    .filter(service => service.toLowerCase().includes(queryLC))
-    .map(service => {
-      const serviceLC = service.toLowerCase();
-      let score = 0;
-
-      // Highest score for an exact match or starting with the query
-      if (serviceLC.startsWith(queryLC)) {
-        score = 3;
-      }
-      // Next highest score if the query matches a whole word
-      else if (new RegExp(`\\b${queryLC}\\b`).test(serviceLC)) {
-        score = 2;
-      }
-      // Lowest score for just including the query
-      else {
-        score = 1;
-      }
-      
-      return { service, score };
+  const q = query.toLowerCase();
+  const allServices = getAllServices();
+  return allServices
+    .filter(s => {
+      const titleMatch = s.title?.toLowerCase().includes(q);
+      const detailsHtml = `${s.description || ''} ${s.workshopServices || ''} ${s.doorstepServices || ''}`;
+      const detailsText = stripHtml(detailsHtml).toLowerCase();
+      return titleMatch || detailsText.includes(q);
     })
-    // Sort by score (descending), then alphabetically (ascending)
-    .sort((a, b) => {
-      if (a.score !== b.score) {
-        return b.score - a.score;
-      }
-      return a.service.localeCompare(b.service);
-    })
-    // Extract just the service name from the sorted objects
-    .map(item => item.service)
-    // Finally, limit to the top 5 results
-    .slice(0, 5);
+    .slice(0, 8);
+};
 
-  return results;
+// String-based suggestions for Additional Work
+const getFilteredAdditionalWorkSuggestions = (query) => {
+  if (!query || query.length < 2) return [];
+  const q = query.toLowerCase();
+  return allIndividualServices
+    .filter(name => name.toLowerCase().includes(q))
+    .map(name => {
+      const lc = name.toLowerCase();
+      const score =
+        lc.startsWith(q) ? 3 :
+        new RegExp(`\\b${q}\\b`).test(lc) ? 2 : 1;
+      return { name, score };
+    })
+    .sort((a, b) => a.score !== b.score ? b.score - a.score : a.name.localeCompare(b.name))
+    .map(x => x.name)
+    .slice(0, 8);
 };
 
 // Function to handle suggestion selection
@@ -2437,21 +2577,21 @@ const handleSuggestionSelect = (rowIndex, service) => {
   updateTechnicianComments(newTableData);
 };
 
-// Function to handle input change in sub category field
 const handleSubCategoryChange = (rowIndex, value) => {
   // Update the name field
   handleNameChange(rowIndex, value);
   
-  // Get suggestions and update suggestion state
-  const suggestions = getFilteredSuggestions(value);
+  // Get object-based suggestions and update suggestion state
+  const suggestions = getFilteredServicePackages(value);
   setSuggestionStates(prev => ({
     ...prev,
     [rowIndex]: {
       isOpen: suggestions.length > 0,
-      suggestions: suggestions
+      suggestions
     }
   }));
 };
+
  
   
   const handleAddCar = (carData, isEdit) => {
@@ -2663,6 +2803,15 @@ const validateForm = () => {
   // Modify handleSubmit to handle both create and update
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!id && formState.customerInfo.marketing && hasMarketingConflict) {
+    toast.error('Cannot create lead: another lead for this customer has Marketing ON.', {
+      position: 'top-right',
+      autoClose: 3000
+    });
+    setIsSubmitting(false);
+    return;
+  }
 
   //   if (isSubmitInProgress || isSubmitting) {
   //   console.log('Submission already in progress, ignoring...');
@@ -4720,26 +4869,21 @@ const handleAdditionalWorkChange = (e) => {
   const value = textarea.value;
   const position = textarea.selectionStart;
 
-  // Find the start and end of the current line
   const lineStart = value.lastIndexOf('\n', position - 1) + 1;
   const lineEnd = value.indexOf('\n', position);
   const endOfLine = lineEnd === -1 ? value.length : lineEnd;
-  
   const currentLineText = value.substring(lineStart, endOfLine);
 
-  // Update the main form state
   handleInputChange('arrivalStatus', 'additionalWork', value);
-
-  // Store active line info for suggestion replacement
   setActiveLineInfo({ text: currentLineText, start: lineStart, end: endOfLine });
 
-  // Get suggestions based on the current line's text
-  const suggestions = getFilteredSuggestions(currentLineText);
+  // Get string-based suggestions for Additional Work
+  const suggestions = getFilteredAdditionalWorkSuggestions(currentLineText);
   setSuggestionStates(prev => ({
     ...prev,
-    'additionalWork': {
+    additionalWork: {
       isOpen: suggestions.length > 0 && currentLineText.trim().length > 1,
-      suggestions: suggestions
+      suggestions
     }
   }));
 };
@@ -6225,6 +6369,37 @@ const statusesToHideDateTime = [
     </div>
   </Collapse>
   </div>
+
+  {/* Voice Bot Section - Only show for Bot Call source */}
+  {formState.customerInfo.source === 'Bot Call' && (
+<div className="dropdown-container" style={{ marginTop: "15px" }}>
+  <Button
+    onClick={() => setIsVoiceBotOpen(!isVoiceBotOpen)}
+    variant="dark"
+    className={`w-full d-flex justify-content-between align-items-center rounded-bottom-0 ${isVoiceBotOpen ? 'border-bottom-0' : ''}`}
+  >
+    🤖 Voice Bot
+    {isVoiceBotOpen ? <FaChevronUp /> : <FaChevronDown />}
+  </Button>
+
+  <Collapse in={isVoiceBotOpen} mountOnEnter={true} unmountOnExit={false}>
+    <div>
+      <Card className="rounded-top-0 border-top-0">
+        <Card.Body>
+          {formState.basicInfo.cceComments && 
+           formState.basicInfo.cceComments.includes('Bot:') ? (
+            <VoiceBotDisplay cceComments={formState.basicInfo.cceComments} />
+          ) : (
+            <div className="text-center text-muted py-3">
+              <p>No voice bot data available for this lead.</p>
+            </div>
+          )}
+        </Card.Body>
+      </Card>
+    </div>
+  </Collapse>
+</div>
+  )}
 {/* </div> */}
 
 <div className="dropdown-container" style={{ marginTop: "15px" }}>
@@ -6270,6 +6445,120 @@ const statusesToHideDateTime = [
         </div>
     </Collapse>
 </div>
+
+
+{/* CallerDesk Recording Section - ADD THIS AT THE BOTTOM */}
+<div className="dropdown-container" style={{ marginTop: "15px" }}>
+  <Button
+    onClick={() => setIsCallerDeskOpen(!isCallerDeskOpen)}
+    variant="dark"
+    className={`w-full d-flex justify-content-between align-items-center rounded-bottom-0 ${isCallerDeskOpen ? 'border-bottom-0' : ''}`}
+  >
+    📞 CallerDesk Recording
+    {isCallerDeskOpen ? <FaChevronUp /> : <FaChevronDown />}
+  </Button>
+
+  <Collapse in={isCallerDeskOpen}>
+    <div>
+      <Card className="rounded-top-0 border-top-0">
+        <Card.Body>
+          {formState.callerdesk_recording_url ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              {/* Audio Player */}
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px', display: 'block' }}>
+                  Recording:
+                </label>
+                <audio 
+                  controls 
+                  style={{ width: '100%', maxHeight: '40px' }}
+                >
+                  <source src={formState.callerdesk_recording_url} type="audio/wav" />
+                  <source src={formState.callerdesk_recording_url} type="audio/mpeg" />
+                  Your browser does not support the audio element.
+                </audio>
+              </div>
+              
+              {/* Recording URL Display */}
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px', display: 'block' }}>
+                  Recording URL:
+                </label>
+                <div style={{ 
+                  backgroundColor: '#f3f4f6', 
+                  padding: '10px', 
+                  borderRadius: '6px', 
+                  wordBreak: 'break-all',
+                  fontSize: '12px',
+                  fontFamily: 'monospace',
+                  border: '1px solid #e5e7eb'
+                }}>
+                  {formState.callerdesk_recording_url}
+                </div>
+              </div>
+              
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                {/* Download Button */}
+                <a
+                  href={formState.callerdesk_recording_url}
+                  download="callerdesk_recording.wav"
+                  style={{
+                    flex: '1',
+                    minWidth: '150px',
+                    textAlign: 'center',
+                    padding: '10px 16px',
+                    backgroundColor: '#3b82f6',
+                    color: 'white',
+                    fontSize: '14px',
+                    borderRadius: '6px',
+                    textDecoration: 'none',
+                    display: 'inline-block',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
+                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}
+                >
+                  📥 Download Recording
+                </a>
+                
+                {/* Open in New Tab Button */}
+                <a
+                  href={formState.callerdesk_recording_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    flex: '1',
+                    minWidth: '150px',
+                    textAlign: 'center',
+                    padding: '10px 16px',
+                    backgroundColor: '#10b981',
+                    color: 'white',
+                    fontSize: '14px',
+                    borderRadius: '6px',
+                    textDecoration: 'none',
+                    display: 'inline-block',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#059669'}
+                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#10b981'}
+                >
+                  🔗 Open in New Tab
+                </a>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center text-muted py-3">
+              <p className="text-sm text-gray-500">CallerDesk Recording: N/A</p>
+            </div>
+          )}
+        </Card.Body>
+      </Card>
+    </div>
+  </Collapse>
+</div>
+
+
 </div>
 
             {/* <div className="dropdown-container" style={{ marginTop: "15px" }}>
@@ -6737,6 +7026,7 @@ const statusesToHideDateTime = [
                     <option value="Whatsapp">Whatsapp</option>
                     <option value="Instagram">Instagram</option>
                     <option value="Meta">Meta</option>
+                    <option value="Meta Ads">Meta Ads</option>
                     <option value="Facebook">Facebook</option>
                     <option value="Reference">Reference</option>
                     <option value="Repeat">Repeat</option>
@@ -7584,23 +7874,22 @@ const statusesToHideDateTime = [
         </td>
        
         <td className="p-3 relative">
-          <input
-            type="text"
-            value={row.name}
-            onChange={(e) => handleSubCategoryChange(index, e.target.value)}
-            onFocus={() => {
-              // Show suggestions if there's already text
-              if (row.name && row.name.length >= 2) {
-                const suggestions = getFilteredSuggestions(row.name);
-                setSuggestionStates(prev => ({
-                  ...prev,
-                  [index]: {
-                    isOpen: suggestions.length > 0,
-                    suggestions: suggestions
-                  }
-                }));
-              }
-            }}
+  <input
+    type="text"
+    value={row.name}
+    onChange={(e) => handleSubCategoryChange(index, e.target.value)}
+    onFocus={() => {
+      if (row.name && row.name.length >= 2) {
+        const suggestions = getFilteredServicePackages(row.name); // CHANGED
+        setSuggestionStates(prev => ({
+          ...prev,
+          [index]: {
+            isOpen: suggestions.length > 0,
+            suggestions
+          }
+        }));
+      }
+    }}
             onBlur={(e) => {
               // Check if the click target is within the suggestions dropdown
               const suggestionDropdown = e.currentTarget.parentElement.querySelector('.absolute.z-50');
@@ -8234,18 +8523,18 @@ const statusesToHideDateTime = [
     {isRephrasingAdditionalWork ? '...' : 'Rephrase'}
   </button>
     {suggestionStates['additionalWork']?.isOpen && suggestionStates['additionalWork']?.suggestions?.length > 0 && (
-    <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
-      {suggestionStates['additionalWork'].suggestions.map((service, suggestionIndex) => (
-        <div
-          key={suggestionIndex} // Use index for key since service is a string
-          className="p-2 hover:bg-gray-100 cursor-pointer border-b text-sm"
-          onClick={() => handleAdditionalWorkSuggestionSelect(service)} // Pass the service string directly
-        >
-          {service} {/* Render the service string directly */}
-        </div>
-      ))}
-    </div>
-  )}
+      <div className="absolute z-50 top-full left-0 right-0 bg-white border border-gray-300 rounded-md shadow-lg max-h-48 overflow-y-auto">
+        {suggestionStates['additionalWork'].suggestions.map((service, suggestionIndex) => (
+          <div
+            key={suggestionIndex}                    // CHANGED: string-safe key
+            className="p-2 hover:bg-gray-100 cursor-pointer border-b text-sm"
+            onClick={() => handleAdditionalWorkSuggestionSelect(service)} // CHANGED: pass string
+          >
+            {service}                                // CHANGED: render string
+          </div>
+        ))}
+      </div>
+    )}
 </div>
       </div>
     )}
@@ -9319,8 +9608,9 @@ const statusesToHideDateTime = [
 
             {/* </div> */}
 
+
 {/* Payment Link Section - Now Collapsible and Conditional */}
-{['Job Card', 'Payment Due', 'Commision Due', 'Completed'].includes(formState.arrivalStatus.leadStatus) && (
+{['Payment Due', 'Commision Due', 'Completed'].includes(formState.arrivalStatus.leadStatus) && (
   <div className="w-full p-2 rounded-lg">
     {/* Updated Header with Toggle Button */}
     <div 
@@ -9764,6 +10054,21 @@ const statusesToHideDateTime = [
                                     {/* Right side with buttons */}
                     <div className="flex justify-end gap-3">
 
+                      <label
+                  htmlFor="marketingToggle"
+                  className="flex items-center gap-2 cursor-pointer mr-2"
+                  title="Block new lead creation for this customer"
+                >
+                  <input
+                    id="marketingToggle"
+                    type="checkbox"
+                    checked={formState.customerInfo.marketing}
+                    onChange={(e) => handleToggleMarketing(e.target.checked)}
+                    className="w-4 h-4 text-red-500 border-gray-300 rounded focus:ring-red-500"
+                  />
+                  <span className="text-gray-700 font-medium">Marketing</span>
+                </label>
+
                   <Button 
                     variant="outline-danger" 
                     type="button" 
@@ -9996,7 +10301,7 @@ Generate Bill
                     {isSubmitting ? 'Saving...' : 'Save & Copy'}
                   </Button> */}
 
-                  <Button 
+                  {/* <Button 
   variant="danger"
   type="submit" 
   disabled={isSubmitting || (formState.basicInfo.cceName !== user?.username  && originalCaName !==user?.username && formState.basicInfo.cceName !== "workshop" && !isAdmin)}
@@ -10021,7 +10326,70 @@ Generate Bill
   ) : (
     'Save & Copy'
   )}
+</Button> */}
+
+<Button 
+  variant="danger"
+  type="submit" 
+  disabled={
+    isSubmitting ||
+    (!id && formState.customerInfo.marketing && hasMarketingConflict) ||
+    (formState.basicInfo.cceName !== user?.username && 
+     originalCaName !== user?.username && 
+     formState.basicInfo.cceName !== "workshop" && 
+     !isAdmin)
+  }
+  title={
+    (!id && formState.customerInfo.marketing && hasMarketingConflict)
+      ? "Another lead for this customer already has Marketing ON"
+      : (formState.basicInfo.cceName !== user?.username && 
+         formState.basicInfo.cceName !== "workshop" && 
+         !isAdmin
+          ? "You can only save leads assigned to you or from workshop"
+          : "")
+  }
+  className={`relative flex items-center justify-center min-w-[120px] ${
+    (isSubmitting ||
+     (!id && formState.customerInfo.marketing && hasMarketingConflict) ||
+     (formState.basicInfo.cceName !== user?.username && 
+      formState.basicInfo.cceName !== "workshop" && 
+      !isAdmin))
+      ? 'cursor-not-allowed'
+      : 'cursor-pointer'
+  }`}
+  onClick={(e) => {
+    e.preventDefault();
+    
+    // Check for marketing conflict on new leads
+    if (!id && formState.customerInfo.marketing && hasMarketingConflict) {
+      toast.error('Cannot create lead: another lead for this customer has Marketing ON.', {
+        position: 'top-right',
+        autoClose: 3000
+      });
+      return;
+    }
+    
+    // Set loading state
+    setIsSubmitting(true);
+    
+    // Show loading state for 1 second before submitting
+    setTimeout(() => {
+      handleSubmit(e);
+      setIsSubmitting(false);
+    }, 1000);
+  }}
+>
+  {isSubmitting ? (
+    <>
+      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+      <span>Saving...</span>
+    </>
+  ) : (
+    'Save & Copy'
+  )}
 </Button>
+
+
 
                   {/* <Button 
   variant={location.state?.previousStatus === "Completed" ? "secondary" : "danger"}
