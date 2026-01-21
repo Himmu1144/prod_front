@@ -1,67 +1,152 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Modal, Button } from 'react-bootstrap';
-import { FaCopy, FaPlay, FaComments, FaTimes } from 'react-icons/fa';
+import { FaCopy, FaComments, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import './VoiceBotDisplay.css';
+
+// ✅ BEST PRACTICE: Define outside component
+const formatTimestamp = (timestamp) => {
+  if (!timestamp) return 'N/A';
+  try {
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleTimeString('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  } catch (e) {
+    console.error('Error formatting timestamp:', e);
+    return 'Invalid time';
+  }
+};
 
 const VoiceBotDisplay = ({ cceComments }) => {
   const [showTranscriptModal, setShowTranscriptModal] = useState(false);
   
   // Parse the cce_comments to extract bot call data
-  const parseComments = (comments) => {
-    if (!comments) return null;
+  const botData = useMemo(() => {
+    if (!cceComments) return null;
     
-    const lines = comments.split('\n');
-    const data = {
-      bot: '',
-      campaign: '',
-      duration: '',
-      status: '',
-      recording: '',
-      summary: '',
-      transcript: []
-    };
+    console.log('=== PARSING CCE COMMENTS ===');
+    console.log('Raw cceComments:', cceComments);
     
-    let isTranscript = false;
-    
-    lines.forEach(line => {
-      if (line.startsWith('Bot:')) {
-        data.bot = line.replace('Bot:', '').trim();
-      } else if (line.startsWith('Campaign:')) {
-        data.campaign = line.replace('Campaign:', '').trim();
-      } else if (line.startsWith('Duration:')) {
-        data.duration = line.replace('Duration:', '').trim();
-      } else if (line.startsWith('Status:')) {
-        data.status = line.replace('Status:', '').trim();
-      } else if (line.startsWith('Recording:')) {
-        data.recording = line.replace('Recording:', '').trim();
-      } else if (line.startsWith('Summary:')) {
-        data.summary = line.replace('Summary:', '').trim();
-      } else if (line.startsWith('Transcript:')) {
-        isTranscript = true;
-      } else if (isTranscript && line.trim()) {
-        // Parse transcript line: [10:29:05] bot: Hello! This is Sarah...
-        const match = line.match(/\[([^\]]+)\]\s*(\w+):\s*(.+)/);
-        if (match) {
-          data.transcript.push({
-            timestamp: match[1],
-            speaker: match[2],
-            message: match[3]
+    try {
+      // First, try to find JSON data in the comments
+      const jsonMatch = cceComments.match(/Bot:\s*({[\s\S]*})/);
+      
+      console.log('JSON Match found:', jsonMatch ? 'YES' : 'NO');
+      
+      if (jsonMatch) {
+        // Parse JSON format
+        const parsed = JSON.parse(jsonMatch[1]);
+        console.log('Parsed data:', parsed);
+        console.log('Original messages count:', parsed.messages?.length || 0);
+        
+        // Deduplicate messages
+        const uniqueMessages = [];
+        const seen = new Set();
+        
+        if (parsed.messages && Array.isArray(parsed.messages)) {
+          parsed.messages.forEach((msg, idx) => {
+            // Create unique key from speaker + message content
+            const key = `${msg.speaker}:${msg.message.trim()}`;
+            
+            if (!seen.has(key)) {
+              seen.add(key);
+              uniqueMessages.push(msg);
+              console.log(`Message ${idx}: Added unique message`);
+            } else {
+              console.log(`Message ${idx}: Skipped duplicate`);
+            }
           });
         }
+        
+        console.log('Unique messages count:', uniqueMessages.length);
+        
+        // Format timestamps for display
+        const formattedMessages = uniqueMessages.map(msg => ({
+          ...msg,
+          formattedTime: formatTimestamp(msg.timestamp)
+        }));
+        
+        console.log('Final formatted messages:', formattedMessages);
+        
+        return {
+          bot: parsed.bot_name || 'Voice Bot',
+          campaign: parsed.campaign_name || 'N/A',
+          duration: parsed.duration || 'N/A',
+          status: parsed.status || 'N/A',
+          recording: parsed.recording_url || '',
+          summary: parsed.summary || '',
+          transcript: formattedMessages,
+          messageCount: formattedMessages.length
+        };
+      } else {
+        // Fallback to plain text parsing (your old format)
+        console.log('Using plain text fallback parsing');
+        const lines = cceComments.split('\n');
+        const data = {
+          bot: '',
+          campaign: '',
+          duration: '',
+          status: '',
+          recording: '',
+          summary: '',
+          transcript: [],
+          messageCount: 0
+        };
+        
+        let isTranscript = false;
+        
+        lines.forEach(line => {
+          if (line.startsWith('Bot:')) {
+            data.bot = line.replace('Bot:', '').trim();
+          } else if (line.startsWith('Campaign:')) {
+            data.campaign = line.replace('Campaign:', '').trim();
+          } else if (line.startsWith('Duration:')) {
+            data.duration = line.replace('Duration:', '').trim();
+          } else if (line.startsWith('Status:')) {
+            data.status = line.replace('Status:', '').trim();
+          } else if (line.startsWith('Recording:')) {
+            data.recording = line.replace('Recording:', '').trim();
+          } else if (line.startsWith('Summary:')) {
+            data.summary = line.replace('Summary:', '').trim();
+          } else if (line.startsWith('Transcript:')) {
+            isTranscript = true;
+          } else if (isTranscript && line.trim()) {
+            const match = line.match(/\[([^\]]+)\]\s*(\w+):\s*(.+)/);
+            if (match) {
+              data.transcript.push({
+                timestamp: match[1],
+                formattedTime: match[1],
+                speaker: match[2],
+                message: match[3]
+              });
+            }
+          }
+        });
+        
+        data.messageCount = data.transcript.length;
+        console.log('Plain text parsed data:', data);
+        return data;
       }
-    });
-    
-    return data;
-  };
+    } catch (error) {
+      console.error('Error parsing voice bot data:', error);
+      return null;
+    }
+  }, [cceComments]);
   
-  const botData = parseComments(cceComments);
+  console.log('Final botData:', botData);
+  console.log('Transcript length:', botData?.transcript?.length);
   
   if (!botData || !botData.bot) {
-    return null; // Don't show if no bot data
+    console.log('No botData or bot name, returning null');
+    return null;
   }
 
-  const hasValidRecordingUrl = botData.recording && botData.recording !== 'N/A' && botData.recording.startsWith('http');
+  const hasValidRecordingUrl = botData.recording && 
+                               botData.recording !== 'N/A' && 
+                               botData.recording.startsWith('http');
   
   const copyRecordingUrl = () => {
     if (hasValidRecordingUrl) {
@@ -69,14 +154,6 @@ const VoiceBotDisplay = ({ cceComments }) => {
       toast.success('Recording URL copied to clipboard!');
     } else {
       toast.info('No recording URL available to copy');
-    }
-  };
-  
-  const openRecording = () => {
-    if (hasValidRecordingUrl) {
-      window.open(botData.recording, '_blank');
-    } else {
-      toast.info('No recording URL available');
     }
   };
 
@@ -98,13 +175,6 @@ const VoiceBotDisplay = ({ cceComments }) => {
           <span className="info-label">⏱️ Duration:</span>
           <span className="info-value">{botData.duration}</span>
         </div>
-        
-        {/* <div className="info-row">
-          <span className="info-label">✅ Status:</span>
-          <span className={`info-value status-${botData.status.toLowerCase()}`}>
-            {botData.status}
-          </span>
-        </div> */}
       </div>
 
       {/* Summary Card */}
@@ -115,7 +185,7 @@ const VoiceBotDisplay = ({ cceComments }) => {
         </div>
       )}
 
-      {/* Recording Card - Always visible */}
+      {/* Recording Card - SIMPLIFIED */}
       <div className="recording-card">
         <div className="recording-header">🎵 Call Recording</div>
         
@@ -124,17 +194,8 @@ const VoiceBotDisplay = ({ cceComments }) => {
           {botData.recording || 'No recording URL available'}
         </div>
 
-        {/* Action Buttons */}
+        {/* Copy Button */}
         <div className="recording-actions">
-          {/* <button 
-            className="recording-btn play-btn"
-            onClick={openRecording}
-            disabled={!hasValidRecordingUrl}
-            title={hasValidRecordingUrl ? "Play Recording" : "No recording available"}
-          >
-            <FaPlay className="btn-icon" />
-            Play Recording
-          </button> */}
           <button 
             className="recording-btn copy-btn"
             onClick={copyRecordingUrl}
@@ -152,10 +213,13 @@ const VoiceBotDisplay = ({ cceComments }) => {
         <div className="transcript-card">
           <button 
             className="transcript-btn"
-            onClick={() => setShowTranscriptModal(true)}
+            onClick={() => {
+              console.log('Opening transcript modal with messages:', botData.transcript);
+              setShowTranscriptModal(true);
+            }}
           >
             <FaComments className="btn-icon" />
-            Show Transcript ({botData.transcript.length} messages)
+            Show Transcript ({botData.messageCount} unique messages)
           </button>
         </div>
       )}
@@ -169,7 +233,7 @@ const VoiceBotDisplay = ({ cceComments }) => {
         className="transcript-modal"
       >
         <Modal.Header>
-          <Modal.Title>💬 Call Transcript</Modal.Title>
+          <Modal.Title>💬 Call Transcript ({botData.messageCount} unique messages)</Modal.Title>
           <button 
             className="modal-close-btn"
             onClick={() => setShowTranscriptModal(false)}
@@ -180,22 +244,30 @@ const VoiceBotDisplay = ({ cceComments }) => {
         </Modal.Header>
         <Modal.Body className="transcript-body">
           <div className="transcript-chat-container">
-            {botData.transcript.map((msg, index) => (
-              <div 
-                key={index} 
-                className={`chat-message ${msg.speaker === 'bot' ? 'bot-message' : 'human-message'}`}
-              >
-                <div className="message-bubble">
-                  <div className="message-header">
-                    <span className="speaker-name">
-                      {msg.speaker === 'bot' ? '🤖 Bot' : '👤 Customer'}
-                    </span>
-                    <span className="message-time">{msg.timestamp}</span>
+            {console.log('Rendering messages:', botData.transcript)}
+            {botData.transcript && botData.transcript.length > 0 ? (
+              botData.transcript.map((msg, index) => {
+                console.log(`Rendering message ${index}:`, msg);
+                return (
+                  <div 
+                    key={`${msg.speaker}-${index}-${msg.timestamp || index}`}
+                    className={`chat-message ${msg.speaker === 'bot' ? 'bot-message' : 'human-message'}`}
+                  >
+                    <div className="message-bubble">
+                      <div className="message-header">
+                        <span className="speaker-name">
+                          {msg.speaker === 'bot' ? '🤖 Bot' : '👤 Customer'}
+                        </span>
+                        <span className="message-time">{msg.formattedTime}</span>
+                      </div>
+                      <div className="message-text">{msg.message}</div>
+                    </div>
                   </div>
-                  <div className="message-text">{msg.message}</div>
-                </div>
-              </div>
-            ))}
+                );
+              })
+            ) : (
+              <div className="no-messages">No messages to display</div>
+            )}
           </div>
         </Modal.Body>
         <Modal.Footer>

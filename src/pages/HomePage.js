@@ -1471,6 +1471,8 @@ const excelData = response.data.leads.map(lead => ({
                             <option value="Website">Website</option>
                             <option value="Google Ads">Google Ads</option>
                             <option value="Whatsapp">Whatsapp</option>
+                            <option value="Web Order">Web Order</option>
+                            <option value=" Bot Call">Bot Call</option>
                             <option value="Instagram">Instagram</option>
                             <option value="Meta">Meta</option>
                             <option value="Meta Ads">Meta Ads</option>
@@ -2141,7 +2143,8 @@ const excelData = response.data.leads.map(lead => ({
   </div>
 )}
 
-
+                {/* Hide search field on mobile when status filter is active */}
+                {!(isMobile && dataFromFilter && filterFormData.status) && (
                 <div className="flex items-center justify-center flex-1">
                     <div className="relative w-96"> {/* Fixed width for search field */}
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
@@ -2160,6 +2163,7 @@ const excelData = response.data.leads.map(lead => ({
                         Apply
                     </button>
                 </div>
+                )}
 
                 <div className="flex gap-2">
                     {!isMobile && (
@@ -2345,9 +2349,12 @@ const excelData = response.data.leads.map(lead => ({
         </span> */}
         <td className="p-2 text-center">
     <div className="flex flex-col items-center gap-2">
-        <span className={`${(lead.status === "Assigned" || (isWx && lead.status === "Referred To Ops")) ? "font-bold text-red-500" : "text-gray-600"}`}>
+        {/* <span className={`${(lead.status === "Assigned" || (isWx && lead.status === "Referred To Ops")) ? "font-bold text-red-500" : "text-gray-600"}`}>
             {lead.status}
-        </span>
+        </span> */}
+        <span className={`${(lead.status === "Assigned" || (isWx && lead.status === "Referred To Ops") || (lead.source === "Web Order" && lead.status === "Referred To Ops")) ? "font-bold text-red-500" : "text-gray-600"}`}>
+    {lead.status}
+</span>
         
         {/* Clean, professional Click2Call button */}
         {/* <button

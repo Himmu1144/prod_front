@@ -93,7 +93,7 @@ const Header = () => {
                 <Container fluid>
                     <Navbar.Brand as={Link} to="/">
                         <img
-                            src="https://onlybigcars.com/wp-content/uploads/2024/11/OnlyBigCars-Logo.png"
+                            src="https://storage.googleapis.com/onlybigcars-crm/media/obc_loogbg.png"
                             width="210"
                             className="d-inline-block align-top"
                             alt="OnlyBigCars"

@@ -479,6 +479,20 @@ const sharePaymentLinkWhatsApp = () => {
 };
 
 
+// Add this helper function after getPaymentValidation()
+const getCommissionValidation = () => {
+  const finalAmount = parseFloat(formState.arrivalStatus.finalAmount) || 0;
+  const commissionReceived = parseFloat(formState.arrivalStatus.commissionReceived) || 0;
+  const commissionDue = parseFloat(formState.arrivalStatus.commissionDue) || 0;
+  const sum = commissionReceived + commissionDue;
+  
+  const isInvalid = sum > finalAmount && finalAmount > 0;
+  
+  return {
+    isInvalid,
+    message: isInvalid ? `Commission total (${sum}) exceeds final amount (${finalAmount})` : null
+  };
+};
 
 const textareaRef = useRef(null);       // ref to the textarea element
 // inside your component function, add these hooks near other hooks:
@@ -7027,6 +7041,7 @@ const statusesToHideDateTime = [
                     <option value="Instagram">Instagram</option>
                     <option value="Meta">Meta</option>
                     <option value="Meta Ads">Meta Ads</option>
+                    <option value="Web Order">Web Order</option>
                     <option value="Facebook">Facebook</option>
                     <option value="Reference">Reference</option>
                     <option value="Repeat">Repeat</option>
@@ -8133,7 +8148,7 @@ const statusesToHideDateTime = [
           const nextStatus = getNextSellBuyStatus(previousStatus);
           const shouldDisable = status !== nextStatus;
           return (
-            <option key={status} value={status} disabled={shouldDisable}>
+            <option key={status} value={status}>
               {status}
             </option>
           );
@@ -8677,286 +8692,362 @@ const statusesToHideDateTime = [
 
   {/* Commission Due specific fields */}
     {/* Commission Due specific fields */}
-      {formState.arrivalStatus.leadStatus === 'Commision Due' && (
-        <>
-          {/* --- DESKTOP VIEW --- */}
-          {!isMobile && (
-            <>
-              {/* Row 1: Final Amount, Commission Received, Commission Percent */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
-                {/* Final Amount Field */}
-                {(() => {
-                  const validation = getPaymentValidation();
-                  return (
-                    <div className="relative border border-gray-300 rounded-md bg-white group">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={formState.arrivalStatus.finalAmount ?? ''}
-                        onChange={(e) => handlePaymentFieldChange('finalAmount', e.target.value)}
-                        className={`w-full p-2 border-0 focus:outline-none rounded-md peer ${validation.isInvalid ? 'bg-red-50 text-red-700' : ''}`}
-                        required
-                        id="finalAmount"
-                        placeholder=" "
-                      />
-                      <label
-                        htmlFor="finalAmount"
-                        className={`absolute duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1 ${validation.isInvalid ? 'text-red-600' : 'text-gray-500'}`}
-                      >
-                        Final Amount
-                      </label>
-                    </div>
-                  );
-                })()}
-
-                {/* Commission Received Field */}
-                <div className="relative border border-gray-300 rounded-md bg-white group">
-                  <input
-                    type="text"
-                    value={formState.arrivalStatus.commissionReceived === 0 ? '0' : formState.arrivalStatus.commissionReceived}
-                    onChange={(e) => handleCommissionChange('commissionReceived', e.target.value)}
-                    className="w-full p-2 border-0 focus:outline-none rounded-md peer"
-                    disabled={location.state?.previousStatus === "Completed"}
-                    required
-                    id="commissionReceived"
-                  />
-                  <label
-                    htmlFor="commissionReceived"
-                    className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
-                  >
-                    Commission Received
-                  </label>
-                </div>
-
-                {/* Commission Percent Field */}
-                <div className="relative border border-gray-300 rounded-md bg-white group">
-                  <input
-                    type="text"
-                    id="commissionPercent"
-                    value={formState.arrivalStatus.commissionPercent === 0 ? '0' : formState.arrivalStatus.commissionPercent}
-                    onChange={(e) => handleCommissionChange('commissionPercent', e.target.value)}
-                    className="w-full p-2 pr-7 border-0 focus:outline-none rounded-md peer"
-                    placeholder=" "
-                    disabled={location.state?.previousStatus === "Completed"}
-                    required
-                  />
-                  <label
-                    htmlFor="commissionPercent"
-                    className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
-                  >
-                    Commission Percent
-                  </label>
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
-                    %
-                  </div>
-                </div>
+{formState.arrivalStatus.leadStatus === 'Commision Due' && (
+  <>
+    {/* --- DESKTOP VIEW --- */}
+    {!isMobile && (
+      <>
+        {/* Row 1: Final Amount, Commission Received, Commission Percent */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+          {/* Final Amount Field */}
+          {(() => {
+            const commissionValidation = getCommissionValidation();
+            return (
+              <div className={`relative border rounded-md bg-white group ${
+                commissionValidation.isInvalid ? 'border-red-300' : 'border-gray-300'
+              }`}>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formState.arrivalStatus.finalAmount ?? ''}
+                  onChange={(e) => handlePaymentFieldChange('finalAmount', e.target.value)}
+                  className={`w-full p-2 border-0 focus:outline-none rounded-md peer ${
+                    commissionValidation.isInvalid ? 'bg-red-50 text-red-700' : ''
+                  }`}
+                  required
+                  id="finalAmount"
+                  placeholder=" "
+                />
+                <label
+                  htmlFor="finalAmount"
+                  className={`absolute duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1 ${
+                    commissionValidation.isInvalid ? 'text-red-600' : 'text-gray-500'
+                  }`}
+                >
+                  Final Amount
+                </label>
               </div>
+            );
+          })()}
 
-              {/* Row 2: Commission Due, GST Percent */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
-                {/* Commission Due Field */}
-                <div className="relative border border-gray-300 rounded-md bg-white group">
-                  <input
-                    type="text"
-                    value={formState.arrivalStatus.commissionDue === 0 ? '0' : formState.arrivalStatus.commissionDue}
-                    onChange={(e) => handleCommissionChange('commissionDue', e.target.value)}
-                    className="w-full p-2 border-0 focus:outline-none rounded-md peer"
-                    disabled={location.state?.previousStatus === "Completed"}
-                    required
-                    id="commissionDue"
-                  />
-                  <label
-                    htmlFor="commissionDue"
-                    className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
-                  >
-                    Commission Due
-                  </label>
-                </div>
-
-                {/* GST % Field */}
-                <div className="relative border border-gray-300 rounded-md bg-white group">
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={formState.arrivalStatus.gst === 0 ? '' : (formState.arrivalStatus.gst || '')}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (value === '' || (!isNaN(value) && parseFloat(value) >= 0 && parseFloat(value) <= 100)) {
-                        handleInputChange('arrivalStatus', 'gst', value);
-                      }
-                    }}
-                    onKeyPress={(e) => {
-                      if (!/[0-9.]/.test(e.key) && !['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-                        e.preventDefault();
-                      }
-                    }}
-                    className="w-full p-2 pr-7 border-0 focus:outline-none rounded-md peer placeholder-transparent"
-                    disabled={location.state?.previousStatus === "Completed"}
-                    id="gstField"
-                    placeholder=" "
-                  />
-                  <label
-                    htmlFor="gstField"
-                    className="absolute text-gray-500 duration-300 transform scale-75 -translate-y-4 top-2 z-10 origin-[0] bg-white px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:scale-75 peer-focus:-translate-y-4 peer-focus:top-2 left-1"
-                  >
-                    GST % (Suggested: {calculateAverageGST(formState.overview.tableData)}%)
-                  </label>
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
-                    %
-                  </div>
-                </div>
+          {/* Commission Received Field */}
+          {(() => {
+            const commissionValidation = getCommissionValidation();
+            return (
+              <div className={`relative border rounded-md bg-white group ${
+                commissionValidation.isInvalid ? 'border-red-300' : 'border-gray-300'
+              }`}>
+                <input
+                  type="text"
+                  value={formState.arrivalStatus.commissionReceived === 0 ? '0' : formState.arrivalStatus.commissionReceived}
+                  onChange={(e) => handleCommissionChange('commissionReceived', e.target.value)}
+                  className={`w-full p-2 border-0 focus:outline-none rounded-md peer ${
+                    commissionValidation.isInvalid ? 'bg-red-50 text-red-700' : ''
+                  }`}
+                  disabled={location.state?.previousStatus === "Completed"}
+                  required
+                  id="commissionReceived"
+                />
+                <label
+                  htmlFor="commissionReceived"
+                  className={`absolute duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1 ${
+                    commissionValidation.isInvalid ? 'text-red-600' : 'text-gray-500'
+                  }`}
+                >
+                  Commission Received
+                </label>
               </div>
-            </>
-          )}
+            );
+          })()}
 
-          {/* --- MOBILE VIEW --- */}
-          {isMobile && (
-            <>
-              {/* Final Amount (Original Layout for Mobile) */}
-              <div className="grid grid-cols-1 gap-2 mb-3">
-                {(() => {
-                  const validation = getPaymentValidation();
-                  return (
-                    <div className="relative border border-gray-300 rounded-md bg-white group">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={formState.arrivalStatus.finalAmount ?? ''}
-                        onChange={(e) => handlePaymentFieldChange('finalAmount', e.target.value)}
-                        className={`w-full p-2 border-0 focus:outline-none rounded-md peer ${validation.isInvalid ? 'bg-red-50 text-red-700' : ''}`}
-                        required
-                        id="finalAmountMobile"
-                        placeholder=" "
-                      />
-                      <label
-                        htmlFor="finalAmountMobile"
-                        className={`absolute duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1 ${validation.isInvalid ? 'text-red-600' : 'text-gray-500'}`}
-                      >
-                        Final Amount
-                      </label>
-                    </div>
-                  );
-                })()}
+          {/* Commission Percent Field */}
+          <div className="relative border border-gray-300 rounded-md bg-white group">
+            <input
+              type="text"
+              id="commissionPercent"
+              value={formState.arrivalStatus.commissionPercent === 0 ? '0' : formState.arrivalStatus.commissionPercent}
+              onChange={(e) => handleCommissionChange('commissionPercent', e.target.value)}
+              className="w-full p-2 pr-7 border-0 focus:outline-none rounded-md peer"
+              placeholder=" "
+              disabled={location.state?.previousStatus === "Completed"}
+              required
+            />
+            <label
+              htmlFor="commissionPercent"
+              className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+            >
+              Commission Percent
+            </label>
+            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
+              %
+            </div>
+          </div>
+        </div>
+
+        {/* Error Message Row - DESKTOP */}
+        {(() => {
+          const validation = getCommissionValidation();
+          return validation.isInvalid && (
+            <div className="col-span-3 mb-3">
+              <div className="bg-red-50 border border-red-200 rounded-md p-3 flex items-center">
+                <svg className="w-5 h-5 text-red-500 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                <span className="text-red-700 text-sm font-medium">
+                  {validation.message}
+                </span>
               </div>
-              {/* Commission and GST Fields (Original Layout for Mobile) */}
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <div className="relative border border-gray-300 rounded-md bg-white group">
-                  <input
-                    type="text"
-                    value={formState.arrivalStatus.commissionDue === 0 ? '0' : formState.arrivalStatus.commissionDue}
-                    onChange={(e) => handleCommissionChange('commissionDue', e.target.value)}
-                    className="w-full p-2 border-0 focus:outline-none rounded-md peer"
-                    disabled={location.state?.previousStatus === "Completed"}
-                    required
-                    id="commissionDueMobile"
-                  />
-                  <label
-                    htmlFor="commissionDueMobile"
-                    className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
-                  >
-                    Commision Due
-                  </label>
-                </div>
+            </div>
+          );
+        })()}
 
-                <div className="relative border border-gray-300 rounded-md bg-white group">
-                  <input
-                    type="text"
-                    value={formState.arrivalStatus.commissionReceived === 0 ? '0' : formState.arrivalStatus.commissionReceived}
-                    onChange={(e) => handleCommissionChange('commissionReceived', e.target.value)}
-                    className="w-full p-2 border-0 focus:outline-none rounded-md peer"
-                    disabled={location.state?.previousStatus === "Completed"}
-                    required
-                    id="commissionReceivedMobile"
-                  />
-                  <label
-                    htmlFor="commissionReceivedMobile"
-                    className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
-                  >
-                    Commission Received
-                  </label>
-                </div>
-
-                {/* <div className="relative">
-                  <input
-                    type="text"
-                    value={formState.arrivalStatus.commissionPercent === 0 ? '0' : formState.arrivalStatus.commissionPercent}
-                    onChange={(e) => handleCommissionChange('commissionPercent', e.target.value)}
-                    placeholder="Commission Percent"
-                    className="p-2 pr-7 border border-gray-300 rounded-md w-full"
-                    disabled={location.state?.previousStatus === "Completed"}
-                    required
-                  />
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
-                    %
-                  </div>
-                </div> */}
-
-                 <div className="relative border border-gray-300 rounded-md bg-white group">
-                  <input
-                    type="text"
-                    id="commissionPercent"
-                    value={formState.arrivalStatus.commissionPercent === 0 ? '0' : formState.arrivalStatus.commissionPercent}
-                    onChange={(e) => handleCommissionChange('commissionPercent', e.target.value)}
-                    className="w-full p-2 pr-7 border-0 focus:outline-none rounded-md peer"
-                    placeholder=" "
-                    disabled={location.state?.previousStatus === "Completed"}
-                    required
-                  />
-                  <label
-                    htmlFor="commissionPercent"
-                    className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
-                  >
-                    Commission Percent
-                  </label>
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
-                    %
-                  </div>
-                </div>
-              {/* </div> */}
-
-                <div className={`relative border border-gray-300 rounded-md bg-white group`}>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={formState.arrivalStatus.gst === 0 ? '' : (formState.arrivalStatus.gst || '')}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (value === '' || (!isNaN(value) && parseFloat(value) >= 0 && parseFloat(value) <= 100)) {
-                        handleInputChange('arrivalStatus', 'gst', value);
-                      }
-                    }}
-                    onKeyPress={(e) => {
-                      if (!/[0-9.]/.test(e.key) && !['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-                        e.preventDefault();
-                      }
-                    }}
-                    className="w-full p-2 pr-7 border-0 focus:outline-none rounded-md peer placeholder-transparent"
-                    disabled={location.state?.previousStatus === "Completed"}
-                    id="gstFieldMobile"
-                    placeholder=" "
-                  />
-                  <label
-                    htmlFor="gstFieldMobile"
-                    className="absolute text-gray-500 duration-300 transform scale-75 -translate-y-4 top-2 z-10 origin-[0] bg-white px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:scale-75 peer-focus:-translate-y-4 peer-focus:top-2 left-1"
-                  >
-                    GST % (Suggested: {calculateAverageGST(formState.overview.tableData)}%)
-                  </label>
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
-                    %
-                  </div>
-                </div>
+        {/* Row 2: Commission Due, GST Percent */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+          {/* Commission Due Field */}
+          {(() => {
+            const commissionValidation = getCommissionValidation();
+            return (
+              <div className={`relative border rounded-md bg-white group ${
+                commissionValidation.isInvalid ? 'border-red-300' : 'border-gray-300'
+              }`}>
+                <input
+                  type="text"
+                  value={formState.arrivalStatus.commissionDue === 0 ? '0' : formState.arrivalStatus.commissionDue}
+                  onChange={(e) => handleCommissionChange('commissionDue', e.target.value)}
+                  className={`w-full p-2 border-0 focus:outline-none rounded-md peer ${
+                    commissionValidation.isInvalid ? 'bg-red-50 text-red-700' : ''
+                  }`}
+                  disabled={location.state?.previousStatus === "Completed"}
+                  required
+                  id="commissionDue"
+                />
+                <label
+                  htmlFor="commissionDue"
+                  className={`absolute duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1 ${
+                    commissionValidation.isInvalid ? 'text-red-600' : 'text-gray-500'
+                  }`}
+                >
+                  Commission Due
+                </label>
               </div>
-            </>
-          )}
-        </>
-      )}
+            );
+          })()}
 
+          {/* GST % Field */}
+          <div className="relative border border-gray-300 rounded-md bg-white group">
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              value={formState.arrivalStatus.gst === 0 ? '' : (formState.arrivalStatus.gst || '')}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === '' || (!isNaN(value) && parseFloat(value) >= 0 && parseFloat(value) <= 100)) {
+                  handleInputChange('arrivalStatus', 'gst', value);
+                }
+              }}
+              onKeyPress={(e) => {
+                if (!/[0-9.]/.test(e.key) && !['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                  e.preventDefault();
+                }
+              }}
+              className="w-full p-2 pr-7 border-0 focus:outline-none rounded-md peer placeholder-transparent"
+              disabled={location.state?.previousStatus === "Completed"}
+              id="gstField"
+              placeholder=" "
+            />
+            <label
+              htmlFor="gstField"
+              className="absolute text-gray-500 duration-300 transform scale-75 -translate-y-4 top-2 z-10 origin-[0] bg-white px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:scale-75 peer-focus:-translate-y-4 peer-focus:top-2 left-1"
+            >
+              GST % (Suggested: {calculateAverageGST(formState.overview.tableData)}%)
+            </label>
+            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
+              %
+            </div>
+          </div>
+        </div>
+      </>
+    )}
+
+    {/* --- MOBILE VIEW --- */}
+    {isMobile && (
+      <>
+        {/* Final Amount */}
+        <div className="grid grid-cols-1 gap-2 mb-3">
+          {(() => {
+            const commissionValidation = getCommissionValidation();
+            return (
+              <div className={`relative border rounded-md bg-white group ${
+                commissionValidation.isInvalid ? 'border-red-300' : 'border-gray-300'
+              }`}>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formState.arrivalStatus.finalAmount ?? ''}
+                  onChange={(e) => handlePaymentFieldChange('finalAmount', e.target.value)}
+                  className={`w-full p-2 border-0 focus:outline-none rounded-md peer ${
+                    commissionValidation.isInvalid ? 'bg-red-50 text-red-700' : ''
+                  }`}
+                  required
+                  id="finalAmountMobile"
+                  placeholder=" "
+                />
+                <label
+                  htmlFor="finalAmountMobile"
+                  className={`absolute duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1 ${
+                    commissionValidation.isInvalid ? 'text-red-600' : 'text-gray-500'
+                  }`}
+                >
+                  Final Amount
+                </label>
+              </div>
+            );
+          })()}
+        </div>
+
+        {/* Error Message - MOBILE */}
+        {(() => {
+          const validation = getCommissionValidation();
+          return validation.isInvalid && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-2 mb-2 flex items-start text-xs">
+              <svg className="w-4 h-4 text-red-500 mr-1 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 18.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              <span className="text-red-700 font-medium">
+                {validation.message}
+              </span>
+            </div>
+          );
+        })()}
+
+        {/* Commission Fields */}
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          {/* Commission Due */}
+          {(() => {
+            const commissionValidation = getCommissionValidation();
+            return (
+              <div className={`relative border rounded-md bg-white group ${
+                commissionValidation.isInvalid ? 'border-red-300' : 'border-gray-300'
+              }`}>
+                <input
+                  type="text"
+                  value={formState.arrivalStatus.commissionDue === 0 ? '0' : formState.arrivalStatus.commissionDue}
+                  onChange={(e) => handleCommissionChange('commissionDue', e.target.value)}
+                  className={`w-full p-2 border-0 focus:outline-none rounded-md peer ${
+                    commissionValidation.isInvalid ? 'bg-red-50 text-red-700' : ''
+                  }`}
+                  disabled={location.state?.previousStatus === "Completed"}
+                  required
+                  id="commissionDueMobile"
+                />
+                <label
+                  htmlFor="commissionDueMobile"
+                  className={`absolute duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1 ${
+                    commissionValidation.isInvalid ? 'text-red-600' : 'text-gray-500'
+                  }`}
+                >
+                  Commission Due
+                </label>
+              </div>
+            );
+          })()}
+
+          {/* Commission Received */}
+          {(() => {
+            const commissionValidation = getCommissionValidation();
+            return (
+              <div className={`relative border rounded-md bg-white group ${
+                commissionValidation.isInvalid ? 'border-red-300' : 'border-gray-300'
+              }`}>
+                <input
+                  type="text"
+                  value={formState.arrivalStatus.commissionReceived === 0 ? '0' : formState.arrivalStatus.commissionReceived}
+                  onChange={(e) => handleCommissionChange('commissionReceived', e.target.value)}
+                  className={`w-full p-2 border-0 focus:outline-none rounded-md peer ${
+                    commissionValidation.isInvalid ? 'bg-red-50 text-red-700' : ''
+                  }`}
+                  disabled={location.state?.previousStatus === "Completed"}
+                  required
+                  id="commissionReceivedMobile"
+                />
+                <label
+                  htmlFor="commissionReceivedMobile"
+                  className={`absolute duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1 ${
+                    commissionValidation.isInvalid ? 'text-red-600' : 'text-gray-500'
+                  }`}
+                >
+                  Commission Received
+                </label>
+              </div>
+            );
+          })()}
+
+          {/* Commission Percent */}
+          <div className="relative border border-gray-300 rounded-md bg-white group">
+            <input
+              type="text"
+              id="commissionPercentMobile"
+              value={formState.arrivalStatus.commissionPercent === 0 ? '0' : formState.arrivalStatus.commissionPercent}
+              onChange={(e) => handleCommissionChange('commissionPercent', e.target.value)}
+              className="w-full p-2 pr-7 border-0 focus:outline-none rounded-md peer"
+              placeholder=" "
+              disabled={location.state?.previousStatus === "Completed"}
+              required
+            />
+            <label
+              htmlFor="commissionPercentMobile"
+              className="absolute text-gray-500 duration-300 transform -translate-y-4 scale-75 top-2 z-10 origin-[0] bg-white px-2 peer-focus:px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:top-2 peer-focus:scale-75 peer-focus:-translate-y-4 left-1"
+            >
+              Commission Percent
+            </label>
+            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
+              %
+            </div>
+          </div>
+
+          {/* GST % */}
+          <div className="relative border border-gray-300 rounded-md bg-white group">
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              value={formState.arrivalStatus.gst === 0 ? '' : (formState.arrivalStatus.gst || '')}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === '' || (!isNaN(value) && parseFloat(value) >= 0 && parseFloat(value) <= 100)) {
+                  handleInputChange('arrivalStatus', 'gst', value);
+                }
+              }}
+              onKeyPress={(e) => {
+                if (!/[0-9.]/.test(e.key) && !['Backspace', 'Delete', 'Tab', 'Enter', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                  e.preventDefault();
+                }
+              }}
+              className="w-full p-2 pr-7 border-0 focus:outline-none rounded-md peer placeholder-transparent"
+              disabled={location.state?.previousStatus === "Completed"}
+              id="gstFieldMobile"
+              placeholder=" "
+            />
+            <label
+              htmlFor="gstFieldMobile"
+              className="absolute text-gray-500 duration-300 transform scale-75 -translate-y-4 top-2 z-10 origin-[0] bg-white px-2 peer-placeholder-shown:scale-100 peer-placeholder-shown:-translate-y-1/2 peer-placeholder-shown:top-1/2 peer-focus:scale-75 peer-focus:-translate-y-4 peer-focus:top-2 left-1"
+            >
+              GST % (Suggested: {calculateAverageGST(formState.overview.tableData)}%)
+            </label>
+            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-gray-500">
+              %
+            </div>
+          </div>
+        </div>
+      </>
+    )}
+  </>
+)}
   
 {/* Find the end of Vehicle Images section and add these RIGHT AFTER: */}
 
@@ -9863,6 +9954,7 @@ const statusesToHideDateTime = [
           <option value="Sahil">Sahil</option>
           <option value="Gokul">Gokul</option>
           <option value="Anjali">Anjali</option>
+          <option value="Deepali">Deepali</option>
           <option value="Loknath">Loknath</option>
           
           
@@ -9892,6 +9984,7 @@ const statusesToHideDateTime = [
             <option value="Gokul">Gokul</option>
             <option value="Sahil">Sahil</option>
             <option value="Loknath">Loknath</option>
+            <option value="Deepali">Deepali</option>
             <option value="obcamarjeet">obcamarjeet</option>
             {/* {users.map(user => (
               <option key={user.id} value={user.username}>{user.username}</option>
