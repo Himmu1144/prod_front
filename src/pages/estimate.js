@@ -506,7 +506,6 @@ const PDFDocument = ({ data }) => {
   const mergedData = { ...defaultData, ...data };
 
   const disclaimers = [
-    "All prices are inclusive of taxes",
     "Workshop will provide the tax invoice directly",
     "The colour of engine oil may appear black after servicing in diesel vehicles",
   ];

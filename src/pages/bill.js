@@ -246,7 +246,6 @@ const PDFDocument = ({ data }) => {
   const mergedData = { ...defaultData, ...data };
 
   const terms = [
-    "All prices are inclusive of taxes.",
     "Workshop will provide the tax invoice directly.",
     "The colour of engine oil may appear black after servicing in diesel vehicles.",
     "Payment to be made at the time of delivery.",
